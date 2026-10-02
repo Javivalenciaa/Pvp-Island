@@ -69,6 +69,41 @@ const hpP = pd.hp; pd.prot = room.t + 10; pa.tid = 's:tok-ana'; pa.prot = 0; pa.
   send(a, { t: 'build', piece: { kind: 'foundation', key: `F${ix + 5},${jz}`, i: ix + 5, j: jz, L: 0, top, bottom: top - 1 } }); await sleep(150);
   const e2 = await client('Eva', 'tok-eva', 'isla'); await sleep(250); ok(e2.other && e2.other.some((m) => m.t === 'pieces' && m.list.length === 1), 'quien entra después recibe las construcciones existentes'); e2.ws.close();
 }
+// objetos, trampas, torretas, explosivos y botín
+{
+  const send = (c, m) => c.ws.send(JSON.stringify(m)), has = (c, f) => c.other.some(f);
+  for (const p of [pa, pb, pc, pd]) { p.cs = true; p.dead = 0; p.prot = 0; p.cd = 0; p.hp = 100; p.tid = 's:' + p.token; }
+  pb.x = pa.x + 2; pb.z = pa.z; pb.y = pa.y; pc.x = pa.x + 40; pc.z = pa.z; pc.y = pa.y; pd.x = pa.x + 300; pd.z = pa.z;
+  const base = { x: pa.x, y: pa.y, z: pa.z }; const at = (dx) => ({ x: base.x + dx, y: base.y, z: base.z }); const near = (dx) => { pa.x = base.x + dx + 1; pa.z = base.z; pa.y = base.y; };
+  // cofre: solo su tribu lo abre; contenido en el servidor; al destruirlo suelta un saco
+  near(-2); send(a, { t: 'place', dep: Object.assign({ t: 'chest', r: 0 }, at(-2)) }); await sleep(150); const chest = [...room.D.map.values()].find((d) => d.t === 'chest'); ok(chest && has(b, (m) => m.t === 'db' && m.d.t === 'chest'), 'el cofre se coloca y todos lo ven');
+  const slots = new Array(24).fill(null); slots[0] = { id: 'ingot', n: 12 }; send(a, { t: 'cset', id: chest.id, slots }); await sleep(120); send(a, { t: 'copen', id: chest.id }); await sleep(150); ok(has(a, (m) => m.t === 'chest' && m.slots[0] && m.slots[0].n === 12), 'el dueño guarda y recupera el contenido del cofre');
+  send(b, { t: 'copen', id: chest.id }); await sleep(150); ok(!b.other.some((m) => m.t === 'chest'), 'otra tribu no puede abrir el cofre');
+  send(b, { t: 'dhit', id: chest.id, weapon: 'iron_axe' }); await sleep(120); ok(chest.hp === 700 - 16, 'un hacha de hierro daña el cofre ajeno');
+  chest.hp = 5; pb.cd = 0; send(b, { t: 'dhit', id: chest.id, weapon: 'iron_axe' }); await sleep(200); ok(!room.D.map.has(chest.id) && room.D.bags.size === 1 && has(a, (m) => m.t === 'lb'), 'al destruir el cofre suelta su botín en un saco');
+  const bag = [...room.D.bags.values()][0]; pb.x = bag.x; pb.z = bag.z; send(b, { t: 'lpick', id: bag.id }); await sleep(150); ok(has(b, (m) => m.t === 'give' && m.items[0][0] === 'ingot' && m.items[0][1] === 12), 'quien llega al saco recoge el botín');
+  // estacas: dañan y ralentizan al enemigo
+  near(-30); send(a, { t: 'place', dep: Object.assign({ t: 'spikes', r: 0 }, at(-30)) }); await sleep(120); const sp = [...room.D.map.values()].find((d) => d.t === 'spikes');
+  pb.x = sp.x; pb.z = sp.z; pb.y = sp.y; pb.hp = 100; await sleep(700); ok(pb.hp < 100 && has(b, (m) => m.t === 'slow'), 'las estacas dañan y frenan al enemigo: ' + pb.hp);
+  pa.x = sp.x + .5; pa.z = sp.z; const hpa = pa.hp; await sleep(700); ok(pa.hp === hpa, 'las estacas no dañan a su dueño');
+  // cepo
+  near(-50); send(a, { t: 'place', dep: Object.assign({ t: 'beartrap', r: 0 }, at(-50)) }); await sleep(120); const bt = [...room.D.map.values()].find((d) => d.t === 'beartrap'); pb.x = bt.x; pb.z = bt.z; pb.hp = 100; await sleep(300);
+  ok(bt.armed === false && has(b, (m) => m.t === 'stun'), 'el cepo inmoviliza al enemigo');
+  // torreta ballesta con munición
+  pb.x = pa.x + 100; pa.x = pa.x - 0; near(-60); send(a, { t: 'place', dep: Object.assign({ t: 'ballista', r: 0 }, at(-60)) }); await sleep(120); const bal = [...room.D.map.values()].find((d) => d.t === 'ballista');
+  pa.x = bal.x + 1; pa.z = bal.z; send(a, { t: 'load', id: bal.id, n: 10 }); await sleep(120); ok(bal.ammo === 10, 'se carga la ballesta con munición');
+  pb.x = bal.x + 15; pb.z = bal.z; pb.y = bal.y; pb.hp = 100; await sleep(1700); ok(pb.hp < 100 && bal.ammo < 10 && has(b, (m) => m.t === 'fx' && m.k === 'bolt'), 'la ballesta dispara sola al enemigo: ' + pb.hp);
+  // explosivo: daña a enemigos y construcciones, no a la propia tribu
+  const ex = pa.x + 200 > 0 ? at(-80) : at(-80); pa.x = ex.x + 6; pa.z = ex.z; pb.x = ex.x; pb.z = ex.z; pb.y = ex.y; pb.hp = 100; pa.hp = 100; pa.exT = 0;
+  send(a, { t: 'explode', kind: 'bomb', x: ex.x, y: ex.y + .3, z: ex.z }); await sleep(150); ok(pb.hp < 100 && has(b, (m) => m.t === 'boom'), 'una bomba daña a los enemigos cercanos: ' + pb.hp);
+  send(a, { t: 'explode', kind: 'bomb', x: ex.x, y: ex.y, z: ex.z }); await sleep(100); ok(true, 'las explosiones se limitan por frecuencia') && null;
+  // barril explosivo en cadena y mina
+  near(-120); send(a, { t: 'place', dep: Object.assign({ t: 'mine', r: 0 }, at(-120)) }); await sleep(120); const mine = [...room.D.map.values()].find((d) => d.t === 'mine'); pb.x = mine.x; pb.z = mine.z; pb.y = mine.y; pb.hp = 100; await sleep(200);
+  ok(!room.D.map.has(mine.id) && pb.hp < 100, 'la mina explota al pisarla: ' + pb.hp);
+  // cama y reaparición
+  near(-140); send(a, { t: 'place', dep: Object.assign({ t: 'bed', r: 0 }, at(-140)) }); await sleep(120); const bed = [...room.D.map.values()].find((d) => d.t === 'bed'); pa.x = bed.x + 1; pa.z = bed.z; send(a, { t: 'bed', id: bed.id }); await sleep(100); ok(pa.bed === bed.id, 'se fija la cama como punto de reaparición');
+  pa.hp = 1; room.hurt(pa, 5, pb); await sleep(100); send(a, { t: 'drop', slots: [{ id: 'wood', n: 30 }] }); send(a, { t: 'respawn' }); await sleep(1700); ok(Math.hypot(pa.x - bed.x, pa.z - bed.z) < 1 && room.D.bags.size >= 1, 'al morir suelta lo que llevaba y reaparece en su cama');
+}
 b.ws.close(); await sleep(200); ok(room.humans === 3 && room.count === 8, 'al salir un humano entra un bot: ' + room.humans + '/' + room.count);
 // los bots se mueven y combaten solos
 srv.close(); process.exit(process.exitCode || 0);

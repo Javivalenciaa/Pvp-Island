@@ -492,6 +492,7 @@ const RULES = [
   [/^Te pones: (.+)$/, (m) => `You put on: ${tr(m[1])}`], [/^(\d+) (.+)$/, (m) => (ES_EN[m[2]] ? `${m[1]} ${ES_EN[m[2]]}` : null)], [/^(.+) ×(\d+)$/, (m) => (ES_EN[m[1]] ? `${ES_EN[m[1]]} ×${m[2]}` : null)],
 ].concat(CHAL.map(([re, en]) => [re, (m) => en.replace(/\$(\d)/g, (_, i) => m[i])]));
 Object.assign(ES_EN, { 'Nombre': 'Name', 'Tribu (opcional)': 'Tribe (optional)', 'Servidor': 'Server', 'Conectando…': 'Connecting…', 'No se pudo conectar con el servidor': 'Could not connect to the server', 'Conexión perdida': 'Connection lost', 'La sala está llena': 'The room is full', 'Isla del Hierro': 'Iron Island', 'Cordillera Helada': 'Frozen Range', 'La construcción en línea llegará pronto': 'Online building is coming soon',
+  'Bolsa de botín': 'Loot bag', 'Recoger': 'Pick up', 'Esto no es de tu tribu': 'This does not belong to your tribe', 'No puedes abrir este cofre': 'You cannot open this chest', 'Los recolectores de lluvia aún no funcionan en línea': 'Rain collectors do not work online yet', 'Tu tribu ha alcanzado el límite de objetos': 'Your tribe reached the object limit', 'Objeto no válido': 'Invalid object', 'Pieza no válida': 'Invalid piece', 'Posición no válida': 'Invalid position', 'Ya hay una pieza aquí': 'There is already a piece here', 'Tu tribu ha alcanzado el límite de piezas': 'Your tribe reached the piece limit', 'Esta construcción no es de tu tribu': 'This building does not belong to your tribe', 'Esta puerta no es de tu tribu': 'This door does not belong to your tribe',
   'Aceptar [Y]': 'Accept [Y]', 'Rechazar [N]': 'Decline [N]', 'Abandonar tribu': 'Leave tribe', 'Clic der. (mantener)': 'Right click (hold)', 'Invitar a tribu': 'Invite to tribe', 'Chat': 'Chat', 'Enter': 'Enter',
   'Está demasiado lejos': 'They are too far away', 'Ese jugador ya tiene tribu': 'That player already has a tribe', 'Tu tribu está completa (máximo 3)': 'Your tribe is full (maximum 3)', 'Esa tribu está completa (máximo 3)': 'That tribe is full (maximum 3)', 'Ya tienes tribu': 'You already have a tribe',
   'Tu tribu se ha disuelto': 'Your tribe has been dissolved', 'No tienes tribu': "You don't have a tribe", 'Has abandonado la tribu': 'You left the tribe', 'Escribe y pulsa Enter (/t para tu tribu)': 'Type and press Enter (/t for your tribe)' });
@@ -1852,6 +1853,7 @@ function explode(p, R, dmg, opts) {
   burst(p, 'fire', 18, 2.2); burst(p, 'stone', 12, 1.3); sfx.boom();
   const dpl = Math.hypot(player.pos.x - p.x, player.pos.y + 1 - p.y, player.pos.z - p.z);
   camShake = Math.max(camShake, clamp(1.1 - dpl / 28, 0, .8)); flash = Math.max(flash, clamp(.5 - dpl / 70, 0, .5));
+  if (NET.on) return;
   for (const b of bots.slice()) { const d = Math.hypot(b.pos.x - p.x, b.pos.y + 1 - p.y, b.pos.z - p.z); if (d < R) hurtBot(b, dmg * (1 - d / R * .6), null, opts.src || 'explosion'); }
   if (dpl < R && !opts.noPlayer) hurtPlayer(dmg * .4 * (1 - dpl / R * .6), 'explosion');
   for (const pc of pieces.slice()) {
@@ -1889,6 +1891,7 @@ function updateTurret(d, T, dt) {
 }
 let bellT = -99;
 function updateDeployables(dt) {
+  if (NET.on) return;
   for (const d of deployables.slice()) {
     const def = DEP_DEFS[d.t];
     if (def.turret) updateTurret(d, def.turret, dt);
@@ -1911,6 +1914,7 @@ function updateDeployables(dt) {
   }
 }
 function useDeployable(d) {
+  if (NET.on) return netUse(d);
   const def = DEP_DEFS[d.t];
   if (d.t === 'chest') { if (d.broken) { toast('El Arcón está roto. Repáralo con el martillo.', 'bad'); return; } chestOpen = d; if (!panelOpen) togglePanel(); else renderPanel(true); return; }
   if (def.turret) {
@@ -1945,7 +1949,7 @@ function repairTarget(a) {
   } else {
     const d = a.dep; if (d.hp >= d.maxHp) { toast('No necesita reparación', 'info'); return; }
     c = { wood: 6, stone: 3 }; if (!inv.pay(c)) { toast('Para reparar necesitas ' + costText(c), 'bad'); sfx.bad(); return; }
-    d.hp = Math.min(d.maxHp, d.hp + d.maxHp * .3); if (d.t === 'chest' && d.hp > d.maxHp * .5) { d.broken = false; toast('Arcón reparado', 'info'); }
+    if (NET.on) netSend({ t: 'drepair', id: d.sid }); else d.hp = Math.min(d.maxHp, d.hp + d.maxHp * .3); if (!NET.on && d.t === 'chest' && d.hp > d.maxHp * .5) { d.broken = false; toast('Arcón reparado', 'info'); }
   }
   stats.repairs = (stats.repairs || 0) + 1; chEvent('repair'); sfx.build(); burst(a.p, 'wood', 5);
 }
@@ -2857,7 +2861,7 @@ function segDist(a, b, c) { _sa.subVectors(b, a); const l = _sa.lengthSq() || 1e
 function updateProjs(dt) {
   for (const pr of projs.slice()) {
     pr.life -= dt;
-    if (pr.type === 'bomb' && (pr.fuse -= dt) <= 0) { removeProj(pr); explode(pr.pos.clone().setY(pr.pos.y + .2), pr.R, pr.dmg, { src: 'bomb', pieceMult: .5 }); continue; }
+    if (pr.type === 'bomb' && (pr.fuse -= dt) <= 0) { removeProj(pr); if (NET.on) { netSend({ t: 'explode', kind: 'bomb', x: +pr.pos.x.toFixed(2), y: +pr.pos.y.toFixed(2), z: +pr.pos.z.toFixed(2) }); continue; } explode(pr.pos.clone().setY(pr.pos.y + .2), pr.R, pr.dmg, { src: 'bomb', pieceMult: .5 }); continue; }
     if (pr.stuck) { if (pr.life <= 0) removeProj(pr); continue; }
     pr.vel.y -= PROJ_G[pr.type] * dt;
     const np = pr.pos.clone().addScaledVector(pr.vel, dt);
@@ -3429,17 +3433,18 @@ function togglePanel() {
   else if (!fallbackLook) requestLock();
 }
 $('#closePanel').addEventListener('click', togglePanel);
+function chestSync() { if (NET.on && chestOpen) netSend({ t: 'cset', id: chestOpen.sid, slots: chestOpen.inv.slots.map((sl) => (sl ? { id: sl.id, n: sl.n, dur: sl.dur } : null)) }); }
 ui.cslots.addEventListener('click', (e) => {
   const el = e.target.closest('[data-c]'); if (!el || !chestOpen) return; const i = +el.dataset.c, s = chestOpen.inv.slots[i]; if (!s) return;
   const over = inv.add(s.id, s.n, s.dur); if (over === s.n) { toast('Mochila llena', 'bad'); return; }
-  if (over > 0) s.n = over; else chestOpen.inv.slots[i] = null; chestOpen.inv.touch(); renderPanel(true);
+  if (over > 0) s.n = over; else chestOpen.inv.slots[i] = null; chestOpen.inv.touch(); renderPanel(true); chestSync();
 });
 ui.slots.addEventListener('click', (e) => {
   const el = e.target.closest('[data-i]'); if (!el) return; const i = +el.dataset.i;
   if (chestOpen) {
     const s = inv.slots[i]; if (!s) return;
     const over = chestOpen.inv.add(s.id, s.n, s.dur); if (over === s.n) { toast('El Arcón está lleno', 'bad'); return; }
-    if (over > 0) s.n = over; else inv.slots[i] = null; inv.touch(); renderPanel(true); return;
+    if (over > 0) s.n = over; else inv.slots[i] = null; inv.touch(); renderPanel(true); chestSync(); return;
   }
   if (picked < 0) { if (inv.slots[i]) picked = i; } else { inv.move(picked, i); picked = -1; }
   renderPanel(true);
@@ -3474,10 +3479,11 @@ let aim = null;
 function computeAim() {
   camera.updateMatrixWorld();
   raycaster.setFromCamera(CENTER, camera); raycaster.far = 7;
-  const hits = raycaster.intersectObjects([...nodeMeshes, pieceRoot, depRoot, botRoot, animalRoot, poiRoot, remoteRoot], true);
+  const hits = raycaster.intersectObjects([...nodeMeshes, pieceRoot, depRoot, botRoot, animalRoot, poiRoot, remoteRoot, lootRoot], true);
   for (const h of hits) {
     const o = h.object;
     if (o.isInstancedMesh) { const n = instOwner.get(o)[h.instanceId]; if (n && !n.depleted) return { kind: 'node', n, d: h.distance, p: h.point }; continue; }
+    if (o.userData.loot) return { kind: 'loot', id: o.userData.loot, d: h.distance, p: h.point };
     if (o.userData.remote) return { kind: 'remote', id: o.userData.remote, d: h.distance, p: h.point };
     if (o.userData.bot) return { kind: 'bot', b: o.userData.bot, d: h.distance, p: h.point };
     if (o.userData.animal) return { kind: 'animal', an: o.userData.animal, d: h.distance, p: h.point };
@@ -3567,6 +3573,7 @@ function primaryAction() {
   const { it: tit } = heldTool(); const tool = tit.tool; const tier = tit.tier || 0;
   nextAction = clock + tool.cd; swingT = 0; sfx.swing();
   const a = aim; if (!a || a.d > tool.range) return;
+  if (NET.on && a.kind === 'dep' && tool.type !== 'hammer' && a.dep.owner !== NET.tid) { netSend({ t: 'dhit', id: a.dep.sid, weapon: s ? s.id : 'fists' }); sfx.wood(); burst(a.p, 'wood', 4); if (s && maxDur(s.id) && inv.wear(sel, 1)) toast(ITEMS[s.id].name + ' se ha roto', 'bad'); return; }
   if (NET.on && a.kind === 'piece' && tool.type !== 'hammer' && a.piece.owner !== NET.tid) { netSend({ t: 'phit', key: a.piece.key, weapon: s ? s.id : 'fists' }); const st = a.piece.tier >= 2; (st ? sfx.stone : sfx.wood)(); burst(a.p, st ? 'stone' : 'wood', 4); if (s && maxDur(s.id) && inv.wear(sel, 1)) toast(ITEMS[s.id].name + ' se ha roto', 'bad'); return; }
   if (tool.type === 'hammer' && (a.kind === 'piece' || a.kind === 'dep')) { repairTarget(a); if (s && inv.wear(sel, 1)) toast('El martillo se ha roto', 'bad'); return; }
   if (a.kind === 'dep' && a.dep.t === 'barrel') { damageDep(a.dep, tool.dmg); return; }
@@ -3590,7 +3597,7 @@ function primaryAction() {
 }
 function interact() {
   const a = aim;
-  const useful = a && a.d <= 3.5 && (a.kind === 'piece' || a.kind === 'dep' || a.kind === 'crate');
+  const useful = a && a.d <= 3.5 && (a.kind === 'piece' || a.kind === 'dep' || a.kind === 'crate' || a.kind === 'loot');
   if (!useful && rainDrinkable()) { if (clock >= nextDrink) { nextDrink = clock + .6; player.thirst = Math.min(100, player.thirst + 5); stats.drank = (stats.drank || 0) + 1; sfx.drink(); toast('Agua de lluvia', 5, 'w:rain'); } return; }
   if (!useful && waterAim && (!a || a.d > waterAim.d)) { drink(); return; }
   if (!a || a.d > 3.5) return;
@@ -3608,6 +3615,7 @@ function interact() {
   }
   if (a.kind === 'dep') useDeployable(a.dep);
   if (a.kind === 'crate') openCrate(a.crate);
+  if (a.kind === 'loot') netSend({ t: 'lpick', id: a.id });
 }
 function demolish() {
   const a = aim; if (!a || a.d > 4) return;
@@ -3617,7 +3625,7 @@ function demolish() {
     const c = pieceCost(p.kind, p.tier); for (const k in c) { const back = Math.floor(c[k] / 2); if (back) giveItem(k, back); }
     destroyPiece(p); sfx.build(); return;
   }
-  if (a.kind === 'dep' && !NET.on) { const d = a.dep; removeDeployable(d); giveItem(d.t, 1); sfx.build(); }
+  if (a.kind === 'dep') { const d = a.dep; if (NET.on) { if (d.owner !== NET.tid) { toast('Esto no es de tu tribu', 'bad'); sfx.bad(); } else netSend({ t: 'dremove', id: d.sid }); return; } removeDeployable(d); giveItem(d.t, 1); sfx.build(); }
 }
 
 // ---------------------------------------------------------------- colocación (construcción y objetos)
@@ -3730,7 +3738,10 @@ function updateGhost() {
 }
 function tryPlace() {
   if (!placement) return false;
-  if (NET.on && placement.dep) { if (placement.ok) toast('Los objetos en línea llegarán pronto', 'info'); return true; }
+  if (NET.on && placement.dep) {
+    if (!placement.ok) { toast(placement.why, 'bad'); sfx.bad(); return true; }
+    const sl = inv.slots[sel]; if (!sl) return true; netSend({ t: 'place', dep: { t: placement.dep, x: placement.x, y: placement.y, z: placement.z, r: placement.r } }); inv.takeOne(sel); stats.placed[placement.dep] = (stats.placed[placement.dep] || 0) + 1; return true;
+  }
   if (NET.on && placement.ok) {
     if (!inv.pay(placement.cost)) return true;
     const p = placement; netSend({ t: 'build', piece: { kind: p.kind, key: p.key, i: p.i, j: p.j, L: p.L || 0, dir: p.dir, top: p.top, bottom: p.bottom } }); NET.pendingPay[p.key] = Object.assign({}, p.cost); ghostKey = ''; return true;
@@ -3789,6 +3800,8 @@ function updateHint() {
     const an = a.an;
     if (an.dead) h = `<span>${an.def.name} abatido</span><span class="bar"><i style="width:${an.corpse.hp / 60 * 100}%"></i></span><span>Golpéalo para sacar carne y piel</span>`;
     else h = `<span class="${an.def.temper === 'flee' ? '' : 'warn'}">${an.def.name}${an.def.temper === 'hunt' ? ' (peligroso)' : ''}</span><span class="bar"><i style="width:${an.hp / an.def.hp * 100}%;background:var(--blood)"></i></span>${an.def.temper === 'flee' ? '<span>Acércate sin correr, o usa el arco</span>' : ''}`;
+  } else if (a && a.kind === 'loot') {
+    h = '<span>Bolsa de botín</span><span><span class="key">E</span>Recoger</span>';
   } else if (a && a.kind === 'remote') {
     const r = NET.remotes.get(a.id); if (r) h = `<span class="${r.friend ? '' : 'warn'}">${r.info.name}</span><span class="bar"><i style="width:${r.hp}%;background:${r.friend ? 'var(--moss)' : 'var(--blood)'}"></i></span><span>Tribu: ${r.info.tribe}</span>`;
   } else if (a && a.kind === 'bot') {
@@ -4091,7 +4104,7 @@ function showAd(done) {
 }
 
 // ---------------------------------------------------------------- modo en línea (servidor autoritativo)
-const NET = { pendingPay: {}, on: false, ws: null, id: 0, remotes: new Map(), roster: new Map(), tid: '', tribe: '', name: '', typing: false, invT: 0, invite: null, touchInvite: false, sendT: 0, wantRespawn: false, killFeedT: 0 };
+const NET = { deps: new Map(), bags: new Map(), slowUntil: 0, slowF: 1, pendingPay: {}, on: false, ws: null, id: 0, remotes: new Map(), roster: new Map(), tid: '', tribe: '', name: '', typing: false, invT: 0, invite: null, touchInvite: false, sendT: 0, wantRespawn: false, killFeedT: 0 };
 const remoteRoot = new THREE.Group(); scene.add(remoteRoot);
 const urlParam = (k) => { const m = location.search.match(new RegExp('[?&]' + k + '=([^&]*)')); return m ? decodeURIComponent(m[1]) : ''; };
 const SERVER_URL = urlParam('server') || (location.protocol === 'https:' ? 'wss://pvp-island.example.com' : 'ws://localhost:8080');
@@ -4176,7 +4189,54 @@ function netMsg(m) {
     if (m.by === NET.id) for (const it of m.items || []) { const c = pieceCost(it.kind, it.tier); for (const k in c) { const back = Math.floor(c[k] / 2); if (back) giveItem(k, back); } }
     sfx.build();
   }
+  else if (m.t === 'deps') { for (const d of m.list) netDep(d); }
+  else if (m.t === 'db') { netDep(m.d); sfx.build(); }
+  else if (m.t === 'ddeny') { giveItem(m.key, 1); toast(m.why, 'bad'); sfx.bad(); }
+  else if (m.t === 'dd') { const d = NET.deps.get(m.id); if (d) { burst(new THREE.Vector3(d.x, d.y + .5, d.z), 'wood', 8, 1.2); removeDeployable(d); NET.deps.delete(m.id); if (chestOpen === d) togglePanel(); } if (m.by === NET.id && m.refund) giveItem(m.refund, 1); }
+  else if (m.t === 'dh') { const d = NET.deps.get(m.id); if (d) { const dmg = d.hp > m.hp; d.hp = m.hp; if (dmg && Math.hypot(d.x - player.pos.x, d.z - player.pos.z) < 40) { sfx.wood(); burst(new THREE.Vector3(d.x, d.y + .6, d.z), 'wood', 3); } } }
+  else if (m.t === 'da') { const d = NET.deps.get(m.id); if (d) { if (m.ammo != null) d.ammo = m.ammo; if (m.armed != null) { d.armed = m.armed; if (d.jaws) setTrap(d); sfx.clank(); } if (m.planted != null) { d.planted = m.planted; d.grow = m.grow || 0; if (d.plants) setGarden(d); } } }
+  else if (m.t === 'dammo') { const d = NET.deps.get(m.id); if (d) { if (m.ammo != null) { d.ammo = m.ammo; toast(`Cargada: ${d.ammo}/${DEP_DEFS[d.t].turret.cap} ${ITEMS[DEP_DEFS[d.t].turret.ammo].name.toLowerCase()}`, 'info'); sfx.craft(); } if (m.refund > 0) giveItem(DEP_DEFS[d.t].turret.ammo, m.refund); } }
+  else if (m.t === 'chest') { const d = NET.deps.get(m.id); if (d) { m.slots.forEach((sl, i) => { d.inv.slots[i] = sl && ITEMS[sl.id] ? sl : null; }); d.inv.touch(); chestOpen = d; if (!panelOpen) togglePanel(); else renderPanel(true); } }
+  else if (m.t === 'boom') { explode(new THREE.Vector3(m.x, m.y, m.z), m.R, m.dmg, {}); }
+  else if (m.t === 'fx') netFx(m);
+  else if (m.t === 'slow') { NET.slowUntil = clock + m.dur; NET.slowF = m.s; }
+  else if (m.t === 'stun') { player.stun = m.dur; sfx.clank(); }
+  else if (m.t === 'give') { for (const [id, n] of m.items) if (ITEMS[id]) giveItem(id, n); sfx.craft(); }
+  else if (m.t === 'bags') { for (const b of m.list) netBag(b); }
+  else if (m.t === 'lb') { netBag(m.b); }
+  else if (m.t === 'lx') { const b = NET.bags.get(m.id); if (b) { lootRoot.remove(b.g); disposeModel(b.g); NET.bags.delete(m.id); } }
+  else if (m.t === 'alarm') { sfx.bell(); toast('¡La campana suena: están atacando tu base!', 'bad'); siege.baseHitT = clock; }
   else if (m.t === 'powner') { for (const p of pieces) if (p.owner === m.from) p.owner = m.to; }
+}
+const lootRoot = new THREE.Group(); scene.add(lootRoot);
+function netBag(b) {
+  if (NET.bags.has(b.id)) return; const g = new THREE.Group(), k = new Kit();
+  k.add(gS(10, 8), MT.leather, 0, .22, 0, 0, 0, 0, .3, .26, .3); k.add(gS(7, 5), MT.leatherD, 0, .46, 0, 0, 0, 0, .12, .09, .12); k.add(gRing(.1, .02, 8), MT.rope, 0, .4, 0); k.bake(g);
+  g.position.set(b.x, Math.max(b.y - .3, terrainH(b.x, b.z)), b.z); g.traverse((o) => { o.userData.loot = b.id; }); lootRoot.add(g); NET.bags.set(b.id, { g, id: b.id });
+}
+function netDep(d) {
+  if (NET.deps.has(d.id)) return;
+  const nd = { t: d.t, x: d.x, y: d.y, z: d.z, r: d.r, hp: d.hp, ammo: d.ammo, armed: d.armed, planted: d.planted, grow: d.grow, water: d.water, broken: d.broken, sid: d.id, owner: d.o };
+  addDeployable(nd); NET.deps.set(d.id, nd);
+}
+function netFx(m) {
+  const d = NET.deps.get(m.id), from = new THREE.Vector3(m.x, m.y, m.z), to = new THREE.Vector3(m.tx, m.ty, m.tz);
+  if (d && d.head) d.head.rotation.y = Math.atan2(to.x - from.x, to.z - from.z) - d.r;
+  const dir = to.clone().sub(from), dist = dir.length() || 1; dir.divideScalar(dist);
+  if (m.k === 'bolt') { spawnProj('bolt', from, dir.clone().multiplyScalar(70).add(new THREE.Vector3(0, .3, 0)), { dmg: 0, owner: 'fx' }); sfx.bow(); }
+  else if (m.k === 'flame') { for (let k = 0; k < 4; k++) { const f = .2 + Math.random() * .8; burst(from.clone().addScaledVector(dir, 9.5 * f).add(new THREE.Vector3((Math.random() - .5), 0, (Math.random() - .5))), 'fire', 1, 1.6); } if (Math.random() < .3) sfx.flame(); }
+  else if (m.k === 'shell') { const T = 2.4; spawnProj('shell', from, new THREE.Vector3((to.x - from.x) / T, (to.y + .3 - from.y) / T + 9.8 * T / 2, (to.z - from.z) / T), { dmg: 0, R: 0, owner: 'fx' }); sfx.thud(); }
+}
+function netUse(d) {
+  if (d.owner !== NET.tid && !STATION_NAMES[d.t]) { toast('Esto no es de tu tribu', 'bad'); sfx.bad(); return; }
+  if (d.t === 'chest') { netSend({ t: 'copen', id: d.sid }); return; }
+  const def = DEP_DEFS[d.t];
+  if (def.turret) { const T = def.turret, n = Math.min(T.cap - d.ammo, inv.count(T.ammo)); if (n <= 0) { toast(d.ammo >= T.cap ? 'Está cargada al máximo' : 'Necesitas ' + ITEMS[T.ammo].name.toLowerCase() + ' para cargarla', 'info'); return; } inv.remove(T.ammo, n); netSend({ t: 'load', id: d.sid, n }); return; }
+  if (d.t === 'beartrap') { netSend({ t: 'arm', id: d.sid }); return; }
+  if (d.t === 'garden') { if (!d.planted) { if (!inv.remove('seeds', 1)) { toast('Necesitas semillas (de los arbustos de bayas o fabrícalas con bayas)', 'bad'); return; } netSend({ t: 'gard', id: d.sid, act: 'plant' }); sfx.bush(); } else if (d.grow < 1) toast(`Aún está creciendo (${Math.round(d.grow * 100)}%)`, 'info'); else netSend({ t: 'gard', id: d.sid, act: 'harvest' }); return; }
+  if (d.t === 'bed') { netSend({ t: 'bed', id: d.sid }); return; }
+  if (d.t === 'collector') { toast('Los recolectores de lluvia aún no funcionan en línea', 'info'); return; }
+  if (STATION_NAMES[d.t] && !panelOpen) togglePanel();
 }
 function netPiece(d) {
   if (pieceMap.has(d.key)) return;
@@ -4186,6 +4246,7 @@ function netPiece(d) {
 function netDie(by, cause) {
   if (state === 'dead') return;
   $('#deathTxt').textContent = by ? `Te ha abatido ${by}. Reapareces en otro punto de la isla.` : 'Has muerto. Reapareces en otro punto de la isla.';
+  netSend({ t: 'drop', slots: inv.slots.map((sl) => (sl ? { id: sl.id, n: sl.n, dur: sl.dur } : null)) }); inv.slots.fill(null); inv.touch(); player.armorId = null;
   player.hp = 0; state = 'dead'; mouseL = false; if (panelOpen) togglePanel(); if (locked) document.exitPointerLock(); $('#death').hidden = false;
 }
 function netClose() { try { if (NET.ws) { NET.ws.onclose = null; NET.ws.close(); } } catch (e) { /* ya cerrado */ } NET.ws = null; NET.on = false; document.body.classList.remove('online-on'); }
@@ -4264,7 +4325,7 @@ function updatePlayer(dt) {
   if (player.stamina <= 0) player.exhausted = true; else if (player.stamina > 25) player.exhausted = false;
   const sprint = (keys.ShiftLeft || keys.ShiftRight) && mz > 0 && !player.crouch && !player.exhausted;
   // vadear frena según la profundidad; nadando se avanza despacio
-  const speed = swimming ? (sprint ? 3.4 : 2.4) : (sprint ? 7.8 : player.crouch ? 2.3 : 4.8) * (1 - .45 * smooth(.3, 1.0, depth));
+  const speed = (swimming ? (sprint ? 3.4 : 2.4) : (sprint ? 7.8 : player.crouch ? 2.3 : 4.8) * (1 - .45 * smooth(.3, 1.0, depth))) * (NET.on && clock < NET.slowUntil ? NET.slowF : 1);
   if (sprint && player.moveSpeed > 4) { player.stamina = Math.max(0, player.stamina - 17 * dt); player.staminaT = clock; }
   else if (clock - (player.staminaT || 0) > .8) player.stamina = Math.min(100, player.stamina + (player.hunger < 20 || player.thirst < 20 ? 7 : 18) * dt);
   player.swimUp = swimming && canMove ? (keys.Space ? 16 : 0) + (keys.KeyC || keys.ControlLeft ? -20 : 0) : 0;
@@ -4486,7 +4547,7 @@ updateObjective();
 setLang(LANG);
 requestAnimationFrame(frame);
 // gancho de pruebas: avanza la simulación sin depender de los FPS
-window.__isla = { remoteRoot, pressR(v) { mouseR = v; }, remotes: () => NET.remotes.values(), NET, netMsg, netSend, remoteHit, hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
+window.__isla = { deployables, remoteRoot, pressR(v) { mouseR = v; }, remotes: () => NET.remotes.values(), NET, netMsg, netSend, remoteHit, hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
   player, inv, nodes, pieces, animals, spawnAnimal, LAKES, waterSurfaceAt, stats, giveItem, spawnBot, terrainH, spawn: SPAWN, scene, refreshEnv, renderer, POIS, destroyPiece, post, weather, setWeather(w) { wxState = w; wxTimer = 999; }, ctlData, N, CELL, HALF, camera, pieceRoot, get state() { return state; }, get aim() { return aim; }, get placement() { return placement; }, get waterAim() { return waterAim; },
   sim(sec, hold) { const n = Math.round(sec / .05); for (let k = 0; k < n; k++) { if (hold) mouseL = true; if (hold === 'click' && k === 0) clickQueued = true; waterTime.value += .05; scene.updateMatrixWorld(); tick(.05, performance.now()); } if (hold) mouseL = false; },
   setPhase(p) { dayPhase = p; } };
