@@ -44,6 +44,31 @@ await sleep(1000); a.ws.send(JSON.stringify({ t: 'chat', text: '/t solo tribu' }
 c.ws.send(JSON.stringify({ t: 'tleave' })); await sleep(150); ok(pc.tid === 's:tok-cris' && pa.tid === pb.tid, 'abandonar la tribu');
 // protección al aparecer
 const hpP = pd.hp; pd.prot = room.t + 10; pa.tid = 's:tok-ana'; pa.prot = 0; pa.cd = 0; pa.x = pd.x; pa.z = pd.z; pa.y = pd.y; a.ws.send(JSON.stringify({ t: 'attack', target: d.welcome.id, weapon: 'iron_sword' })); await sleep(150); ok(pd.hp === hpP, 'los jugadores recién llegados están protegidos');
+// construcción autoritativa
+{
+  const send = (c, m) => c.ws.send(JSON.stringify(m)), has = (c, f) => c.other.some(f);
+  const pid = pa.id; for (const p of [pa, pb, pc, pd]) { p.cs = true; p.dead = 0; p.prot = 0; p.cd = 0; }
+  pa.tid = 's:tok-ana'; pb.tid = 's:tok-beto'; pc.tid = 's:tok-cris'; pd.tid = 's:tok-dani';
+  const top = pa.y + .5, ix = Math.floor(pa.x / 3), jz = Math.floor(pa.z / 3);
+  send(a, { t: 'build', piece: { kind: 'wall', key: `Wh${ix},${jz},0`, i: ix, j: jz, L: 0, dir: 'h', top, bottom: top - 1 } }); await sleep(150); ok(has(a, (m) => m.t === 'pdeny'), 'una pared sin cimiento se rechaza');
+  send(a, { t: 'build', piece: { kind: 'foundation', key: `F${ix},${jz}`, i: ix, j: jz, L: 0, top, bottom: top - 1 } }); await sleep(150); ok(has(b, (m) => m.t === 'pb' && m.p.kind === 'foundation' && m.p.o === 's:tok-ana'), 'el cimiento se crea y todos lo ven');
+  send(a, { t: 'build', piece: { kind: 'door', key: `Wh${ix},${jz},0`, i: ix, j: jz, L: 0, dir: 'h', top, bottom: top - 1 } }); await sleep(150); ok(room.B.get(`Wh${ix},${jz},0`), 'la puerta sobre el cimiento se acepta');
+  send(a, { t: 'build', piece: { kind: 'wall', key: `Wv${ix},${jz},0`, i: ix, j: jz, L: 0, dir: 'v', top, bottom: top - 1 } }); await sleep(150);
+  send(b, { t: 'door', key: `Wh${ix},${jz},0` }); await sleep(120); ok(room.B.get(`Wh${ix},${jz},0`).open === false, 'otra tribu no puede abrir la puerta');
+  send(a, { t: 'door', key: `Wh${ix},${jz},0` }); await sleep(120); ok(room.B.get(`Wh${ix},${jz},0`).open === true, 'su dueño sí puede abrirla');
+  send(b, { t: 'upgrade', key: `Wv${ix},${jz},0` }); await sleep(120); ok(room.B.get(`Wv${ix},${jz},0`).tier === 0, 'otra tribu no puede mejorar piezas ajenas');
+  send(a, { t: 'upgrade', key: `Wv${ix},${jz},0` }); await sleep(120); ok(room.B.get(`Wv${ix},${jz},0`).tier === 1, 'el dueño mejora la pared a madera');
+  // raideo: Beto golpea la pared ajena
+  pb.x = pa.x + 1; pb.z = pa.z; pb.y = pa.y; const w = room.B.get(`Wv${ix},${jz},0`), hpw = w.hp; send(b, { t: 'phit', key: w.key, weapon: 'iron_axe' }); await sleep(150);
+  ok(w.hp < hpw && Math.abs((hpw - w.hp) - 14 * 0.75) < .6, 'un hacha de hierro daña la pared ajena con la resistencia de la madera: ' + (hpw - w.hp).toFixed(1));
+  send(a, { t: 'phit', key: w.key, weapon: 'iron_axe' }); await sleep(80); ok(w.hp === hpw - 14 * .75 || w.hp > hpw - 14, 'no se puede dañar la propia construcción');
+  // destruir y derrumbe en cascada: al romper el cimiento caen puerta y pared
+  const f = room.B.get(`F${ix},${jz}`); f.hp = 5; pb.cd = 0; send(b, { t: 'phit', key: f.key, weapon: 'iron_axe' }); await sleep(200);
+  ok(!room.B.get(f.key) && !room.B.get(w.key) && !room.B.get(`Wh${ix},${jz},0`) && has(a, (m) => m.t === 'pd' && m.keys.length === 3), 'al caer el cimiento se derrumba todo lo que sostenía (3 piezas)');
+  // un jugador que entra después recibe las piezas existentes
+  send(a, { t: 'build', piece: { kind: 'foundation', key: `F${ix + 5},${jz}`, i: ix + 5, j: jz, L: 0, top, bottom: top - 1 } }); await sleep(150);
+  const e2 = await client('Eva', 'tok-eva', 'isla'); await sleep(250); ok(e2.other && e2.other.some((m) => m.t === 'pieces' && m.list.length === 1), 'quien entra después recibe las construcciones existentes'); e2.ws.close();
+}
 b.ws.close(); await sleep(200); ok(room.humans === 3 && room.count === 8, 'al salir un humano entra un bot: ' + room.humans + '/' + room.count);
 // los bots se mueven y combaten solos
 srv.close(); process.exit(process.exitCode || 0);

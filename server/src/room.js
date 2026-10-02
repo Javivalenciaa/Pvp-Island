@@ -1,10 +1,11 @@
 import { createTerrain } from '../../shared/terrain.js';
 import { MAPS, DT } from '../../shared/maps.js';
+import { Buildings, PIECE_DMG, TIER_MULT, TIER_RES, pieceCenter } from './buildings.js';
 const WEAPONS = { fists: [4, 3.2], stone_axe: [13, 3.8], stone_pick: [13, 3.8], hammer: [10, 3.8], spear: [26, 4.8], iron_axe: [22, 4], iron_pick: [22, 4], iron_sword: [48, 4.2] }, RANGED = { bow: 40, crossbow: 80 };
 const PROT = process.env.PROT_SECONDS !== undefined ? +process.env.PROT_SECONDS : 30;
 const SPEED = 4.8, SPRINT = 7.8, RADIUS = 160, HP = 100, REACH = 2.6, DMG = 14, ATK_CD = .6;
 export class Room {
-  constructor(mapId, maxPlayers = 20) { this.mapId = mapId; this.map = MAPS[mapId]; this.T = createTerrain({ world: this.map.world, seed: this.map.seed }); this.half = this.map.world / 2; this.sea = 0; this.max = maxPlayers; this.players = new Map(); this.nextId = 1; this.t = 0; this.tribeInfo = new Map(); this.tribeOfToken = new Map(); this.invites = new Map(); this.nextTribe = 1; this.timer = setInterval(() => this.tick(), DT * 1000); }
+  constructor(mapId, maxPlayers = 20) { this.mapId = mapId; this.map = MAPS[mapId]; this.T = createTerrain({ world: this.map.world, seed: this.map.seed }); this.half = this.map.world / 2; this.sea = 0; this.max = maxPlayers; this.players = new Map(); this.nextId = 1; this.t = 0; this.tribeInfo = new Map(); this.tribeOfToken = new Map(); this.invites = new Map(); this.nextTribe = 1; this.B = new Buildings(); this.timer = setInterval(() => this.tick(), DT * 1000); }
   get humans() { let n = 0; for (const p of this.players.values()) if (!p.bot) n++; return n; }
   get count() { return this.players.size; }
   spawnPoint() { for (let i = 0; i < 40; i++) { const a = Math.random() * 6.283, r = this.half * (.2 + Math.random() * .5), x = Math.cos(a) * r, z = Math.sin(a) * r; if (this.T.terrainH(x, z) > 1.5) return { x, z }; } return { x: 0, z: 0 }; }
@@ -22,7 +23,7 @@ export class Room {
     return p;
   }
   leave(p) { this.players.delete(p.id); this.invites.delete(p.id); this.broadcast({ t: 'leave', id: p.id }); }
-  setTribe(p, tid) { p.tid = tid; this.tribeOfToken.set(p.token, tid); this.broadcast(Object.assign({ t: 'tribe' }, this.pub(p))); }
+  setTribe(p, tid) { const old = p.tid; if (old.startsWith('s:') && old !== tid) { this.B.changeOwner(old, tid); this.broadcast({ t: 'powner', from: old, to: tid }); } p.tid = tid; this.tribeOfToken.set(p.token, tid); this.broadcast(Object.assign({ t: 'tribe' }, this.pub(p))); }
   invite(p, targetId) {
     const q = this.players.get(targetId); if (!q || q.bot || q === p || p.dead > 0) return;
     if (Math.hypot(q.x - p.x, q.z - p.z) > 12) return this.notice(p, 'Está demasiado lejos');
@@ -45,7 +46,7 @@ export class Room {
   leaveTribe(p) {
     if (!this.tribeInfo.has(p.tid)) return; const old = p.tid; this.setTribe(p, 's:' + p.token);
     const left = this.members(old).filter((q) => !q.bot);
-    if (left.length === 1) { const q = left[0]; this.tribeOfToken.delete(q.token); this.setTribe(q, 's:' + q.token); this.tribeInfo.delete(old); this.notice(q, 'Tu tribu se ha disuelto'); }
+    if (left.length === 1) { const q = left[0]; this.tribeOfToken.delete(q.token); this.setTribe(q, 's:' + q.token); this.B.changeOwner(old, 's:' + q.token); this.broadcast({ t: 'powner', from: old, to: 's:' + q.token }); this.tribeInfo.delete(old); this.notice(q, 'Tu tribu se ha disuelto'); }
     this.broadcastTribe(old, { t: 'notice', text: p.name + ' ha abandonado la tribu' });
   }
   chat(p, text) {
@@ -66,6 +67,38 @@ export class Room {
     else if (m.t === 'invite') this.invite(p, +m.target);
     else if (m.t === 'invreply') this.reply(p, +m.from, !!m.accept);
     else if (m.t === 'tleave') this.leaveTribe(p);
+    else if (m.t === 'build') this.build(p, m.piece || {});
+    else if (m.t === 'upgrade') this.upgrade(p, String(m.key));
+    else if (m.t === 'door') this.door(p, String(m.key));
+    else if (m.t === 'demolish') this.demolish(p, String(m.key));
+    else if (m.t === 'repair') this.repair(p, String(m.key));
+    else if (m.t === 'phit') this.pieceHit(p, String(m.key), String(m.weapon || 'fists'));
+  }
+  // ---- construcción (autoritativa)
+  near(p, c, R) { return Math.hypot(c.x - p.x, c.z - p.z) <= R && Math.abs(c.y - p.y) < 14; }
+  deny(p, key, why) { if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'pdeny', key, why })); }
+  build(p, d) {
+    if (p.dead > 0) return; const probe = Object.assign({}, d, { tier: 0 });
+    const res = this.B.place(probe, p.tid, this.B.countOf(p.tid)); if (!res.ok) return this.deny(p, d.key, res.why);
+    if (!this.near(p, pieceCenter(res.p), 16)) { this.B.map.delete(res.p.key); return this.deny(p, d.key, 'Está demasiado lejos'); }
+    this.broadcast({ t: 'pb', p: this.B.pub(res.p) });
+  }
+  own(p, key) { const q = this.B.get(key); return q && q.owner === p.tid ? q : null; }
+  upgrade(p, key) {
+    const q = this.own(p, key); if (!q || q.tier >= 3 || !this.near(p, pieceCenter(q), 8)) return; q.tier++; q.hp = this.B.maxHp(q);
+    this.broadcast({ t: 'pu', key, tier: q.tier, hp: Math.round(q.hp) });
+  }
+  door(p, key) { const q = this.own(p, key); if (!q || q.kind !== 'door' || !this.near(p, pieceCenter(q), 8)) return; q.open = !q.open; this.broadcast({ t: 'po', key, open: q.open }); }
+  repair(p, key) { const q = this.own(p, key); if (!q || !this.near(p, pieceCenter(q), 8)) return; q.hp = Math.min(this.B.maxHp(q), q.hp + this.B.maxHp(q) * .25); this.broadcast({ t: 'ph', key, hp: Math.round(q.hp) }); }
+  demolish(p, key) { const q = this.own(p, key); if (!q || !this.near(p, pieceCenter(q), 8)) return; this.removePieces(q, p.id, true); }
+  removePieces(q, by, refund) { const out = this.B.remove(q); this.broadcast({ t: 'pd', keys: out.map((x) => x.key), items: refund ? out.map((x) => ({ kind: x.kind, tier: x.tier })) : [], by }); return out; }
+  damagePiece(q, dmg, by) {
+    q.hp -= dmg; if (q.hp > 0) { this.broadcast({ t: 'ph', key: q.key, hp: Math.round(q.hp) }); return false; }
+    this.removePieces(q, by ? by.id : 0, false); return true;
+  }
+  pieceHit(p, key, weapon) {
+    if (p.dead > 0 || p.cd > 0) return; const q = this.B.get(key); if (!q || q.owner === p.tid) return; const base = PIECE_DMG[weapon] ?? 1;
+    if (!this.near(p, pieceCenter(q), 5.2)) return; p.cd = .4; this.broadcast({ t: 'swing', id: p.id }); this.damagePiece(q, base * (1 - TIER_RES[q.tier]), p);
   }
   // posición enviada por el cliente (predicción); el servidor la valida para frenar teletransportes y velocidades imposibles
   setPos(p, m, now) {

@@ -1940,7 +1940,8 @@ function repairTarget(a) {
     const p = a.piece; if (p.hp >= p.maxHp && !p.burn) { toast('No necesita reparación', 'info'); return; }
     c = {}; const full = pieceCost(p.kind, p.tier); for (const k in full) c[k] = Math.max(1, Math.ceil(full[k] * .15));
     if (!inv.pay(c)) { toast('Para reparar necesitas ' + costText(c), 'bad'); sfx.bad(); return; }
-    p.hp = Math.min(p.maxHp, p.hp + p.maxHp * .25); p.burn = 0;
+    if (NET.on) { if (p.owner !== NET.tid) { toast('Esta construcción no es de tu tribu', 'bad'); return; } netSend({ t: 'repair', key: p.key }); }
+    else { p.hp = Math.min(p.maxHp, p.hp + p.maxHp * .25); p.burn = 0; }
   } else {
     const d = a.dep; if (d.hp >= d.maxHp) { toast('No necesita reparación', 'info'); return; }
     c = { wood: 6, stone: 3 }; if (!inv.pay(c)) { toast('Para reparar necesitas ' + costText(c), 'bad'); sfx.bad(); return; }
@@ -3566,6 +3567,7 @@ function primaryAction() {
   const { it: tit } = heldTool(); const tool = tit.tool; const tier = tit.tier || 0;
   nextAction = clock + tool.cd; swingT = 0; sfx.swing();
   const a = aim; if (!a || a.d > tool.range) return;
+  if (NET.on && a.kind === 'piece' && tool.type !== 'hammer' && a.piece.owner !== NET.tid) { netSend({ t: 'phit', key: a.piece.key, weapon: s ? s.id : 'fists' }); const st = a.piece.tier >= 2; (st ? sfx.stone : sfx.wood)(); burst(a.p, st ? 'stone' : 'wood', 4); if (s && maxDur(s.id) && inv.wear(sel, 1)) toast(ITEMS[s.id].name + ' se ha roto', 'bad'); return; }
   if (tool.type === 'hammer' && (a.kind === 'piece' || a.kind === 'dep')) { repairTarget(a); if (s && inv.wear(sel, 1)) toast('El martillo se ha roto', 'bad'); return; }
   if (a.kind === 'dep' && a.dep.t === 'barrel') { damageDep(a.dep, tool.dmg); return; }
   if (a.kind === 'node') {
@@ -3594,12 +3596,15 @@ function interact() {
   if (!a || a.d > 3.5) return;
   if (buildMode && a.kind === 'piece') {
     const p = a.piece; if (p.tier >= 3) { toast('Esta pieza ya es de metal', 'info'); return; }
+    if (NET.on && p.owner !== NET.tid) { toast('Esta construcción no es de tu tribu', 'bad'); sfx.bad(); return; }
     const c = pieceCost(p.kind, p.tier + 1);
     if (!inv.pay(c)) { toast('Para mejorar a ' + BTIERS[p.tier + 1].name.toLowerCase() + ' necesitas ' + costText(c), 'bad'); sfx.bad(); return; }
+    if (NET.on) { netSend({ t: 'upgrade', key: p.key }); stats.upgraded++; return; }
     setTier(p, p.tier + 1); stats.upgraded++; sfx.build(); burst(a.p, p.tier >= 2 ? 'stone' : 'wood', 8); return;
   }
   if (a.kind === 'piece' && a.piece.kind === 'door') {
-    const p = a.piece; p.open = !p.open; rebuildColliders(); sfx.wood(); return;
+    const p = a.piece; if (NET.on) { if (p.owner !== NET.tid) { toast('Esta puerta no es de tu tribu', 'bad'); sfx.bad(); } else netSend({ t: 'door', key: p.key }); return; }
+    p.open = !p.open; rebuildColliders(); sfx.wood(); return;
   }
   if (a.kind === 'dep') useDeployable(a.dep);
   if (a.kind === 'crate') openCrate(a.crate);
@@ -3608,10 +3613,11 @@ function demolish() {
   const a = aim; if (!a || a.d > 4) return;
   if (a.kind === 'piece') {
     const p = a.piece;
+    if (NET.on) { if (p.owner !== NET.tid) { toast('Esta construcción no es de tu tribu', 'bad'); sfx.bad(); } else netSend({ t: 'demolish', key: p.key }); return; }
     const c = pieceCost(p.kind, p.tier); for (const k in c) { const back = Math.floor(c[k] / 2); if (back) giveItem(k, back); }
     destroyPiece(p); sfx.build(); return;
   }
-  if (a.kind === 'dep') { const d = a.dep; removeDeployable(d); giveItem(d.t, 1); sfx.build(); }
+  if (a.kind === 'dep' && !NET.on) { const d = a.dep; removeDeployable(d); giveItem(d.t, 1); sfx.build(); }
 }
 
 // ---------------------------------------------------------------- colocación (construcción y objetos)
@@ -3723,8 +3729,12 @@ function updateGhost() {
   ghost.traverse((m) => { if (m.isMesh) m.material = mat; });
 }
 function tryPlace() {
-  if (NET.on) return;
   if (!placement) return false;
+  if (NET.on && placement.dep) { if (placement.ok) toast('Los objetos en línea llegarán pronto', 'info'); return true; }
+  if (NET.on && placement.ok) {
+    if (!inv.pay(placement.cost)) return true;
+    const p = placement; netSend({ t: 'build', piece: { kind: p.kind, key: p.key, i: p.i, j: p.j, L: p.L || 0, dir: p.dir, top: p.top, bottom: p.bottom } }); NET.pendingPay[p.key] = Object.assign({}, p.cost); ghostKey = ''; return true;
+  }
   if (!placement.ok) { toast(placement.why, 'bad'); sfx.bad(); return true; }
   if (placement.dep) {
     const s = inv.slots[sel]; if (!s) return true;
@@ -4081,7 +4091,7 @@ function showAd(done) {
 }
 
 // ---------------------------------------------------------------- modo en línea (servidor autoritativo)
-const NET = { on: false, ws: null, id: 0, remotes: new Map(), roster: new Map(), tid: '', tribe: '', name: '', typing: false, invT: 0, invite: null, touchInvite: false, sendT: 0, wantRespawn: false, killFeedT: 0 };
+const NET = { pendingPay: {}, on: false, ws: null, id: 0, remotes: new Map(), roster: new Map(), tid: '', tribe: '', name: '', typing: false, invT: 0, invite: null, touchInvite: false, sendT: 0, wantRespawn: false, killFeedT: 0 };
 const remoteRoot = new THREE.Group(); scene.add(remoteRoot);
 const urlParam = (k) => { const m = location.search.match(new RegExp('[?&]' + k + '=([^&]*)')); return m ? decodeURIComponent(m[1]) : ''; };
 const SERVER_URL = urlParam('server') || (location.protocol === 'https:' ? 'wss://pvp-island.example.com' : 'ws://localhost:8080');
@@ -4155,6 +4165,23 @@ function netMsg(m) {
   else if (m.t === 'chat') chatAdd(m.from, m.text, m.tribe, false);
   else if (m.t === 'full') { $('#netStatus').textContent = 'La sala está llena'; netClose(); }
   else if (m.t === 'rooms') { NET.rooms = m.rooms; renderRooms(); }
+  else if (m.t === 'pieces') { for (const d of m.list.sort((a, b) => (a.kind === 'foundation' ? 0 : 1) - (b.kind === 'foundation' ? 0 : 1) || a.L - b.L)) netPiece(d); }
+  else if (m.t === 'pb') { netPiece(m.p); delete NET.pendingPay[m.p.key]; sfx.build(); }
+  else if (m.t === 'pdeny') { const c = NET.pendingPay[m.key]; if (c) { for (const k in c) giveItem(k, c[k]); delete NET.pendingPay[m.key]; } toast(m.why, 'bad'); sfx.bad(); }
+  else if (m.t === 'pu') { const p = pieceMap.get(m.key); if (p) { setTier(p, m.tier); p.hp = m.hp; sfx.build(); burst(p.obj.position.clone().setY(p.obj.position.y + 1.4), p.tier >= 2 ? 'stone' : 'wood', 8); } }
+  else if (m.t === 'po') { const p = pieceMap.get(m.key); if (p) { p.open = m.open; rebuildColliders(); sfx.wood(); } }
+  else if (m.t === 'ph') { const p = pieceMap.get(m.key); if (p) { const dmg = p.hp > m.hp; p.hp = m.hp; if (dmg) { p.hitT = clock; if (Math.hypot(p.obj.position.x - player.pos.x, p.obj.position.z - player.pos.z) < 40) { (p.tier >= 2 ? sfx.stone : sfx.wood)(); burst(p.obj.position.clone().setY(p.obj.position.y + 1.4), p.tier >= 2 ? 'stone' : 'wood', 3); } if (p.owner === NET.tid) siege.baseHitT = clock; } } }
+  else if (m.t === 'pd') {
+    for (const k of m.keys) { const p = pieceMap.get(k); if (p) removePiece(p, true); } rebuildColliders();
+    if (m.by === NET.id) for (const it of m.items || []) { const c = pieceCost(it.kind, it.tier); for (const k in c) { const back = Math.floor(c[k] / 2); if (back) giveItem(k, back); } }
+    sfx.build();
+  }
+  else if (m.t === 'powner') { for (const p of pieces) if (p.owner === m.from) p.owner = m.to; }
+}
+function netPiece(d) {
+  if (pieceMap.has(d.key)) return;
+  const p = addPiece({ kind: d.kind, key: d.key, i: d.i, j: d.j, L: d.L, dir: d.dir, tier: d.tier, top: d.top, bottom: d.bottom, open: d.open, owner: d.o });
+  p.hp = d.hp; p.owner = d.o;
 }
 function netDie(by, cause) {
   if (state === 'dead') return;

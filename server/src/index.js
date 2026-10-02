@@ -27,6 +27,7 @@ export function createServer({ port = 8080, maxPlayers = 20, minPlayers = 8 } = 
         me = room.join(m.name, m.token, ws);
         if (!me) { ws.send(JSON.stringify({ t: 'full' })); return; }
         ws.send(JSON.stringify({ t: 'welcome', id: me.id, map: room.mapId, seed: room.map.seed, world: room.map.world, tid: me.tid, tribe: room.pub(me).tribe, x: me.x, z: me.z, roster: [...room.players.values()].map((q) => room.pub(q)) }));
+        if (room.B.map.size) ws.send(JSON.stringify({ t: 'pieces', list: [...room.B.map.values()].map((q) => room.B.pub(q)) }));
         balance(room); return;
       }
       room.onMessage(me, m);
