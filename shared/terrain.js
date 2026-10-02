@@ -1,0 +1,65 @@
+// Terreno determinista por semilla: servidor y clientes generan exactamente lo mismo (sin enviar el mapa por red).
+// Con seed = 0 y world = 640 es idéntico al mapa del juego de un jugador.
+export function createTerrain({ world = 640, seed = 0, maxLakes = 4 } = {}) {
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v), lerp = (a, b, t) => a + (b - a) * t;
+  const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function hash2(x, y) { let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967295; }
+  function vnoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi; const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf); const a = hash2(xi, yi), b = hash2(xi + 1, yi), c = hash2(xi, yi + 1), d = hash2(xi + 1, yi + 1); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; }
+  function fbm(x, y, o) { let s = 0, a = .5, f = 1, n = 0; for (let i = 0; i < o; i++) { s += a * vnoise(x * f + i * 17.3, y * f - i * 9.1); n += a; a *= .5; f *= 2.03; } return s / n; }
+  const WORLD = world, HALF = WORLD / 2, SEG = Math.round(WORLD / 2), N = SEG + 1, CELL = WORLD / SEG, K = WORLD / 640;
+  const so = seed ? ((seed * 7.31) % 997) : 0, sr = mulberry32(seed || 1);
+  let MOUNT = { x: 95 * K, z: -75 * K }, MOUNT2 = { x: -125 * K, z: -120 * K };
+  if (seed) { const a = sr() * 6.283, b = a + 2 + sr() * 2; MOUNT = { x: Math.cos(a) * HALF * .3, z: Math.sin(a) * HALF * .3 }; MOUNT2 = { x: Math.cos(b) * HALF * .38, z: Math.sin(b) * HALF * .38 }; }
+  function baseHeight(x, z) {
+    const r = Math.hypot(x, z * 1.1) / HALF;
+    const coast = (fbm(x * .0075 + 3 + so, z * .0075 + 7 + so, 4) - .5) * .3;
+    const mask = 1 - smooth(.52, .94, r + coast);
+    const base = fbm(x * .006 + so, z * .006 + so, 5);
+    const hills = Math.pow(base, 2.1) * 32;
+    const ridge = 1 - Math.abs(fbm(x * .013 + 11 + so, z * .013 - 4 + so, 4) * 2 - 1);
+    const m1 = Math.exp(-((x - MOUNT.x) ** 2 + (z - MOUNT.z) ** 2) / (2 * 62 * 62 * K * K)) * 44 * (.45 + .55 * ridge * ridge);
+    const m2 = Math.exp(-((x - MOUNT2.x) ** 2 + (z - MOUNT2.z) ** 2) / (2 * 48 * 48 * K * K)) * 30 * (.5 + .5 * ridge);
+    return (2.2 + hills + m1 + m2) * mask - 7 * (1 - mask);
+  }
+  const forestAt = (x, z) => smooth(.42, .64, fbm(x * .011 + 40 + so, z * .011 + so, 3));
+  const LAKES = [];
+  {
+    const rng = mulberry32(777 + (seed | 0));
+    const spots = [[2.25, .5], [-2.3, .42], [.95, .45], [-.9, .55], [3.0, .3], [1.6, .6], [-1.5, .62], [0.2, .35], [-3.0, .55]];
+    for (const [ang, rr] of spots) {
+      if (LAKES.length >= maxLakes) break;
+      let best = null;
+      for (let t = 0; t < 300; t++) {
+        const a = ang + (rng() - .5) * .6, r = HALF * (rr + (rng() - .5) * .15), x = Math.cos(a) * r, z = Math.sin(a) * r, h = baseHeight(x, z);
+        if (h < 3.5 || h > 11) continue;
+        const sl = Math.hypot(baseHeight(x + 8, z) - baseHeight(x - 8, z), baseHeight(x, z + 8) - baseHeight(x, z - 8)) / 16;
+        if (!best || sl < best.sl) best = { x, z, sl, h };
+      }
+      if (best && best.sl < .25 && !LAKES.some((L) => Math.hypot(L.x - best.x, L.z - best.z) < 70)) LAKES.push({ x: best.x, z: best.z, R: 13 + rng() * 6, level: best.h - .4 });
+    }
+  }
+  function rawHeight(x, z) {
+    let h = baseHeight(x, z);
+    for (const L of LAKES) {
+      const d = Math.hypot(x - L.x, z - L.z);
+      if (d > L.R * 1.45) continue;
+      if (d < L.R) h = Math.min(h, L.level + .02 - 3.2 * (1 - (d / L.R) ** 2));
+      else if (d < L.R * 1.12) h = Math.max(h, L.level + .02 + .6 * smooth(L.R, L.R * 1.12, d));
+      else h = Math.max(h, lerp(L.level + .62, h, smooth(L.R * 1.12, L.R * 1.45, d)));
+    }
+    return h;
+  }
+  const heights = new Float32Array(N * N);
+  for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) heights[iz * N + ix] = rawHeight(-HALF + ix * CELL, -HALF + iz * CELL);
+  function terrainH(x, z) {
+    const fx = (x + HALF) / CELL, fz = (z + HALF) / CELL;
+    if (fx < 0 || fz < 0 || fx >= SEG || fz >= SEG) return -8;
+    const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, i = iz * N + ix;
+    return lerp(lerp(heights[i], heights[i + 1], tx), lerp(heights[i + N], heights[i + N + 1], tx), tz);
+  }
+  const slopeAt = (x, z) => Math.hypot(terrainH(x + 1, z) - terrainH(x - 1, z), terrainH(x, z + 1) - terrainH(x, z - 1)) / 2;
+  const lakeAt = (x, z) => { for (const L of LAKES) if ((x - L.x) ** 2 + (z - L.z) ** 2 < L.R * L.R) return L; return null; };
+  const nearLake = (x, z, f) => LAKES.some((L) => Math.hypot(x - L.x, z - L.z) < L.R * f);
+  return { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake };
+}

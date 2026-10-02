@@ -1,7 +1,7 @@
 import { WebSocketServer } from 'ws';
 import { Room } from './room.js';
 import { brain, botName } from './bots.js';
-import { MAPS } from '../../shared/world.js';
+import { MAPS } from '../../shared/maps.js';
 // Dos servidores de hasta 20 jugadores: uno por mapa. Si no hay jugadores humanos suficientes se rellenan con bots.
 export function createServer({ port = 8080, maxPlayers = 20, minPlayers = 8 } = {}) {
   const rooms = Object.keys(MAPS).map((id) => new Room(id, maxPlayers));
@@ -26,7 +26,7 @@ export function createServer({ port = 8080, maxPlayers = 20, minPlayers = 8 } = 
         if (room.count >= room.max) { const b = [...room.players.values()].find((p) => p.bot); if (b) room.leave(b); }
         me = room.join(m.name, m.tribe, ws);
         if (!me) { ws.send(JSON.stringify({ t: 'full' })); return; }
-        ws.send(JSON.stringify({ t: 'welcome', id: me.id, map: room.mapId, seed: room.map.seed, size: room.map.size, tribe: me.tribe }));
+        ws.send(JSON.stringify({ t: 'welcome', id: me.id, map: room.mapId, seed: room.map.seed, world: room.map.world, tribe: me.tribe, x: me.x, z: me.z, roster: [...room.players.values()].map((q) => ({ id: q.id, name: q.name, tribe: q.tribe, bot: q.bot })) }));
         balance(room); return;
       }
       room.onMessage(me, m);
