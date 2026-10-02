@@ -4,7 +4,7 @@ export function brain(room, p) {
   const b = p.ai || (p.ai = { wx: p.x, wz: p.z, think: 0, react: 0, flee: 0 });
   b.think -= 1 / 20; b.react -= 1 / 20;
   // enemigo más cercano a la vista (radio limitado, con tiempo de reacción humano)
-  let tgt = null, td = 45; for (const q of room.players.values()) { if (q === p || q.dead > 0 || q.tribe === p.tribe) continue; const d = Math.hypot(q.x - p.x, q.z - p.z); if (d < td) { td = d; tgt = q; } }
+  let tgt = null, td = 45; for (const q of room.players.values()) { if (q === p || q.dead > 0 || q.tid === p.tid) continue; const d = Math.hypot(q.x - p.x, q.z - p.z); if (d < td) { td = d; tgt = q; } }
   if (p.hp < 30 && tgt) b.flee = 3;
   let gx, gz, mode = 'wander';
   if (b.flee > 0 && tgt) { b.flee -= 1 / 20; mode = 'flee'; gx = p.x + (p.x - tgt.x); gz = p.z + (p.z - tgt.z); }
