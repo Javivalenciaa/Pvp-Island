@@ -20,7 +20,8 @@ Juego de supervivencia multijugador PvP para navegador (pensado para CrazyGames)
 | Objetos, trampas, torretas, explosivos, cofres y bolsas de botín en el servidor | Hecho |
 | Recursos compartidos, fauna del servidor, domar y montar caballos, día/noche común | Hecho |
 | Persistencia en JSON (piezas, objetos, cofres, tribus) y guía de despliegue gratis | Hecho (`docs/DEPLOY.md`) |
-| Mapas más grandes, biomas nuevos y cuevas/minas como interiores | Pendiente |
+| Mapa Cordillera de 960 m, biomas (desierto, pantano, jungla) y punto de aparición en terreno llano | Hecho |
+| Cuevas/minas: boca en la montaña, interior aparte con minerales, entrada/salida validadas por el servidor, sin construcción dentro | Hecho (`npm test`) |
 | Inventario y crafting validados por el servidor | Pendiente (hoy los confía al cliente) |
 | Interfaz táctil en línea, clima sincronizado, recolectores en línea, prueba de carga con 20 jugadores reales | Pendiente |
 

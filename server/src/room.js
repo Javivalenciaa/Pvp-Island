@@ -60,6 +60,7 @@ export class Room {
     const now = performance.now();
     if (m.t === 'input') { const i = p.input; i.mx = Math.max(-1, Math.min(1, +m.mx || 0)); i.mz = Math.max(-1, Math.min(1, +m.mz || 0)); i.sprint = !!m.sprint; i.jump = !!m.jump; if (Number.isFinite(m.yaw)) p.yaw = m.yaw; }
     else if (m.t === 'pos') this.setPos(p, m, now);
+    else if (m.t === 'cave') this.cave(p, m);
     else if (m.t === 'attack') { if (m.target != null) this.meleeHit(p, +m.target, String(m.weapon || 'fists')); else this.attack(p); }
     else if (m.t === 'shot') this.shotHit(p, +m.target, String(m.weapon || 'bow'), +m.charge || 1);
     else if (m.t === 'selfdmg') { if (p.dead <= 0) this.hurt(p, Math.max(0, Math.min(35, +m.amt || 0)), null, m.cause); }
@@ -99,7 +100,7 @@ export class Room {
   near(p, c, R) { return Math.hypot(c.x - p.x, c.z - p.z) <= R && Math.abs(c.y - p.y) < 14; }
   deny(p, key, why) { if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'pdeny', key, why })); }
   build(p, d) {
-    if (p.dead > 0) return; const probe = Object.assign({}, d, { tier: 0 });
+    if (p.dead > 0) return; if (p.cave != null) return this.deny(p, d.key, 'No se puede construir en una cueva'); const probe = Object.assign({}, d, { tier: 0 });
     const res = this.B.place(probe, p.tid, this.B.countOf(p.tid)); if (!res.ok) return this.deny(p, d.key, res.why);
     if (!this.near(p, pieceCenter(res.p), 16)) { this.B.map.delete(res.p.key); return this.deny(p, d.key, 'Está demasiado lejos'); }
     this.broadcast({ t: 'pb', p: this.B.pub(res.p) });
@@ -125,7 +126,7 @@ export class Room {
   depNear(p, d, R) { return Math.hypot(d.x - p.x, d.z - p.z) <= R && Math.abs(d.y - p.y) < 8; }
   send(p, m) { if (p && p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify(m)); }
   placeDep(p, d) {
-    if (p.dead > 0) return; const t = String(d.t), x = +d.x, y = +d.y, z = +d.z;
+    if (p.dead > 0) return; if (p.cave != null) return this.send(p, { t: 'ddeny', key: String(d.t), why: 'No se puede colocar nada en una cueva' }); const t = String(d.t), x = +d.x, y = +d.y, z = +d.z;
     const fail = (why) => this.send(p, { t: 'ddeny', key: t, why });
     if (!DEF[t] || !Number.isFinite(x + y + z)) return fail('Objeto no válido');
     if (Math.hypot(x - p.x, z - p.z) > 14) return fail('Está demasiado lejos');
@@ -235,9 +236,24 @@ export class Room {
     if (p.dead > 0) return;
     const x = +m.x, y = +m.y, z = +m.z; if (!Number.isFinite(x + y + z)) return;
     const dt = Math.min(1, Math.max(.02, (now - (p.lastPos || now - 50)) / 1000)); p.lastPos = now; p.cs = true;
-    const d = Math.hypot(x - p.x, z - p.z), lim = this.half * .99;
-    if (d > (p.mount ? 22 : 16) * dt + 2.5 || Math.abs(x) > lim || Math.abs(z) > lim) { p.strikes = (p.strikes || 0) + 1; if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'correct', x: p.x, y: p.y, z: p.z })); return; }
+    const d = Math.hypot(x - p.x, z - p.z), lim = this.half * .99, cv = p.cave != null ? this.T.CAVES[p.cave] : null;
+    const out = cv ? Math.hypot(x - cv.in.x, z - cv.in.z) > cv.in.R + 3 : Math.abs(x) > lim || Math.abs(z) > lim;
+    if (d > (p.mount ? 22 : 16) * dt + 2.5 || out) { p.strikes = (p.strikes || 0) + 1; if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'correct', x: p.x, y: p.y, z: p.z })); return; }
     p.x = x; p.y = y; p.z = z; if (Number.isFinite(+m.yaw)) p.yaw = +m.yaw; if (Number.isFinite(+m.pitch)) p.pitch = +m.pitch;
+  }
+  // entrar o salir de una cueva: el servidor comprueba que estés junto a la boca (o junto a la salida del interior) y te teletransporta
+  cave(p, m) {
+    if (p.dead > 0 || p.mount) return; const now = this.t; if (now < (p.caveT || 0)) return;
+    const C = this.T.CAVES;
+    if (m.dir === 'in' && p.cave == null) {
+      const c = C[m.id | 0]; if (!c || Math.hypot(p.x - c.ex, p.z - c.ez) > 8 || Math.abs(p.y - c.y) > 8) return;
+      p.cave = c.id; p.x = c.in.x - c.in.R + 2.5; p.z = c.in.z; p.y = c.in.y; p.cs = true; p.lastPos = 0;
+    } else if (m.dir === 'out' && p.cave != null) {
+      const c = C[p.cave]; if (Math.hypot(p.x - (c.in.x - c.in.R + 2.5), p.z - c.in.z) > 7) return;
+      p.cave = null; p.x = c.ex; p.z = c.ez; p.y = this.T.terrainH(c.ex, c.ez); p.cs = true; p.lastPos = 0;
+    } else return;
+    p.caveT = now + 1;
+    if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'tp', x: p.x, y: p.y, z: p.z, cave: p.cave == null ? -1 : p.cave }));
   }
   find(id) { const q = this.players.get(id); return q && q.dead <= 0 ? q : null; }
   meleeHit(p, id, weapon) {
@@ -261,7 +277,7 @@ export class Room {
       if (p.bot && p.brain) p.brain(this, p);
       if (p.cd > 0) p.cd -= DT;
       if (p.hp < HP && p.dead <= 0 && this.t > (p.regenT || 0)) p.hp = Math.min(HP, p.hp + DT * 1.2);
-      if (p.dead > 0) { if (p.bot || p.wantRespawn) p.dead -= DT; if (p.dead <= 0) { p.wantRespawn = false; const bd = p.bed && this.D.map.get(p.bed), sp = bd && bd.owner === p.tid ? { x: bd.x, z: bd.z } : this.spawnPoint(); p.x = sp.x; p.z = sp.z; p.y = bd && bd.owner === p.tid ? bd.y + .7 : this.T.terrainH(p.x, p.z); p.dropped = false; p.hp = HP; p.prot = this.t + Math.min(20, PROT); if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'respawn', x: p.x, y: p.y, z: p.z })); } continue; }
+      if (p.dead > 0) { if (p.bot || p.wantRespawn) p.dead -= DT; if (p.dead <= 0) { p.wantRespawn = false; const bd = p.bed && this.D.map.get(p.bed), sp = bd && bd.owner === p.tid ? { x: bd.x, z: bd.z } : this.spawnPoint(); p.x = sp.x; p.z = sp.z; p.y = bd && bd.owner === p.tid ? bd.y + .7 : this.T.terrainH(p.x, p.z); p.dropped = false; p.cave = null; p.hp = HP; p.prot = this.t + Math.min(20, PROT); if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'respawn', x: p.x, y: p.y, z: p.z })); } continue; }
       if (p.cs) continue;
       const i = p.input, len = Math.hypot(i.mx, i.mz) || 1, sp = i.sprint ? SPRINT : SPEED;
       // mz>0 = adelante; yaw igual que el cliente (-sin, -cos)

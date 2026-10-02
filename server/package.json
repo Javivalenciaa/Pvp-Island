@@ -3,6 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node src/index.js", "test": "node src/test.js && node src/test_persist.js" },
+  "scripts": { "start": "node src/index.js", "test": "node src/test.js && node src/test_persist.js && node src/test_cave.js" },
   "dependencies": { "ws": "^8.18.0" }
 }

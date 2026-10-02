@@ -82,9 +82,22 @@ export function createTerrain({ world = 640, seed = 0, maxLakes = 4 } = {}) {
     out.jungle *= (1 - out.desert) * (1 - out.swamp) * smooth(1.8, 3.5, h) * (1 - smooth(15, 21, h));
     return out;
   };
+  // cuevas/minas: boca en la ladera de una montaña; el interior es una sala aparte, fuera del mapa (se entra con un teletransporte validado por el servidor)
+  const CAVES = [];
+  {
+    const rng = mulberry32(8080 + (seed | 0)), want = WORLD > 800 ? 5 : 3;
+    for (let t = 0; t < 6000 && CAVES.length < want; t++) {
+      const Mt = rng() < .55 ? MOUNT : MOUNT2, a = rng() * 6.283, r = (10 + rng() * 55) * K, x = Mt.x + Math.cos(a) * r, z = Mt.z + Math.sin(a) * r, h = terrainH(x, z);
+      if (h < 9 || h > 34 || Math.abs(x) > HALF * .9 || Math.abs(z) > HALF * .9) continue;
+      const gx = (terrainH(x + 1.5, z) - terrainH(x - 1.5, z)) / 3, gz = (terrainH(x, z + 1.5) - terrainH(x, z - 1.5)) / 3, sl = Math.hypot(gx, gz);
+      if (sl < .35 || sl > 1.2 || CAVES.some((c) => Math.hypot(c.x - x, c.z - z) < 80 * K) || LAKES.some((L) => Math.hypot(x - L.x, z - L.z) < L.R * 2)) continue;
+      const id = CAVES.length, dx = -gx / sl, dz = -gz / sl;
+      CAVES.push({ id, x, z, y: h, dx, dz, ex: x + dx * 3.2, ez: z + dz * 3.2, in: { x: HALF + 300 + id * 400, y: -40, z: 0, R: 13, H: 5.5 } });
+    }
+  }
   const forestAt = (x, z) => { const b = biomeAt(x, z); return Math.min(1, forestBase(x, z) * (1 - b.desert * .95) + b.jungle * .9 + b.swamp * .25); };
   const slopeAt = (x, z) => Math.hypot(terrainH(x + 1, z) - terrainH(x - 1, z), terrainH(x, z + 1) - terrainH(x, z - 1)) / 2;
   const lakeAt = (x, z) => { for (const L of LAKES) if ((x - L.x) ** 2 + (z - L.z) ** 2 < L.R * L.R) return L; return null; };
   const nearLake = (x, z, f) => LAKES.some((L) => Math.hypot(x - L.x, z - L.z) < L.R * f);
-  return { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake, biomeAt, BIOMES };
+  return { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake, biomeAt, BIOMES, CAVES };
 }
