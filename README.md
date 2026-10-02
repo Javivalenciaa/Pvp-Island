@@ -10,13 +10,17 @@ Juego de supervivencia multijugador PvP para navegador (pensado para CrazyGames)
 
 | Hito | Estado |
 |---|---|
-| Servidor con salas, tribus, movimiento, PvP y bots | Hecho (probado, `npm test`) |
-| Mundo por semilla con biomas y cuevas | Hecho (versión inicial) |
-| Cliente conectado al servidor (jugadores y bots visibles) | Siguiente |
-| Construcción y raideo en servidor | Pendiente |
+| Servidor con salas, tribus, PvP y bots | Hecho (probado, `npm test`) |
+| Terreno compartido servidor/cliente (mismo código, `shared/terrain.js`) | Hecho |
+| Cliente en línea: menú de salas, nombre y tribu, avatares vikingos con nombre | Hecho (probado con navegador real) |
+| PvP: golpes, flechas y ballesta con daño calculado en el servidor, muerte y reaparición | Hecho |
+| Anti-trampas básico: posición validada, daño por arma, sin fuego amigo | Hecho |
+| Construcción y raideo sincronizados por el servidor | Siguiente |
 | Domar animales y monturas | Pendiente |
-| Cuevas/minas como interiores | Pendiente |
-| Persistencia y despliegue | Pendiente |
+| Mapas grandes, biomas nuevos y cuevas/minas como interiores | Pendiente |
+| Persistencia (SQLite) y despliegue gratuito | Pendiente |
+
+Por ahora los recursos (árboles, rocas) y los animales son locales en cada cliente, y la construcción está desactivada en línea hasta que el servidor la controle.
 
 ## Probar el servidor
 
@@ -24,7 +28,9 @@ Juego de supervivencia multijugador PvP para navegador (pensado para CrazyGames)
 cd server
 npm install
 npm test        # prueba automática con 2 clientes simulados
-npm start       # escucha en el puerto 8080 (PORT para cambiarlo)
+npm start       # escucha en el puerto 8080 (PORT para cambiarlo; MIN_PLAYERS = bots mínimos por sala)
 ```
+
+Cliente: abre `client/index.html` en el navegador (`?server=ws://localhost:8080`, `?map=cordillera` para el otro mapa, `?offline=1` para jugar solo). Tras tocar `shared/terrain.js`: `python3 tools/sync_terrain.py`.
 
 Diseño completo en [`docs/DESIGN.md`](docs/DESIGN.md).

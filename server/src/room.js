@@ -22,7 +22,8 @@ export class Room {
     else if (m.t === 'attack') { if (m.target != null) this.meleeHit(p, +m.target, String(m.weapon || 'fists')); else this.attack(p); }
     else if (m.t === 'shot') this.shotHit(p, +m.target, String(m.weapon || 'bow'), +m.charge || 1);
     else if (m.t === 'selfdmg') { if (p.dead <= 0) this.hurt(p, Math.max(0, Math.min(35, +m.amt || 0)), null, m.cause); }
-    else if (m.t === 'respawn') { if (p.dead > 0 || p.hp <= 0) { p.dead = .01; } }
+    else if (m.t === 'respawn') { if (p.dead > 0) { p.wantRespawn = true; p.dead = Math.min(p.dead, 1.2); } }
+    else if (m.t === 'swing') this.broadcast({ t: 'swing', id: p.id });
     else if (m.t === 'chat') { const text = String(m.text || '').slice(0, 120); if (m.all) this.broadcast({ t: 'chat', from: p.name, tribe: false, text }); else this.broadcastTribe(p.tribe, { t: 'chat', from: p.name, tribe: true, text }); }
   }
   // posición enviada por el cliente (predicción); el servidor la valida para frenar teletransportes y velocidades imposibles
@@ -36,7 +37,7 @@ export class Room {
   }
   find(id) { const q = this.players.get(id); return q && q.dead <= 0 ? q : null; }
   meleeHit(p, id, weapon) {
-    if (p.cd > 0 || p.dead > 0) return; const w = WEAPONS[weapon] || WEAPONS.fists, q = this.find(id); p.cd = .35; if (!q || q === p || q.tribe === p.tribe) return;
+    if (p.cd > 0 || p.dead > 0) return; this.broadcast({ t: 'swing', id: p.id }); const w = WEAPONS[weapon] || WEAPONS.fists, q = this.find(id); p.cd = .35; if (!q || q === p || q.tribe === p.tribe) return;
     if (Math.hypot(q.x - p.x, q.z - p.z) > w[1] + 1.2 || Math.abs(q.y - p.y) > 3) return; this.hurt(q, w[0], p);
   }
   shotHit(p, id, weapon, charge) {
@@ -56,7 +57,7 @@ export class Room {
       if (p.bot && p.brain) p.brain(this, p);
       if (p.cd > 0) p.cd -= DT;
       if (p.hp < HP && p.dead <= 0 && this.t > (p.regenT || 0)) p.hp = Math.min(HP, p.hp + DT * 1.2);
-      if (p.dead > 0) { p.dead -= DT; if (p.dead <= 0) { const sp = this.spawnPoint(); p.x = sp.x; p.z = sp.z; p.y = this.T.terrainH(p.x, p.z); p.hp = HP; if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'respawn', x: p.x, y: p.y, z: p.z })); } continue; }
+      if (p.dead > 0) { if (p.bot || p.wantRespawn) p.dead -= DT; if (p.dead <= 0) { p.wantRespawn = false; const sp = this.spawnPoint(); p.x = sp.x; p.z = sp.z; p.y = this.T.terrainH(p.x, p.z); p.hp = HP; if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'respawn', x: p.x, y: p.y, z: p.z })); } continue; }
       if (p.cs) continue;
       const i = p.input, len = Math.hypot(i.mx, i.mz) || 1, sp = i.sprint ? SPRINT : SPEED;
       // mz>0 = adelante; yaw igual que el cliente (-sin, -cos)

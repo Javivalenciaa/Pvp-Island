@@ -35,4 +35,4 @@ export function createServer({ port = 8080, maxPlayers = 20, minPlayers = 8 } = 
   });
   return { wss, rooms, close() { rooms.forEach((r) => r.close()); wss.close(); } };
 }
-if (process.argv[1] && process.argv[1].endsWith('index.js')) { const port = +process.env.PORT || 8080; createServer({ port }); console.log('Servidor en el puerto', port); }
+if (process.argv[1] && process.argv[1].endsWith('index.js')) { const port = +process.env.PORT || 8080; createServer({ port, minPlayers: process.env.MIN_PLAYERS !== undefined ? +process.env.MIN_PLAYERS : 8 }); console.log('Servidor en el puerto', port); }

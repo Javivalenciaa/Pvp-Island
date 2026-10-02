@@ -28,7 +28,7 @@ const xx = pa.x; a.ws.send(JSON.stringify({ t: 'pos', x: pa.x + 300, y: pa.y, z:
 await sleep(700); a.ws.send(JSON.stringify({ t: 'attack', target: b.welcome.id, weapon: 'iron_sword' })); await sleep(150); ok(pb.hp === 52, 'la espada de hierro hace 48 de daño: ' + pb.hp);
 await sleep(400); a.ws.send(JSON.stringify({ t: 'attack', target: b.welcome.id, weapon: 'iron_sword', dmg: 9999 })); await sleep(150); ok(pb.hp === 4 && !(pb.dead > 0), 'el cliente no puede inflar el daño: ' + pb.hp);
 await sleep(400); a.ws.send(JSON.stringify({ t: 'shot', target: b.welcome.id, weapon: 'bow', charge: 1 })); await sleep(150); ok(pb.dead > 0 && pa.kills >= 1, 'una flecha tensada mata y suma baja');
-await sleep(4300); ok(pb.dead <= 0 && pb.hp === 100, 'el jugador reaparece con vida completa');
+await sleep(1500); ok(pb.dead > 0, 'un jugador muerto espera a pedir reaparecer'); b.ws.send(JSON.stringify({ t: 'respawn' })); await sleep(1700); ok(pb.dead <= 0 && pb.hp === 100 && b.other.some((m) => m.t === 'respawn'), 'el jugador reaparece con vida completa al pedirlo');
 b.ws.close(); await sleep(200); ok(room.humans === 1 && room.count === 8, 'al salir un humano entra un bot');
 // los bots se mueven y combaten solos
 const bot = [...room.players.values()].find((p) => p.bot), bx = bot.x, bz = bot.z; await sleep(2500); ok(Math.hypot(bot.x - bx, bot.z - bz) > 1, 'los bots se mueven solos');

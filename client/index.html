@@ -84,6 +84,11 @@ button:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
 #itemname{font-size:14px;font-weight:600;text-shadow:0 1px 3px #000;min-height:18px}
 #armorInfo{font-size:12px;color:var(--muted);text-shadow:0 1px 3px #000;min-height:0}
 
+#netui{display:none;flex-direction:column;gap:8px;margin:6px 0}
+body.online #netui{display:flex}
+#netui input{background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:6px;color:var(--bone);padding:6px 10px;font:600 14px var(--body);width:180px}
+body.online #btnNew,body.online #btnReset,body.online #resetConfirm{display:none!important}
+.online-on #objective,.online-on #queue{display:block}
 #touch{display:none}
 body.touch #touch{display:block}
 body.touch #clock{display:none}
@@ -280,6 +285,12 @@ body.touch #bottom{transform:scale(.68);transform-origin:bottom center}
       <button class="btn ghost" id="btnNew" type="button" hidden>Nueva partida</button>
     </div>
     <p class="records" id="records"></p>
+    <div id="netui">
+      <div class="qrow"><span>Nombre</span><input id="inName" maxlength="16" autocomplete="off"></div>
+      <div class="qrow"><span>Tribu (opcional)</span><input id="inTribe" maxlength="16" autocomplete="off"></div>
+      <div class="qrow"><span>Servidor</span><div class="qb" id="roomList"></div></div>
+      <p class="note" id="netStatus"></p>
+    </div>
     <div class="qrow"><span>Idioma</span><div class="qb"><button type="button" class="chipbtn" data-lang="en">English</button><button type="button" class="chipbtn" data-lang="es">Español</button></div></div>
     <div class="qrow"><span>Calidad gráfica</span><div class="qb"><button type="button" class="chipbtn" data-q="baja">Baja</button><button type="button" class="chipbtn" data-q="media">Media</button><button type="button" class="chipbtn" data-q="alta">Alta</button><button type="button" class="chipbtn" data-q="ultra">Ultra</button></div></div>
     <p class="note" id="touchNote" hidden>Este prototipo necesita teclado y ratón. Ábrelo en un ordenador.</p>
@@ -334,6 +345,7 @@ body.touch #bottom{transform:scale(.68);transform-origin:bottom center}
 (function () {
 'use strict';
 const $ = (s) => document.querySelector(s);
+const ONLINE = !/[?&]offline=1/.test(location.search);
 const isTouch = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches;
 if (isTouch) $('#touchNote').hidden = false;
 if (typeof THREE === 'undefined') { $('#libNote').hidden = false; $('#btnPlay').disabled = true; return; }
@@ -462,6 +474,8 @@ const RULES = [
   [/^(.+) \(lejos\)$/, (m) => `${tr(m[1])} (too far)`], [/^(.+) \(peligroso\)$/, (m) => `${tr(m[1])} (dangerous)`], [/^(.+) \(lleva tu botín\)$/, (m) => `${tr(m[1])} (carrying your loot)`], [/^Edad (.+)$/, (m) => `${tr(m[1])} Age`],
   [/^Te pones: (.+)$/, (m) => `You put on: ${tr(m[1])}`], [/^(\d+) (.+)$/, (m) => (ES_EN[m[2]] ? `${m[1]} ${ES_EN[m[2]]}` : null)], [/^(.+) ×(\d+)$/, (m) => (ES_EN[m[1]] ? `${ES_EN[m[1]]} ×${m[2]}` : null)],
 ].concat(CHAL.map(([re, en]) => [re, (m) => en.replace(/\$(\d)/g, (_, i) => m[i])]));
+Object.assign(ES_EN, { 'Nombre': 'Name', 'Tribu (opcional)': 'Tribe (optional)', 'Servidor': 'Server', 'Conectando…': 'Connecting…', 'No se pudo conectar con el servidor': 'Could not connect to the server', 'Conexión perdida': 'Connection lost', 'La sala está llena': 'The room is full', 'Isla del Hierro': 'Iron Island', 'Cordillera Helada': 'Frozen Range', 'La construcción en línea llegará pronto': 'Online building is coming soon' });
+RULES.unshift([/^Tribu: (.+)$/, (m) => `Tribe: ${m[1]}`], [/^(.+) ha abatido a (.+)$/, (m) => `${m[1]} killed ${m[2]}`], [/^Te ha abatido (.+)\. Reapareces en otro punto de la isla\.$/, (m) => `${m[1]} killed you. You respawn somewhere else on the island.`], [/^Has muerto\. Reapareces en otro punto de la isla\.$/, () => 'You died. You respawn somewhere else on the island.']);
 const trCache = new Map();
 function tr(s) {
   if (LANG !== 'en' || !s) return s;
@@ -980,61 +994,81 @@ const tierTex = [
 const tierMats = tierTex.map((t, i) => new THREE.MeshStandardMaterial({ map: t, roughness: i === 3 ? .55 : .9, metalness: i === 3 ? .45 : 0 }));
 
 // ---------------------------------------------------------------- terreno
-const WORLD = 640, HALF = WORLD / 2, SEG = 320, N = SEG + 1, CELL = WORLD / SEG;
-const MOUNT = { x: 95, z: -75 }, MOUNT2 = { x: -125, z: -120 };
-function baseHeight(x, z) {
-  const r = Math.hypot(x, z * 1.1) / HALF;
-  const coast = (fbm(x * .0075 + 3, z * .0075 + 7, 4) - .5) * .3;
-  const mask = 1 - smooth(.52, .94, r + coast);
-  const base = fbm(x * .006, z * .006, 5);
-  const hills = Math.pow(base, 2.1) * 32;
-  // crestas: ruido "ridged" para que las montañas tengan aristas y valles
-  const ridge = 1 - Math.abs(fbm(x * .013 + 11, z * .013 - 4, 4) * 2 - 1);
-  const m1 = Math.exp(-((x - MOUNT.x) ** 2 + (z - MOUNT.z) ** 2) / (2 * 62 * 62)) * 44 * (.45 + .55 * ridge * ridge);
-  const m2 = Math.exp(-((x - MOUNT2.x) ** 2 + (z - MOUNT2.z) ** 2) / (2 * 48 * 48)) * 30 * (.5 + .5 * ridge);
-  return (2.2 + hills + m1 + m2) * mask - 7 * (1 - mask);
-}
-// densidad de bosque (la usan la colocación de árboles y el shader del suelo)
-const forestAt = (x, z) => smooth(.42, .64, fbm(x * .011 + 40, z * .011, 3));
-// lagos de agua dulce: se buscan sobre el relieve base y se excavan con un dique natural
-const LAKES = [];
-{
-  const rng = mulberry32(777);
-  for (const [ang, rr] of [[2.25, .5], [-2.3, .42], [.95, .45], [-.9, .55], [3.0, .3]]) {
-    if (LAKES.length >= 4) break;
-    let best = null;
-    for (let t = 0; t < 300; t++) {
-      const a = ang + (rng() - .5) * .6, r = HALF * (rr + (rng() - .5) * .15), x = Math.cos(a) * r, z = Math.sin(a) * r, h = baseHeight(x, z);
-      if (h < 3.5 || h > 11) continue;
-      const sl = Math.hypot(baseHeight(x + 8, z) - baseHeight(x - 8, z), baseHeight(x, z + 8) - baseHeight(x, z - 8)) / 16;
-      if (!best || sl < best.sl) best = { x, z, sl, h };
+// @@terrain-begin (generado por tools/sync_terrain.py desde shared/terrain.js)
+// Terreno determinista por semilla: servidor y clientes generan exactamente lo mismo (sin enviar el mapa por red).
+// Con seed = 0 y world = 640 es idéntico al mapa del juego de un jugador.
+function createTerrain({ world = 640, seed = 0, maxLakes = 4 } = {}) {
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v), lerp = (a, b, t) => a + (b - a) * t;
+  const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function hash2(x, y) { let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967295; }
+  function vnoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi; const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf); const a = hash2(xi, yi), b = hash2(xi + 1, yi), c = hash2(xi, yi + 1), d = hash2(xi + 1, yi + 1); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; }
+  function fbm(x, y, o) { let s = 0, a = .5, f = 1, n = 0; for (let i = 0; i < o; i++) { s += a * vnoise(x * f + i * 17.3, y * f - i * 9.1); n += a; a *= .5; f *= 2.03; } return s / n; }
+  const WORLD = world, HALF = WORLD / 2, SEG = Math.round(WORLD / 2), N = SEG + 1, CELL = WORLD / SEG, K = WORLD / 640;
+  const so = seed ? ((seed * 7.31) % 997) : 0, sr = mulberry32(seed || 1);
+  let MOUNT = { x: 95 * K, z: -75 * K }, MOUNT2 = { x: -125 * K, z: -120 * K };
+  if (seed) { const a = sr() * 6.283, b = a + 2 + sr() * 2; MOUNT = { x: Math.cos(a) * HALF * .3, z: Math.sin(a) * HALF * .3 }; MOUNT2 = { x: Math.cos(b) * HALF * .38, z: Math.sin(b) * HALF * .38 }; }
+  function baseHeight(x, z) {
+    const r = Math.hypot(x, z * 1.1) / HALF;
+    const coast = (fbm(x * .0075 + 3 + so, z * .0075 + 7 + so, 4) - .5) * .3;
+    const mask = 1 - smooth(.52, .94, r + coast);
+    const base = fbm(x * .006 + so, z * .006 + so, 5);
+    const hills = Math.pow(base, 2.1) * 32;
+    const ridge = 1 - Math.abs(fbm(x * .013 + 11 + so, z * .013 - 4 + so, 4) * 2 - 1);
+    const m1 = Math.exp(-((x - MOUNT.x) ** 2 + (z - MOUNT.z) ** 2) / (2 * 62 * 62 * K * K)) * 44 * (.45 + .55 * ridge * ridge);
+    const m2 = Math.exp(-((x - MOUNT2.x) ** 2 + (z - MOUNT2.z) ** 2) / (2 * 48 * 48 * K * K)) * 30 * (.5 + .5 * ridge);
+    return (2.2 + hills + m1 + m2) * mask - 7 * (1 - mask);
+  }
+  const forestAt = (x, z) => smooth(.42, .64, fbm(x * .011 + 40 + so, z * .011 + so, 3));
+  const LAKES = [];
+  {
+    const rng = mulberry32(777 + (seed | 0));
+    const spots = [[2.25, .5], [-2.3, .42], [.95, .45], [-.9, .55], [3.0, .3], [1.6, .6], [-1.5, .62], [0.2, .35], [-3.0, .55]];
+    for (const [ang, rr] of spots) {
+      if (LAKES.length >= maxLakes) break;
+      let best = null;
+      for (let t = 0; t < 300; t++) {
+        const a = ang + (rng() - .5) * .6, r = HALF * (rr + (rng() - .5) * .15), x = Math.cos(a) * r, z = Math.sin(a) * r, h = baseHeight(x, z);
+        if (h < 3.5 || h > 11) continue;
+        const sl = Math.hypot(baseHeight(x + 8, z) - baseHeight(x - 8, z), baseHeight(x, z + 8) - baseHeight(x, z - 8)) / 16;
+        if (!best || sl < best.sl) best = { x, z, sl, h };
+      }
+      if (best && best.sl < .25 && !LAKES.some((L) => Math.hypot(L.x - best.x, L.z - best.z) < 70)) LAKES.push({ x: best.x, z: best.z, R: 13 + rng() * 6, level: best.h - .4 });
     }
-    if (best && best.sl < .25 && !LAKES.some((L) => Math.hypot(L.x - best.x, L.z - best.z) < 70)) LAKES.push({ x: best.x, z: best.z, R: 13 + rng() * 6, level: best.h - .4 });
   }
-}
-function rawHeight(x, z) {
-  let h = baseHeight(x, z);
-  for (const L of LAKES) {
-    const d = Math.hypot(x - L.x, z - L.z);
-    if (d > L.R * 1.45) continue;
-    if (d < L.R) h = Math.min(h, L.level + .02 - 3.2 * (1 - (d / L.R) ** 2));
-    else if (d < L.R * 1.12) h = Math.max(h, L.level + .02 + .6 * smooth(L.R, L.R * 1.12, d));
-    else h = Math.max(h, lerp(L.level + .62, h, smooth(L.R * 1.12, L.R * 1.45, d)));
+  function rawHeight(x, z) {
+    let h = baseHeight(x, z);
+    for (const L of LAKES) {
+      const d = Math.hypot(x - L.x, z - L.z);
+      if (d > L.R * 1.45) continue;
+      if (d < L.R) h = Math.min(h, L.level + .02 - 3.2 * (1 - (d / L.R) ** 2));
+      else if (d < L.R * 1.12) h = Math.max(h, L.level + .02 + .6 * smooth(L.R, L.R * 1.12, d));
+      else h = Math.max(h, lerp(L.level + .62, h, smooth(L.R * 1.12, L.R * 1.45, d)));
+    }
+    return h;
   }
-  return h;
+  const heights = new Float32Array(N * N);
+  for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) heights[iz * N + ix] = rawHeight(-HALF + ix * CELL, -HALF + iz * CELL);
+  function terrainH(x, z) {
+    const fx = (x + HALF) / CELL, fz = (z + HALF) / CELL;
+    if (fx < 0 || fz < 0 || fx >= SEG || fz >= SEG) return -8;
+    const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, i = iz * N + ix;
+    return lerp(lerp(heights[i], heights[i + 1], tx), lerp(heights[i + N], heights[i + N + 1], tx), tz);
+  }
+  const slopeAt = (x, z) => Math.hypot(terrainH(x + 1, z) - terrainH(x - 1, z), terrainH(x, z + 1) - terrainH(x, z - 1)) / 2;
+  const lakeAt = (x, z) => { for (const L of LAKES) if ((x - L.x) ** 2 + (z - L.z) ** 2 < L.R * L.R) return L; return null; };
+  const nearLake = (x, z, f) => LAKES.some((L) => Math.hypot(x - L.x, z - L.z) < L.R * f);
+  return { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake };
 }
-const heights = new Float32Array(N * N);
-for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) heights[iz * N + ix] = rawHeight(-HALF + ix * CELL, -HALF + iz * CELL);
-function terrainH(x, z) {
-  const fx = (x + HALF) / CELL, fz = (z + HALF) / CELL;
-  if (fx < 0 || fz < 0 || fx >= SEG || fz >= SEG) return -8;
-  const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, i = iz * N + ix;
-  const a = heights[i], b = heights[i + 1], c = heights[i + N], d = heights[i + N + 1];
-  return lerp(lerp(a, b, tx), lerp(c, d, tx), tz);
-}
-function slopeAt(x, z) { return Math.hypot(terrainH(x + 1, z) - terrainH(x - 1, z), terrainH(x, z + 1) - terrainH(x, z - 1)) / 2; }
-const lakeAt = (x, z) => { for (const L of LAKES) if ((x - L.x) ** 2 + (z - L.z) ** 2 < L.R * L.R) return L; return null; };
-const nearLake = (x, z, f) => LAKES.some((L) => Math.hypot(x - L.x, z - L.z) < L.R * f);
+
+const MAPS = {
+  isla: { name: 'Isla del Hierro', seed: 0, world: 640 },
+  cordillera: { name: 'Cordillera Helada', seed: 90210, world: 640 },
+};
+const MAP_ID = (location.search.match(/[?&]map=(\w+)/) || [])[1] in MAPS ? location.search.match(/[?&]map=(\w+)/)[1] : 'isla';
+const TERRAIN = createTerrain({ world: MAPS[MAP_ID].world, seed: MAPS[MAP_ID].seed });
+const { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake } = TERRAIN;
+// @@terrain-end
 
 // textura de control que leen los shaders: R altura, G hierba, B nivel del agua más cercana, A bosque
 const ctlData = new Float32Array(N * N * 4);
@@ -2349,7 +2383,7 @@ function fireArrow(dmg, speed) {
   const right = new THREE.Vector3().crossVectors(dir, camera.up).normalize(), p = new THREE.Vector3(); camera.getWorldPosition(p);
   p.addScaledVector(dir, .7).addScaledVector(right, .08).y -= .07;
   m.position.copy(p); m.lookAt(p.clone().add(dir)); scene.add(m);
-  arrows.push({ m, pos: p, vel: dir.multiplyScalar(speed), life: 6, stuck: false, dmg });
+  arrows.push({ m, pos: p, vel: dir.multiplyScalar(speed), life: 6, stuck: false, dmg, weapon: speed > 55 ? 'crossbow' : 'bow', charge: clamp((speed / 46 - .5) * 2, .3, 1) });
 }
 // arco: mantener el clic tensa la cuerda, soltar dispara. La potencia y el daño crecen con el tensado.
 function updateBow(dt) {
@@ -2486,8 +2520,8 @@ const VK = {
   boss: { cl: 'black', pants: 'black', helm: 'jarl', fur: 1.7, mail: true, weapon: 'dane', shield: 2, banner: true, rings: true, pauldron: true, rage: true, gold: true },
 };
 const SW_KEYS = [[0, 0, -.5, .3], [.3, -2.5, -.35, -1.3], [.52, -1.4, -.15, 1.9], [.78, -1.0, -.3, 1.1], [1, 0, -.5, .3]];
-function vikingModel(type) {
-  const V = VK[type], g = new THREE.Group(), out = { g, type }, pick = (a) => a[(Math.random() * a.length) | 0];
+function vikingModel(type, opts) {
+  const V = Object.assign({}, VK[type], opts || {}), g = new THREE.Group(), out = { g, type }, pick = (a) => a[(Math.random() * a.length) | 0];
   const skin = pick(MT.skins), hair = pick(MT.hairs), cloth = MT.cl[V.cl], pants = MT.pants[V.pants], eyeM = V.rage ? BOT_MATS.eye : MT.eye;
   const leg = (sd) => {
     const hip = new THREE.Group(); hip.position.set(sd * .12, .92, 0); g.add(hip);
@@ -2767,6 +2801,7 @@ function endSiege() {
   save();
 }
 function updateSiege(dt) {
+  if (ONLINE) return;
   const night = isNight();
   if (night && !siege.active && stats.siegeDone !== dayCount && clock > 20) startSiege(dayCount);
   if (!night && siege.active) endSiege();
@@ -3352,6 +3387,7 @@ addEventListener('keydown', (e) => {
   if (panelOpen) { if (e.code === 'Escape') togglePanel(); return; }
   if (e.code === 'Escape') { if (mapOpen) { toggleMap(); return; } pauseGame(); return; }
   if (/^Digit[1-6]$/.test(e.code)) { const n = +e.code.slice(5) - 1; if (buildMode) { if (n < 4) buildPiece = n; } else sel = n; }
+  if (e.code === 'KeyB' && NET.on) { toast('La construcción en línea llegará pronto', 'info'); return; }
   if (e.code === 'KeyB') { buildMode = !buildMode; ui.build.hidden = !buildMode; hotVer = -1; }
   if (e.code === 'KeyE') interact();
   if (e.code === 'KeyX' && buildMode) demolish();
@@ -3389,7 +3425,7 @@ function startGame() {
   if (!fallbackLook) requestLock();
 }
 function pauseGame() { if (state !== 'playing') return; state = 'paused'; mouseL = false; $('#pause').hidden = false; $('#resetConfirm').hidden = true; $('#records2').textContent = recordsText(); save(); }
-$('#btnPlay').addEventListener('click', startGame);
+$('#btnPlay').addEventListener('click', () => { if (ONLINE && !NET.on) { audio(); netConnect(); } else startGame(); });
 $('#btnResume').addEventListener('click', startGame);
 let resetArmed = false;
 function resetGame() { if (!resetArmed) { resetArmed = true; $('#resetConfirm').hidden = false; return; } try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); }
@@ -3404,7 +3440,7 @@ const doRespawn = () => {
   if (!bed) for (const b of bots.slice()) if (Math.hypot(b.pos.x - SPAWN.x, b.pos.z - SPAWN.z) < 60) killBot(b, false);
   $('#death').hidden = true; startGame();
 };
-$('#btnRespawn').addEventListener('click', () => showAd(doRespawn));
+$('#btnRespawn').addEventListener('click', () => showAd(ONLINE && NET.on ? () => { NET.wantRespawn = true; netSend({ t: 'respawn' }); } : doRespawn));
 
 // ---------------------------------------------------------------- apuntado y acciones
 const raycaster = new THREE.Raycaster(); const CENTER = new THREE.Vector2(0, 0);
@@ -3412,10 +3448,11 @@ let aim = null;
 function computeAim() {
   camera.updateMatrixWorld();
   raycaster.setFromCamera(CENTER, camera); raycaster.far = 7;
-  const hits = raycaster.intersectObjects([...nodeMeshes, pieceRoot, depRoot, botRoot, animalRoot, poiRoot], true);
+  const hits = raycaster.intersectObjects([...nodeMeshes, pieceRoot, depRoot, botRoot, animalRoot, poiRoot, remoteRoot], true);
   for (const h of hits) {
     const o = h.object;
     if (o.isInstancedMesh) { const n = instOwner.get(o)[h.instanceId]; if (n && !n.depleted) return { kind: 'node', n, d: h.distance, p: h.point }; continue; }
+    if (o.userData.remote) return { kind: 'remote', id: o.userData.remote, d: h.distance, p: h.point };
     if (o.userData.bot) return { kind: 'bot', b: o.userData.bot, d: h.distance, p: h.point };
     if (o.userData.animal) return { kind: 'animal', an: o.userData.animal, d: h.distance, p: h.point };
     if (o.userData.piece) return { kind: 'piece', piece: o.userData.piece, d: h.distance, p: h.point, normal: h.face ? h.face.normal.clone().transformDirection(o.matrixWorld) : null };
@@ -3515,6 +3552,8 @@ function primaryAction() {
     burst(a.p, type === 'tree' || type === 'appletree' ? 'wood' : type === 'bush' ? 'leaf' : type === 'berry' ? 'berry' : type === 'ore' ? 'ore' : 'stone', 6);
     for (const [id, n] of r.loot) giveItem(id, n);
     if (s && maxDur(s.id) && inv.wear(sel, 1)) toast(ITEMS[s.id].name + ' se ha roto', 'bad');
+  } else if (a.kind === 'remote') {
+    const r = NET.remotes.get(a.id); if (r && !r.dead) { remoteHit(r, s ? s.id : 'fists'); netSend({ t: 'swing' }); sfx.hit(); burst(a.p, 'blood', 4); if (s && maxDur(s.id) && inv.wear(sel, 1)) toast(ITEMS[s.id].name + ' se ha roto', 'bad'); }
   } else if (a.kind === 'bot') {
     hurtBot(a.b, tool.dmg, a.p); if (s && maxDur(s.id) && inv.wear(sel, 1)) toast(ITEMS[s.id].name + ' se ha roto', 'bad');
   } else if (a.kind === 'animal') {
@@ -3659,6 +3698,7 @@ function updateGhost() {
   ghost.traverse((m) => { if (m.isMesh) m.material = mat; });
 }
 function tryPlace() {
+  if (NET.on) return;
   if (!placement) return false;
   if (!placement.ok) { toast(placement.why, 'bad'); sfx.bad(); return true; }
   if (placement.dep) {
@@ -3714,6 +3754,8 @@ function updateHint() {
     const an = a.an;
     if (an.dead) h = `<span>${an.def.name} abatido</span><span class="bar"><i style="width:${an.corpse.hp / 60 * 100}%"></i></span><span>Golpéalo para sacar carne y piel</span>`;
     else h = `<span class="${an.def.temper === 'flee' ? '' : 'warn'}">${an.def.name}${an.def.temper === 'hunt' ? ' (peligroso)' : ''}</span><span class="bar"><i style="width:${an.hp / an.def.hp * 100}%;background:var(--blood)"></i></span>${an.def.temper === 'flee' ? '<span>Acércate sin correr, o usa el arco</span>' : ''}`;
+  } else if (a && a.kind === 'remote') {
+    const r = NET.remotes.get(a.id); if (r) h = `<span class="${r.friend ? '' : 'warn'}">${r.info.name}</span><span class="bar"><i style="width:${r.hp}%;background:${r.friend ? 'var(--moss)' : 'var(--blood)'}"></i></span><span>Tribu: ${r.info.tribe}</span>`;
   } else if (a && a.kind === 'bot') {
     const tip = { archer: 'Dispara de lejos: cúbrete tras un muro', torcher: 'Lanza antorchas: la paja y la madera arden', brute: 'Revienta puertas y te empuja', sapper: 'Lleva pólvora: mátalo lejos de tus muros', boss: 'Su escudo para los golpes de frente: rodéalo' }[a.b.type];
     h = `<span class="warn">${a.b.def.name}${a.b.carry ? ' (lleva tu botín)' : ''}</span><span class="bar"><i style="width:${Math.max(0, a.b.hp / a.b.maxHp * 100)}%;background:var(--blood)"></i></span>${tip ? '<span>' + tip + '</span>' : ''}`;
@@ -3928,7 +3970,7 @@ function drawCompass() {
 // ---------------------------------------------------------------- guardado
 const SAVE_KEY = 'isla-de-hierro-v3';
 function save() {
-  if (state === 'menu') return;
+  if (state === 'menu' || ONLINE) return;
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       v: 1, inv: inv.slots, sel, p: [player.pos.x, player.pos.y, player.pos.z], yaw: player.yaw, hp: player.hp, hunger: player.hunger, thirst: player.thirst, phase: dayPhase, day: dayCount, obj: objIndex, stats, found: POIS.filter((q) => q.found).map((q) => q.name),
@@ -3951,7 +3993,7 @@ function load() {
     return true;
   } catch (e) { return false; }
 }
-if (load()) { $('#btnPlay').textContent = 'Continuar'; $('#btnNew').hidden = false; }
+if (!ONLINE && load()) { $('#btnPlay').textContent = 'Continuar'; $('#btnNew').hidden = false; }
 $('#records').textContent = recordsText();
 setInterval(() => { if (state === 'playing') save(); }, 15000);
 addEventListener('beforeunload', save);
@@ -4010,6 +4052,107 @@ function showAd(done) {
     });
   } catch (e) { fin(); }
   setTimeout(fin, 90000);
+}
+
+// ---------------------------------------------------------------- modo en línea (servidor autoritativo)
+const NET = { on: false, ws: null, id: 0, remotes: new Map(), roster: new Map(), tribe: '', name: '', sendT: 0, wantRespawn: false, killFeedT: 0 };
+const remoteRoot = new THREE.Group(); scene.add(remoteRoot);
+const urlParam = (k) => { const m = location.search.match(new RegExp('[?&]' + k + '=([^&]*)')); return m ? decodeURIComponent(m[1]) : ''; };
+const SERVER_URL = urlParam('server') || (location.protocol === 'https:' ? 'wss://pvp-island.example.com' : 'ws://localhost:8080');
+function netSend(m) { if (NET.ws && NET.ws.readyState === 1) NET.ws.send(JSON.stringify(m)); }
+const TRIBE_CLOTH = ['red', 'blue', 'green', 'brown', 'grey', 'ember'];
+const tribeCloth = (t) => { let h = 0; for (const c of String(t)) h = (h * 31 + c.charCodeAt(0)) | 0; return TRIBE_CLOTH[Math.abs(h) % TRIBE_CLOTH.length]; };
+function nameTag(text, color) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d'); g.font = '700 30px sans-serif'; g.textAlign = 'center'; g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,.8)'; g.strokeText(text, 128, 42); g.fillStyle = color; g.fillText(text, 128, 42);
+  const t = new THREE.CanvasTexture(c); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false })); sp.scale.set(1.9, .48, 1); sp.renderOrder = 10; return sp;
+}
+function makeRemote(id) {
+  const info = NET.roster.get(id) || { name: 'Player', tribe: '?' };
+  const mdl = vikingModel('raider', { cl: tribeCloth(info.tribe) });
+  const b = { mdl, def: ETYPES.raider, type: 'raider', walk: 0, swing: 1, windup: 0, los: false, mode: 'remote', stun: 0, rcd: 5, fuse: -1 };
+  mdl.g.traverse((o) => { o.userData.remote = id; });
+  const friend = info.tribe === NET.tribe, tag = nameTag(info.name + (info.bot ? '' : ''), friend ? '#9be37a' : '#ff8a7a'); tag.position.y = 2.3; mdl.g.add(tag);
+  remoteRoot.add(mdl.g);
+  const r = { id, g: mdl.g, b, pos: new THREE.Vector3(), tgt: new THREE.Vector3(), yaw: 0, tyaw: 0, hp: 100, dead: false, fresh: true, info, friend };
+  NET.remotes.set(id, r); return r;
+}
+function dropRemote(r) { remoteRoot.remove(r.g); disposeModel(r.g); NET.remotes.delete(r.id); }
+function netSnap(m) {
+  const seen = new Set();
+  for (const e of m.p) {
+    const id = e[0];
+    if (id === NET.id) { if (state === 'playing' && e[5] > 0) player.hp = e[5]; continue; }
+    seen.add(id); let r = NET.remotes.get(id) || makeRemote(id);
+    r.tgt.set(e[1], e[2], e[3]); r.tyaw = e[4]; r.hp = e[5]; r.dead = !!e[6];
+    if (r.fresh) { r.pos.copy(r.tgt); r.yaw = r.tyaw; r.fresh = false; }
+  }
+  for (const r of [...NET.remotes.values()]) if (!seen.has(r.id)) dropRemote(r);
+}
+function updateRemotes(dt) {
+  for (const r of NET.remotes.values()) {
+    const px = r.pos.x, pz = r.pos.z, k = 1 - Math.exp(-14 * dt);
+    r.pos.lerp(r.tgt, k); r.yaw = lerpAngle(r.yaw, r.tyaw + Math.PI, k);
+    const moved = Math.hypot(r.pos.x - px, r.pos.z - pz); r.b.walk += moved; r.b.swing = Math.min(1, r.b.swing + dt * 2.8);
+    r.g.position.copy(r.pos); r.g.rotation.order = 'YXZ'; r.g.rotation.y = r.yaw;
+    animViking(r.b, dt, moved);
+    r.g.rotation.x = r.dead ? -1.5 : 0; r.g.position.y = r.pos.y - (r.dead ? .1 : 0);
+  }
+}
+function netMsg(m) {
+  if (m.t === 'welcome') {
+    NET.id = m.id; NET.tribe = m.tribe; NET.roster.clear(); for (const q of m.roster) NET.roster.set(q.id, q);
+    player.pos.set(m.x, terrainH(m.x, m.z) + .1, m.z); player.vel.set(0, 0, 0); player.hp = 100; NET.on = true; document.body.classList.add('online-on');
+    $('#netStatus').textContent = ''; startGame(); toast(`Tribu: ${m.tribe}`, 'info');
+  } else if (m.t === 'snap') netSnap(m);
+  else if (m.t === 'join') { NET.roster.set(m.id, { id: m.id, name: m.name, tribe: m.tribe, bot: m.bot }); }
+  else if (m.t === 'leave') { NET.roster.delete(m.id); const r = NET.remotes.get(m.id); if (r) dropRemote(r); }
+  else if (m.t === 'swing') { const r = NET.remotes.get(m.id); if (r) r.b.swing = 0; }
+  else if (m.t === 'hit') { if (m.id === NET.id) { player.hp = m.hp; sfx.hurt(); camShake = Math.max(camShake, .25); ui.hurt.style.boxShadow = 'inset 0 0 160px rgba(200,30,20,.55)'; setTimeout(() => { ui.hurt.style.boxShadow = 'inset 0 0 160px rgba(200,30,20,0)'; }, 160); } else { const r = NET.remotes.get(m.id); if (r) { r.hp = m.hp; burst(r.pos.clone().setY(r.pos.y + 1.2), 'blood', 5); } } }
+  else if (m.t === 'kill') {
+    const v = NET.roster.get(m.victim), k = NET.roster.get(m.killer);
+    if (k && v) toast(`${k.name} ha abatido a ${v.name}`, m.killer === NET.id ? 'info' : undefined);
+    if (m.victim === NET.id) netDie(k ? k.name : '', m.cause);
+    else if (m.killer === NET.id) { stats.kills = (stats.kills || 0) + 1; }
+  } else if (m.t === 'correct') { player.pos.set(m.x, m.y, m.z); player.vel.set(0, 0, 0); }
+  else if (m.t === 'respawn') { if (NET.wantRespawn) { NET.wantRespawn = false; player.pos.set(m.x, terrainH(m.x, m.z) + .1, m.z); player.vel.set(0, 0, 0); player.hp = 100; player.hunger = Math.max(player.hunger, 70); player.thirst = Math.max(player.thirst, 70); player.air = 1; $('#death').hidden = true; startGame(); } }
+  else if (m.t === 'chat') toast(`${m.tribe ? '[' + NET.tribe + '] ' : ''}${m.from}: ${m.text}`, 'info');
+  else if (m.t === 'full') { $('#netStatus').textContent = 'La sala está llena'; netClose(); }
+  else if (m.t === 'rooms') { NET.rooms = m.rooms; renderRooms(); }
+}
+function netDie(by, cause) {
+  if (state === 'dead') return;
+  $('#deathTxt').textContent = by ? `Te ha abatido ${by}. Reapareces en otro punto de la isla.` : 'Has muerto. Reapareces en otro punto de la isla.';
+  player.hp = 0; state = 'dead'; mouseL = false; if (panelOpen) togglePanel(); if (locked) document.exitPointerLock(); $('#death').hidden = false;
+}
+function netClose() { try { if (NET.ws) { NET.ws.onclose = null; NET.ws.close(); } } catch (e) { /* ya cerrado */ } NET.ws = null; NET.on = false; document.body.classList.remove('online-on'); }
+function netConnect() {
+  const name = ($('#inName').value || 'Player').trim().slice(0, 16), tribe = ($('#inTribe').value || '').trim().slice(0, 16);
+  try { localStorage.setItem('pvp-name', name); localStorage.setItem('pvp-tribe', tribe); } catch (e) { /* sin almacenamiento */ }
+  $('#netStatus').textContent = 'Conectando…'; NET.name = name;
+  let ws; try { ws = new WebSocket(SERVER_URL); } catch (e) { $('#netStatus').textContent = 'No se pudo conectar con el servidor'; return; }
+  NET.ws = ws; let opened = false;
+  ws.onopen = () => { opened = true; ws.send(JSON.stringify({ t: 'join', name, tribe, map: MAP_ID })); };
+  ws.onmessage = (e) => { try { netMsg(JSON.parse(e.data)); } catch (err) { /* mensaje inválido */ } };
+  ws.onerror = () => { if (!opened) $('#netStatus').textContent = 'No se pudo conectar con el servidor'; };
+  ws.onclose = () => { const was = NET.on; netClose(); if (was) { toast('Conexión perdida', 'bad'); if (state === 'playing') pauseGame(); } else if (opened) $('#netStatus').textContent = 'Conexión perdida'; };
+}
+function renderRooms() {
+  const box = $('#roomList'); box.innerHTML = '';
+  for (const r of NET.rooms) { const b = document.createElement('button'); b.type = 'button'; b.className = 'chipbtn' + (r.map === MAP_ID ? ' on' : ''); b.textContent = `${r.name} · ${r.players}/${r.max}`; b.addEventListener('click', () => { if (r.map !== MAP_ID) { const u = new URL(location.href); u.searchParams.set('map', r.map); location.href = u.toString(); } }); box.appendChild(b); }
+}
+function netListRooms() {
+  try { const ws = new WebSocket(SERVER_URL); ws.onopen = () => ws.send(JSON.stringify({ t: 'list' })); ws.onmessage = (e) => { try { const m = JSON.parse(e.data); if (m.t === 'rooms') { NET.rooms = m.rooms; renderRooms(); ws.close(); } } catch (err) { /* ignorar */ } }; ws.onerror = () => { $('#netStatus').textContent = 'No se pudo conectar con el servidor'; }; } catch (e) { /* sin red */ }
+}
+function netTick(dt) {
+  if (!NET.on) return;
+  updateRemotes(dt);
+  if (state === 'playing' && (NET.sendT -= dt) <= 0) { NET.sendT = .05; netSend({ t: 'pos', x: +player.pos.x.toFixed(2), y: +player.pos.y.toFixed(2), z: +player.pos.z.toFixed(2), yaw: +player.yaw.toFixed(3), pitch: +player.pitch.toFixed(3) }); }
+}
+function remoteHit(r, weapon, extra) { netSend(Object.assign({ t: weapon === 'bow' || weapon === 'crossbow' ? 'shot' : 'attack', target: r.id, weapon }, extra || {})); }
+if (ONLINE) {
+  document.body.classList.add('online');
+  try { $('#inName').value = localStorage.getItem('pvp-name') || ('Player' + Math.floor(100 + Math.random() * 900)); $('#inTribe').value = localStorage.getItem('pvp-tribe') || ''; } catch (e) { $('#inName').value = 'Player' + Math.floor(100 + Math.random() * 900); }
+  netListRooms();
 }
 
 // ---------------------------------------------------------------- bucle principal
@@ -4090,7 +4233,7 @@ function updatePlayer(dt) {
   player.thirst = Math.max(0, player.thirst - dt * .16 * exert);
   if (player.hunger <= 0 || player.thirst <= 0) { if ((player.starveT = (player.starveT || 0) + dt) > 1.5) { player.starveT = 0; hurtPlayer(player.hunger <= 0 && player.thirst <= 0 ? 4 : 3, player.thirst <= 0 ? 'thirst' : 'hunger', true); } }
   // regeneración lenta fuera de combate, solo bien alimentado
-  if (clock - player.lastHurt > 12 && player.hp < 100 && player.hunger > 35 && player.thirst > 35) player.hp = Math.min(100, player.hp + dt * .6);
+  if (!ONLINE && clock - player.lastHurt > 12 && player.hp < 100 && player.hunger > 35 && player.thirst > 35) player.hp = Math.min(100, player.hp + dt * .6);
 }
 const DEATH_TXT = {
   raider: 'Los Errantes te han dejado fuera de combate.',
@@ -4110,6 +4253,7 @@ const DEATH_TXT = {
 function hurtPlayer(dmg, cause, quiet) {
   if (player.hp <= 0) return;
   if (player.armorId && ['raider', 'wolf', 'boar', 'arrow', 'explosion', 'boss', 'trap', 'fire'].includes(cause)) dmg *= 1 - ITEMS[player.armorId].armor;
+  if (ONLINE && NET.on) { netSend({ t: 'selfdmg', amt: dmg, cause }); player.lastHurt = clock; if (!quiet) camShake = Math.max(camShake, .2); return; }
   player.hp -= dmg; player.lastHurt = clock; if (!quiet || player.hp < 25) sfx.hurt(); if (!quiet) camShake = Math.max(camShake, .2);
   ui.hurt.style.boxShadow = `inset 0 0 160px rgba(200,30,20,${quiet ? .3 : .55})`; setTimeout(() => { ui.hurt.style.boxShadow = 'inset 0 0 160px rgba(200,30,20,0)'; }, 160);
   if (player.hp <= 0) {
@@ -4130,6 +4274,7 @@ function updateArrows(dt) {
       let hit = false;
       const seg = np.clone().sub(a.pos), sl = seg.lengthSq() || 1e-6;
       for (const b of bots) { const c = b.pos.clone(); c.y += 1.1; const t = clamp(c.clone().sub(a.pos).dot(seg) / sl, 0, 1); if (a.pos.clone().addScaledVector(seg, t).distanceTo(c) < .55) { hurtBot(b, a.dmg, c, 'arrow', a.pos); hit = true; break; } }
+      if (!hit && NET.on) for (const r of NET.remotes.values()) { if (r.dead || r.friend) continue; const c = r.pos.clone(); c.y += 1.1; const t = clamp(c.clone().sub(a.pos).dot(seg) / sl, 0, 1); if (a.pos.clone().addScaledVector(seg, t).distanceTo(c) < .6) { remoteHit(r, a.weapon, { charge: a.charge }); burst(c, 'blood', 5); hit = true; break; } }
       if (!hit) for (const an of animals) { if (an.dead) continue; const c = an.pos.clone(); c.y += an.def.height * .5; const t = clamp(c.clone().sub(a.pos).dot(seg) / sl, 0, 1); if (a.pos.clone().addScaledVector(seg, t).distanceTo(c) < an.def.radius + .3) { hurtAnimal(an, a.dmg, c); hit = true; break; } }
       if (under && a.vel.lengthSq() < .3) { a.stuck = true; a.life = Math.min(a.life, 4); }
       if (hit) { scene.remove(a.m); arrows.splice(arrows.indexOf(a), 1); continue; }
@@ -4187,7 +4332,7 @@ function tick(dt, now) {
     else if (mouseL && !buildMode) primaryAction();
   } else if (ghost) ghost.visible = false;
   clickQueued = false;
-  updateBow(dt); updateVM(dt); updateParts(dt); updateDebris(dt); updateHint(); drawCompass(); if (mapOpen) drawMap(); if (buildMode) renderBuildBar(); renderHotbar(); updateToasts();
+  netTick(dt); updateBow(dt); updateVM(dt); updateParts(dt); updateDebris(dt); updateHint(); drawCompass(); if (mapOpen) drawMap(); if (buildMode) renderBuildBar(); renderHotbar(); updateToasts();
   ui.hp.style.width = player.hp + '%'; ui.stam.style.width = player.stamina + '%'; ui.stamW.classList.toggle('low', !!player.exhausted);
   ui.food.style.width = player.hunger + '%'; ui.drink.style.width = player.thirst + '%';
   ui.foodW.classList.toggle('low', player.hunger < 20); ui.drinkW.classList.toggle('low', player.thirst < 20);
@@ -4251,7 +4396,7 @@ updateObjective();
 setLang(LANG);
 requestAnimationFrame(frame);
 // gancho de pruebas: avanza la simulación sin depender de los FPS
-window.__isla = { hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
+window.__isla = { remotes: () => NET.remotes.values(), NET, netMsg, netSend, remoteHit, hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
   player, inv, nodes, pieces, animals, spawnAnimal, LAKES, waterSurfaceAt, stats, giveItem, spawnBot, terrainH, spawn: SPAWN, scene, refreshEnv, renderer, POIS, destroyPiece, post, weather, setWeather(w) { wxState = w; wxTimer = 999; }, ctlData, N, CELL, HALF, camera, pieceRoot, get state() { return state; }, get aim() { return aim; }, get placement() { return placement; }, get waterAim() { return waterAim; },
   sim(sec, hold) { const n = Math.round(sec / .05); for (let k = 0; k < n; k++) { if (hold) mouseL = true; if (hold === 'click' && k === 0) clickQueued = true; waterTime.value += .05; scene.updateMatrixWorld(); tick(.05, performance.now()); } if (hold) mouseL = false; },
   setPhase(p) { dayPhase = p; } };
