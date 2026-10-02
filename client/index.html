@@ -492,11 +492,13 @@ const RULES = [
   [/^Te pones: (.+)$/, (m) => `You put on: ${tr(m[1])}`], [/^(\d+) (.+)$/, (m) => (ES_EN[m[2]] ? `${m[1]} ${ES_EN[m[2]]}` : null)], [/^(.+) ×(\d+)$/, (m) => (ES_EN[m[1]] ? `${ES_EN[m[1]]} ×${m[2]}` : null)],
 ].concat(CHAL.map(([re, en]) => [re, (m) => en.replace(/\$(\d)/g, (_, i) => m[i])]));
 Object.assign(ES_EN, { 'Nombre': 'Name', 'Tribu (opcional)': 'Tribe (optional)', 'Servidor': 'Server', 'Conectando…': 'Connecting…', 'No se pudo conectar con el servidor': 'Could not connect to the server', 'Conexión perdida': 'Connection lost', 'La sala está llena': 'The room is full', 'Isla del Hierro': 'Iron Island', 'Cordillera Helada': 'Frozen Range', 'La construcción en línea llegará pronto': 'Online building is coming soon',
+  'Caballo': 'Horse', 'Domado': 'Tamed', 'Montar': 'Mount', 'Desmontar': 'Dismount', 'No se puede domar': 'It cannot be tamed', 'Este animal ya está domado': 'This animal is already tamed', 'Montado: pulsa F para bajar': 'Mounted: press F to dismount',
   'Bolsa de botín': 'Loot bag', 'Recoger': 'Pick up', 'Esto no es de tu tribu': 'This does not belong to your tribe', 'No puedes abrir este cofre': 'You cannot open this chest', 'Los recolectores de lluvia aún no funcionan en línea': 'Rain collectors do not work online yet', 'Tu tribu ha alcanzado el límite de objetos': 'Your tribe reached the object limit', 'Objeto no válido': 'Invalid object', 'Pieza no válida': 'Invalid piece', 'Posición no válida': 'Invalid position', 'Ya hay una pieza aquí': 'There is already a piece here', 'Tu tribu ha alcanzado el límite de piezas': 'Your tribe reached the piece limit', 'Esta construcción no es de tu tribu': 'This building does not belong to your tribe', 'Esta puerta no es de tu tribu': 'This door does not belong to your tribe',
   'Aceptar [Y]': 'Accept [Y]', 'Rechazar [N]': 'Decline [N]', 'Abandonar tribu': 'Leave tribe', 'Clic der. (mantener)': 'Right click (hold)', 'Invitar a tribu': 'Invite to tribe', 'Chat': 'Chat', 'Enter': 'Enter',
   'Está demasiado lejos': 'They are too far away', 'Ese jugador ya tiene tribu': 'That player already has a tribe', 'Tu tribu está completa (máximo 3)': 'Your tribe is full (maximum 3)', 'Esa tribu está completa (máximo 3)': 'That tribe is full (maximum 3)', 'Ya tienes tribu': 'You already have a tribe',
   'Tu tribu se ha disuelto': 'Your tribe has been dissolved', 'No tienes tribu': "You don't have a tribe", 'Has abandonado la tribu': 'You left the tribe', 'Escribe y pulsa Enter (/t para tu tribu)': 'Type and press Enter (/t for your tribe)' });
-RULES.unshift([/^(.+) te invita a su tribu$/, (m) => `${m[1]} invites you to their tribe`], [/^Invitar a tribu: (.+)$/, (m) => `Invite to tribe: ${m[1]}`], [/^Invitación enviada a (.+)$/, (m) => `Invitation sent to ${m[1]}`], [/^(.+) ha rechazado la invitación$/, (m) => `${m[1]} declined the invitation`],
+RULES.unshift([/^Domar \((.+)\)$/, (m) => `Tame (${tr(m[1])})`], [/^Domando: (\d+)%$/, (m) => `Taming: ${m[1]}%`], [/^(.+) ha domado un animal$/, (m) => `${m[1]} tamed an animal`], [/^(.+) \(domado\)$/, (m) => `${tr(m[1])} (tamed)`], [/^manzana o bayas$/, () => 'apple or berries'],
+  [/^(.+) te invita a su tribu$/, (m) => `${m[1]} invites you to their tribe`], [/^Invitar a tribu: (.+)$/, (m) => `Invite to tribe: ${m[1]}`], [/^Invitación enviada a (.+)$/, (m) => `Invitation sent to ${m[1]}`], [/^(.+) ha rechazado la invitación$/, (m) => `${m[1]} declined the invitation`],
   [/^(.+) se ha unido a la tribu$/, (m) => `${m[1]} joined the tribe`], [/^(.+) ha abandonado la tribu$/, (m) => `${m[1]} left the tribe`], [/^(.+) se ha unido$/, (m) => `${m[1]} joined`], [/^(.+) ha salido$/, (m) => `${m[1]} left`], [/^Tribu de (.+)$/, (m) => `${m[1]}'s tribe`],
   [/^Tribu: (.+)$/, (m) => `Tribe: ${m[1]}`], [/^(.+) ha abatido a (.+)$/, (m) => `${m[1]} killed ${m[2]}`], [/^Te ha abatido (.+)\. Reapareces en otro punto de la isla\.$/, (m) => `${m[1]} killed you. You respawn somewhere else on the island.`], [/^Has muerto\. Reapareces en otro punto de la isla\.$/, () => 'You died. You respawn somewhere else on the island.']);
 const trCache = new Map();
@@ -615,6 +617,7 @@ const NODES = {
 const ANIMALS = {
   deer: { name: 'Ciervo', hp: 50, walk: 1.5, run: 8.2, temper: 'flee', fleeR: 15, reach: 0, height: 1.7, radius: .45, gait: 2.2, loot: { meat: 5, hide: 3, fat: 2 } },
   boar: { name: 'Jabalí', hp: 85, walk: 1.3, run: 6, temper: 'defend', provokeR: 5, dmg: 12, cd: 1.1, reach: 1.7, height: 1, radius: .45, gait: 3, loot: { meat: 6, hide: 2, fat: 4 } },
+  horse: { name: 'Caballo', hp: 120, walk: 2, run: 11, temper: 'flee', fleeR: 12, reach: 0, height: 1.9, radius: .6, gait: 2.2, loot: { meat: 8, hide: 4, fat: 0 } },
   wolf: { name: 'Lobo', hp: 60, walk: 1.8, run: 6.6, temper: 'hunt', aggro: 26, dmg: 9, cd: .95, reach: 1.6, height: 1.1, radius: .4, gait: 2.6, loot: { meat: 3, hide: 3, fat: 1 } },
 };
 const TIER_NAMES = ['Primitivo', 'Piedra', 'Hierro'];
@@ -1574,7 +1577,7 @@ function harvest(n, tool, tier) {
       n.fall = { axis: new THREE.Vector3(dz / d, 0, -dx / d), ang: 0, vel: .3, rest: 0, landed: false }; fallers.add(n); sfx.creak();
     } else if (n.type === 'rock' || n.type === 'ore' || n.type === 'sulfur') burst(new THREE.Vector3(n.x, n.y + .6, n.z), n.type === 'ore' ? 'ore' : 'stone', 22, 1.8);
   }
-  n.shake = .3; shaking.add(n); writeNode(n);
+  n.shake = .3; shaking.add(n); writeNode(n); if (depleting) netNodeDepleted(n);
   return { st: 'ok', loot, eff: ev.eff };
 }
 const shaking = new Set();
@@ -2181,6 +2184,7 @@ const MT = {
   bossShield: mt(shieldTex('#1b1c1e', '#d4b062', '#d4b062', 2), { roughness: .6, metalness: .3 }),
   flame: new THREE.MeshBasicMaterial({ color: new THREE.Color(3.6, 1.15, .22) }), flag: mt(clothTex('#7a1414', '#d4b062'), { side: THREE.DoubleSide }),
 };
+MT.fHorse = mt(strokeTex(128, '#7b4a2a', ['#5f3519', '#946038', '#a8714a', '#4d2b14'], 800, 9, 1.3, Math.PI / 2, .4, 2.5), { roughness: .9 }); MT.fHorseD = mt(strokeTex(128, '#241a14', ['#15100c', '#3a2c22'], 600, 14, 1.8, Math.PI / 2, .3, 2), { roughness: 1 });
 const FLASH_MAT = stdMat('#8f2018', { emissive: new THREE.Color(.55, .06, .03) });
 function setFlash(g, on) {
   if (g.userData.fl === on) return; g.userData.fl = on;
@@ -2508,6 +2512,17 @@ function animalModel(type) {
     kh.bake(hd);
     const tl = part(.78, -.66, -.4); out.tail = tl; out.tailRest = -.4; new Kit().arc(F, [[0, 0, 0], [0, .05, -.07], [.03, .1, -.08], [.05, .09, -.04]], .016, .006, 5).bake(tl);
     leg(-.2, .4, .46, .2, .22, .085, .065, .042, F, D, true); leg(.2, .4, .46, .2, .22, .085, .065, .042, F, D, true); leg(-.2, -.42, .46, .2, .22, .095, .065, .042, F, D, true); leg(.2, -.42, .46, .2, .22, .095, .065, .042, F, D, true); out.bodyY = .68;
+  } else if (type === 'horse') {
+    const F = MT.fHorse, M = MT.fHorseD;
+    k.add(gS(12, 9), F, 0, 1.18, 0, 0, 0, 0, .28, .31, .72); k.add(gS(10, 8), F, 0, 1.22, .5, 0, 0, 0, .29, .34, .34); k.add(gS(10, 8), F, 0, 1.2, -.5, 0, 0, 0, .28, .33, .34);
+    k.limb(F, 0, 1.3, .62, 0, 1.85, .98, .2, .12, 9); for (let i = 0; i < 7; i++) { const t = i / 6; k.add(gS(6, 5), M, 0, 1.4 + t * .55 + .12, .66 + t * .34 - .1, 0, 0, 0, .05, .1, .08); }
+    k.bake(g);
+    const hd = part(1.9, 1.0, .55), kh = new Kit(); out.head = hd; out.headRest = .55;
+    kh.add(gS(9, 7), F, 0, 0, .17, 0, 0, 0, .12, .14, .27); kh.add(gS(8, 6), F, 0, -.08, .4, .1, 0, 0, .085, .09, .17); kh.add(gS(6, 5), MT.nose, 0, -.12, .55, 0, 0, 0, .05, .045, .04); kh.add(gS(6, 4), MT.fWhite, 0, .02, .3, .1, 0, 0, .03, .05, .17);
+    for (const sd of [-1, 1]) { kh.add(gS(6, 5), MT.eye, sd * .11, .06, .2, 0, 0, 0, .025, .025, .025); kh.add(new THREE.ConeGeometry(.04, .14, 5), F, sd * .07, .17, .0, .2, 0, -sd * .2); }
+    kh.add(gS(7, 5), M, 0, .12, .05, 0, 0, 0, .05, .12, .1); kh.bake(hd);
+    const tl = part(1.3, -.85, -.5); out.tail = tl; out.tailRest = -.5; new Kit().add(gS(8, 6), M, 0, -.35, -.05, .2, 0, 0, .07, .42, .07).bake(tl);
+    leg(-.15, .5, 1.02, .5, .55, .09, .06, .04, F, MT.fHorse, true); leg(.15, .5, 1.02, .5, .55, .09, .06, .04, F, MT.fHorse, true); leg(-.16, -.5, 1.02, .5, .55, .12, .07, .04, F, MT.fHorse, true); leg(.16, -.5, 1.02, .5, .55, .12, .07, .04, F, MT.fHorse, true); out.bodyY = 1.2;
   } else {
     const F = MT.fWolf, D = MT.fWolfD, LT = MT.fWolfL;
     k.add(gS(11, 8), F, 0, .76, .26, 0, 0, 0, .17, .22, .3); k.add(gS(10, 8), F, 0, .7, -.1, 0, 0, 0, .14, .17, .3); k.add(gS(10, 8), F, 0, .72, -.38, 0, 0, 0, .15, .18, .22);
@@ -3059,6 +3074,7 @@ function butcher(a, tool, p) {
 }
 let animalTimer = 1;
 function updateAnimals(dt) {
+  if (NET.on) { if (animals.length) for (const a of animals.slice()) removeAnimal(a); return; }
   const night = isNight();
   if ((animalTimer -= dt) <= 0) {
     animalTimer = 3;
@@ -3417,6 +3433,7 @@ addEventListener('keydown', (e) => {
   if (panelOpen) { if (e.code === 'Escape') togglePanel(); return; }
   if (e.code === 'Escape') { if (mapOpen) { toggleMap(); return; } pauseGame(); return; }
   if (/^Digit[1-6]$/.test(e.code)) { const n = +e.code.slice(5) - 1; if (buildMode) { if (n < 4) buildPiece = n; } else sel = n; }
+  if (e.code === 'KeyF' && NET.on && NET.mount) { netSend({ t: 'dismount' }); return; }
   if (e.code === 'KeyB' && NET.on) { toast('La construcción en línea llegará pronto', 'info'); return; }
   if (e.code === 'KeyB') { buildMode = !buildMode; ui.build.hidden = !buildMode; hotVer = -1; }
   if (e.code === 'KeyE') interact();
@@ -3591,13 +3608,14 @@ function primaryAction() {
   } else if (a.kind === 'bot') {
     hurtBot(a.b, tool.dmg, a.p); if (s && maxDur(s.id) && inv.wear(sel, 1)) toast(ITEMS[s.id].name + ' se ha roto', 'bad');
   } else if (a.kind === 'animal') {
-    if (a.an.dead) butcher(a.an, tool, a.p); else hurtAnimal(a.an, tool.dmg, a.p);
+    if (NET.on && a.an.sid != null) { netSend({ t: a.an.dead ? 'abutcher' : 'ahit', id: a.an.sid, weapon: s ? s.id : 'fists' }); sfx.hit(); burst(a.p, 'blood', 4); }
+    else if (a.an.dead) butcher(a.an, tool, a.p); else hurtAnimal(a.an, tool.dmg, a.p);
     if (s && maxDur(s.id) && inv.wear(sel, 1)) toast(ITEMS[s.id].name + ' se ha roto', 'bad');
   }
 }
 function interact() {
   const a = aim;
-  const useful = a && a.d <= 3.5 && (a.kind === 'piece' || a.kind === 'dep' || a.kind === 'crate' || a.kind === 'loot');
+  const useful = a && a.d <= 3.5 && (a.kind === 'animal' || a.kind === 'piece' || a.kind === 'dep' || a.kind === 'crate' || a.kind === 'loot');
   if (!useful && rainDrinkable()) { if (clock >= nextDrink) { nextDrink = clock + .6; player.thirst = Math.min(100, player.thirst + 5); stats.drank = (stats.drank || 0) + 1; sfx.drink(); toast('Agua de lluvia', 5, 'w:rain'); } return; }
   if (!useful && waterAim && (!a || a.d > waterAim.d)) { drink(); return; }
   if (!a || a.d > 3.5) return;
@@ -3616,6 +3634,14 @@ function interact() {
   if (a.kind === 'dep') useDeployable(a.dep);
   if (a.kind === 'crate') openCrate(a.crate);
   if (a.kind === 'loot') netSend({ t: 'lpick', id: a.id });
+  if (a.kind === 'animal' && NET.on && a.an.sid != null && !a.an.dead) {
+    const an = a.an;
+    if (an.owned) { if (an.type === 'horse') netSend({ t: NET.mount ? 'dismount' : 'mount', id: an.sid }); else toast('Este animal ya está domado', 'info'); return; }
+    const foods = an.type === 'horse' ? ['apple', 'berries'] : an.type === 'wolf' ? ['raw_meat', 'cooked_meat'] : [];
+    if (!foods.length) { toast('No se puede domar', 'info'); return; }
+    const f = foods.find((id) => inv.count(id) > 0); if (!f) { toast('Necesitas ' + foods.map((id) => ITEMS[id].name.toLowerCase()).join(' o ') + ' para domarlo', 'bad'); sfx.bad(); return; }
+    inv.remove(f, 1); netSend({ t: 'tame', id: an.sid, item: f });
+  }
 }
 function demolish() {
   const a = aim; if (!a || a.d > 4) return;
@@ -3799,6 +3825,7 @@ function updateHint() {
   } else if (a && a.kind === 'animal' && a.d < 5) {
     const an = a.an;
     if (an.dead) h = `<span>${an.def.name} abatido</span><span class="bar"><i style="width:${an.corpse.hp / 60 * 100}%"></i></span><span>Golpéalo para sacar carne y piel</span>`;
+    else if (NET.on && an.sid != null && (an.type === 'horse' || an.type === 'wolf')) h = `<span>${an.def.name}${an.owned ? ' (domado)' : ''}</span><span class="bar"><i style="width:${an.hp / an.def.hp * 100}%;background:var(--blood)"></i></span><span><span class="key">E</span>${an.owned ? (an.type === 'horse' ? (NET.mount ? 'Desmontar' : 'Montar') : 'Domado') : 'Domar (' + (an.type === 'horse' ? 'manzana o bayas' : 'carne') + ')'}</span>`;
     else h = `<span class="${an.def.temper === 'flee' ? '' : 'warn'}">${an.def.name}${an.def.temper === 'hunt' ? ' (peligroso)' : ''}</span><span class="bar"><i style="width:${an.hp / an.def.hp * 100}%;background:var(--blood)"></i></span>${an.def.temper === 'flee' ? '<span>Acércate sin correr, o usa el arco</span>' : ''}`;
   } else if (a && a.kind === 'loot') {
     h = '<span>Bolsa de botín</span><span><span class="key">E</span>Recoger</span>';
@@ -4104,7 +4131,7 @@ function showAd(done) {
 }
 
 // ---------------------------------------------------------------- modo en línea (servidor autoritativo)
-const NET = { deps: new Map(), bags: new Map(), slowUntil: 0, slowF: 1, pendingPay: {}, on: false, ws: null, id: 0, remotes: new Map(), roster: new Map(), tid: '', tribe: '', name: '', typing: false, invT: 0, invite: null, touchInvite: false, sendT: 0, wantRespawn: false, killFeedT: 0 };
+const NET = { animals: new Map(), mount: 0, deps: new Map(), bags: new Map(), slowUntil: 0, slowF: 1, pendingPay: {}, on: false, ws: null, id: 0, remotes: new Map(), roster: new Map(), tid: '', tribe: '', name: '', typing: false, invT: 0, invite: null, touchInvite: false, sendT: 0, wantRespawn: false, killFeedT: 0 };
 const remoteRoot = new THREE.Group(); scene.add(remoteRoot);
 const urlParam = (k) => { const m = location.search.match(new RegExp('[?&]' + k + '=([^&]*)')); return m ? decodeURIComponent(m[1]) : ''; };
 const SERVER_URL = urlParam('server') || (location.protocol === 'https:' ? 'wss://pvp-island.example.com' : 'ws://localhost:8080');
@@ -4136,10 +4163,11 @@ function netSnap(m) {
     const id = e[0];
     if (id === NET.id) { if (state === 'playing' && e[5] > 0) player.hp = e[5]; continue; }
     seen.add(id); let r = NET.remotes.get(id) || makeRemote(id);
-    r.tgt.set(e[1], e[2], e[3]); r.tyaw = e[4]; r.hp = e[5]; r.dead = !!e[6];
+    r.tgt.set(e[1], e[2], e[3]); r.tyaw = e[4]; r.hp = e[5]; r.dead = !!e[6]; r.mounted = !!e[7];
     if (r.fresh) { r.pos.copy(r.tgt); r.yaw = r.tyaw; r.fresh = false; }
   }
   for (const r of [...NET.remotes.values()]) if (!seen.has(r.id)) dropRemote(r);
+  if (m.a) netAnimals(m.a);
 }
 function updateRemotes(dt) {
   for (const r of NET.remotes.values()) {
@@ -4148,12 +4176,12 @@ function updateRemotes(dt) {
     const moved = Math.hypot(r.pos.x - px, r.pos.z - pz); r.b.walk += moved; r.b.swing = Math.min(1, r.b.swing + dt * 2.8);
     r.g.position.copy(r.pos); r.g.rotation.order = 'YXZ'; r.g.rotation.y = r.yaw;
     animViking(r.b, dt, moved);
-    r.g.rotation.x = r.dead ? -1.5 : 0; r.g.position.y = r.pos.y - (r.dead ? .1 : 0);
+    r.g.rotation.x = r.dead ? -1.5 : 0; r.g.position.y = r.pos.y - (r.dead ? .1 : 0) + (r.mounted ? .95 : 0);
   }
 }
 function netMsg(m) {
   if (m.t === 'welcome') {
-    NET.id = m.id; NET.tid = m.tid; NET.tribe = m.tribe; $('#btnTLeave').hidden = !m.tribe; NET.roster.clear(); for (const q of m.roster) NET.roster.set(q.id, q);
+    dayPhase = m.phase; dayCount = m.day; NET.id = m.id; NET.tid = m.tid; NET.tribe = m.tribe; $('#btnTLeave').hidden = !m.tribe; NET.roster.clear(); for (const q of m.roster) NET.roster.set(q.id, q);
     player.pos.set(m.x, terrainH(m.x, m.z) + .1, m.z); player.vel.set(0, 0, 0); player.hp = 100; NET.on = true; document.body.classList.add('online-on');
     $('#netStatus').textContent = ''; startGame(); if (m.tribe) toast(`Tribu: ${m.tribe}`, 'info');
   } else if (m.t === 'snap') netSnap(m);
@@ -4189,6 +4217,15 @@ function netMsg(m) {
     if (m.by === NET.id) for (const it of m.items || []) { const c = pieceCost(it.kind, it.tier); for (const k in c) { const back = Math.floor(c[k] / 2); if (back) giveItem(k, back); } }
     sfx.build();
   }
+  else if (m.t === 'time') { dayPhase = m.phase; dayCount = m.day; }
+  else if (m.t === 'nodes') { for (const id of m.list) netNode(id, true); }
+  else if (m.t === 'nd') { if (m.by !== NET.id) netNode(m.id, false); }
+  else if (m.t === 'nr') { const n = nodes[m.id]; if (n && n.depleted) { n.depleted = false; n.hp = n.def.hp; n.acc.fill(0); n.fall = null; fallers.delete(n); writeNode(n); } }
+  else if (m.t === 'ahit') { const a = NET.animals.get(m.id); if (a) { burst(a.pos.clone().setY(a.pos.y + .8), 'blood', 4); sfx.animal(a.type); } }
+  else if (m.t === 'adead') { const a = NET.animals.get(m.id); if (a) { a.dead = true; sfx.thud(); } }
+  else if (m.t === 'tameprog') { toast(`Domando: ${m.v}%`, 'info'); sfx.eat(); }
+  else if (m.t === 'tamed') { toast(`${m.name} ha domado un animal`, 'info'); sfx.craft(); }
+  else if (m.t === 'mounted') { NET.mount = m.id; if (m.id) toast('Montado: pulsa F para bajar', 'info'); }
   else if (m.t === 'deps') { for (const d of m.list) netDep(d); }
   else if (m.t === 'db') { netDep(m.d); sfx.build(); }
   else if (m.t === 'ddeny') { giveItem(m.key, 1); toast(m.why, 'bad'); sfx.bad(); }
@@ -4209,6 +4246,38 @@ function netMsg(m) {
   else if (m.t === 'powner') { for (const p of pieces) if (p.owner === m.from) p.owner = m.to; }
 }
 const lootRoot = new THREE.Group(); scene.add(lootRoot);
+function netNode(id, silent) {
+  const n = nodes[id]; if (!n || n.depleted) return; n.depleted = true; n.hp = 0; n.respawnAt = 1e12;
+  if ((n.type === 'tree' || n.type === 'appletree') && !silent) { const a = Math.random() * 6.283; n.fall = { axis: new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), ang: 0, vel: .3, rest: 0, landed: false }; fallers.add(n); }
+  writeNode(n);
+}
+let nodeIdx = null;
+function netNodeDepleted(n) { if (!NET.on) return; if (!nodeIdx) nodeIdx = new Map(nodes.map((q, i) => [q, i])); netSend({ t: 'ndep', id: nodeIdx.get(n), rt: n.def.respawn }); }
+function makeNetAnimal(e) {
+  const type = e[1], def = ANIMALS[type]; if (!def) return null; const mdl = animalModel(type);
+  const a = { sid: e[0], type, def, mdl, g: mdl.g, legs: mdl.legs, pos: new THREE.Vector3(e[2], e[3], e[4]), tgt: new THREE.Vector3(e[2], e[3], e[4]), yaw: e[5], tyaw: e[5], walk: 0, hp: def.hp, dead: false, corpse: { hp: 60 }, flash: 0, owned: false, mine: false, mode: 0 };
+  mdl.g.traverse((o) => { o.userData.animal = a; }); mdl.g.position.copy(a.pos); animalRoot.add(mdl.g); NET.animals.set(a.sid, a); return a;
+}
+function dropNetAnimal(a) { animalRoot.remove(a.g); disposeModel(a.g); NET.animals.delete(a.sid); }
+function netAnimals(list) {
+  const seen = new Set();
+  for (const e of list) {
+    const a = NET.animals.get(e[0]) || makeNetAnimal(e); if (!a) continue; seen.add(e[0]);
+    a.tgt.set(e[2], e[3], e[4]); a.tyaw = e[5]; a.hp = e[6] / 100 * a.def.hp; const fl = e[7]; a.dead = !!(fl & 1); a.owned = !!(fl & 2); a.rider = !!(fl & 4); a.mode = e[8]; a.mine = a.owned && a.ownerMine !== false;
+    if (a.dead && !a.deadSet) { a.deadSet = true; a.g.rotation.z = Math.PI / 2; for (const l of a.legs) l.rotation.x = 0; a.pos.copy(a.tgt); }
+  }
+  for (const a of [...NET.animals.values()]) if (!seen.has(a.sid)) dropNetAnimal(a);
+}
+function updateNetAnimals(dt) {
+  for (const a of NET.animals.values()) {
+    const px = a.pos.x, pz = a.pos.z, k = 1 - Math.exp(-10 * dt);
+    if (!a.dead) { a.pos.lerp(a.tgt, k); a.yaw = lerpAngle(a.yaw, a.tyaw, k); } else a.pos.lerp(a.tgt, k);
+    const moved = Math.hypot(a.pos.x - px, a.pos.z - pz) / Math.max(dt, 1e-3);
+    if (a.dead) { a.g.position.set(a.pos.x, a.pos.y + .22, a.pos.z); a.g.rotation.set(0, a.yaw, Math.PI / 2); setFlash(a.g, false); continue; }
+    a.walk += dt * moved * a.def.gait; a.g.position.copy(a.pos); a.g.rotation.set(0, a.yaw, 0);
+    animAnimal(a, a.walk, Math.min(1, moved / 2), a.mode === 1 || a.mode === 4 ? 'chase' : 'wander');
+  }
+}
 function netBag(b) {
   if (NET.bags.has(b.id)) return; const g = new THREE.Group(), k = new Kit();
   k.add(gS(10, 8), MT.leather, 0, .22, 0, 0, 0, 0, .3, .26, .3); k.add(gS(7, 5), MT.leatherD, 0, .46, 0, 0, 0, 0, .12, .09, .12); k.add(gRing(.1, .02, 8), MT.rope, 0, .4, 0); k.bake(g);
@@ -4296,7 +4365,7 @@ function netTick(dt) {
     NET.invT += dt; const ring = $('#invring'); ring.hidden = NET.invT < 0; $('#invtxt').textContent = `Invitar a tribu: ${tgt.info.name}`; $('#invbar').style.setProperty('--p', clamp(NET.invT / .9, 0, 1) * 100 + '%');
     if (NET.invT >= .9) { netSend({ t: 'invite', target: tgt.id }); NET.invT = -3; }
   } else { NET.invT = 0; $('#invring').hidden = true; }
-  updateRemotes(dt);
+  updateRemotes(dt); updateNetAnimals(dt);
   if (state === 'playing' && (NET.sendT -= dt) <= 0) { NET.sendT = .05; netSend({ t: 'pos', x: +player.pos.x.toFixed(2), y: +player.pos.y.toFixed(2), z: +player.pos.z.toFixed(2), yaw: +player.yaw.toFixed(3), pitch: +player.pitch.toFixed(3) }); }
 }
 function remoteHit(r, weapon, extra) { netSend(Object.assign({ t: weapon === 'bow' || weapon === 'crossbow' ? 'shot' : 'attack', target: r.id, weapon }, extra || {})); }
@@ -4325,7 +4394,7 @@ function updatePlayer(dt) {
   if (player.stamina <= 0) player.exhausted = true; else if (player.stamina > 25) player.exhausted = false;
   const sprint = (keys.ShiftLeft || keys.ShiftRight) && mz > 0 && !player.crouch && !player.exhausted;
   // vadear frena según la profundidad; nadando se avanza despacio
-  const speed = (swimming ? (sprint ? 3.4 : 2.4) : (sprint ? 7.8 : player.crouch ? 2.3 : 4.8) * (1 - .45 * smooth(.3, 1.0, depth))) * (NET.on && clock < NET.slowUntil ? NET.slowF : 1);
+  const speed = (swimming ? (sprint ? 3.4 : 2.4) : (sprint ? 7.8 : player.crouch ? 2.3 : 4.8) * (1 - .45 * smooth(.3, 1.0, depth))) * (NET.on && clock < NET.slowUntil ? NET.slowF : 1) * (NET.mount ? 1.9 : 1);
   if (sprint && player.moveSpeed > 4) { player.stamina = Math.max(0, player.stamina - 17 * dt); player.staminaT = clock; }
   else if (clock - (player.staminaT || 0) > .8) player.stamina = Math.min(100, player.stamina + (player.hunger < 20 || player.thirst < 20 ? 7 : 18) * dt);
   player.swimUp = swimming && canMove ? (keys.Space ? 16 : 0) + (keys.KeyC || keys.ControlLeft ? -20 : 0) : 0;
@@ -4363,7 +4432,7 @@ function updatePlayer(dt) {
   const bobAmp = player.onGround && !swimming ? Math.min(1, player.moveSpeed / 5) * .035 : 0;
   camShake = Math.max(0, camShake - dt);
   const sh = camShake * .18;
-  camera.position.set(player.pos.x + (Math.random() - .5) * sh, player.pos.y + player.eye + Math.sin(bobT * 2) * bobAmp - camDip + (Math.random() - .5) * sh, player.pos.z + (Math.random() - .5) * sh);
+  camera.position.set(player.pos.x + (Math.random() - .5) * sh, player.pos.y + player.eye + (NET.mount ? .95 : 0) + Math.sin(bobT * 2) * bobAmp - camDip + (Math.random() - .5) * sh, player.pos.z + (Math.random() - .5) * sh);
   camera.rotation.set(player.pitch, player.yaw, Math.sin(bobT) * bobAmp * .25);
   const fov = 72 + (sprint && player.moveSpeed > 6 ? 7 : 0) - Math.max(0, bowS.vis) * 9;
   if (Math.abs(camera.fov - fov) > .05) { camera.fov = lerp(camera.fov, fov, Math.min(1, dt * 6)); camera.updateProjectionMatrix(); }
@@ -4454,7 +4523,7 @@ function updateNodes(dt) {
   }
   if ((slowTick += dt) > .5) {
     slowTick = 0;
-    for (const n of nodes) if (n.depleted && !n.fall && clock >= n.respawnAt && Math.hypot(n.x - player.pos.x, n.z - player.pos.z) > 25) { n.depleted = false; n.hp = n.def.hp; n.acc.fill(0); writeNode(n); }
+    if (!NET.on) for (const n of nodes) if (n.depleted && !n.fall && clock >= n.respawnAt && Math.hypot(n.x - player.pos.x, n.z - player.pos.z) > 25) { n.depleted = false; n.hp = n.def.hp; n.acc.fill(0); writeNode(n); }
     for (const q of POIS) if (!q.found && Math.hypot(q.x - player.pos.x, q.z - player.pos.z) < 55) { q.found = true; toast('Has descubierto: ' + q.name, 'info'); sfx.craft(); }
     updateObjective(); renderPanel();
   }

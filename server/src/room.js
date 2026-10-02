@@ -2,11 +2,12 @@ import { createTerrain } from '../../shared/terrain.js';
 import { MAPS, DT } from '../../shared/maps.js';
 import { Buildings, PIECE_DMG, TIER_MULT, TIER_RES, EXP_RES, pieceCenter } from './buildings.js';
 import { Deps, DEF, DEP_DMG, EXPLOSIONS } from './deps.js';
+import { Fauna, ANI } from './animals.js';
 const WEAPONS = { fists: [4, 3.2], stone_axe: [13, 3.8], stone_pick: [13, 3.8], hammer: [10, 3.8], spear: [26, 4.8], iron_axe: [22, 4], iron_pick: [22, 4], iron_sword: [48, 4.2] }, RANGED = { bow: 40, crossbow: 80 };
 const PROT = process.env.PROT_SECONDS !== undefined ? +process.env.PROT_SECONDS : 30;
 const SPEED = 4.8, SPRINT = 7.8, RADIUS = 160, HP = 100, REACH = 2.6, DMG = 14, ATK_CD = .6;
 export class Room {
-  constructor(mapId, maxPlayers = 20) { this.mapId = mapId; this.map = MAPS[mapId]; this.T = createTerrain({ world: this.map.world, seed: this.map.seed }); this.half = this.map.world / 2; this.sea = 0; this.max = maxPlayers; this.players = new Map(); this.nextId = 1; this.t = 0; this.tribeInfo = new Map(); this.tribeOfToken = new Map(); this.invites = new Map(); this.nextTribe = 1; this.B = new Buildings(); this.D = new Deps(); this.fxT = 0; this.timer = setInterval(() => this.tick(), DT * 1000); }
+  constructor(mapId, maxPlayers = 20) { this.mapId = mapId; this.map = MAPS[mapId]; this.T = createTerrain({ world: this.map.world, seed: this.map.seed }); this.half = this.map.world / 2; this.sea = 0; this.max = maxPlayers; this.players = new Map(); this.nextId = 1; this.t = 0; this.tribeInfo = new Map(); this.tribeOfToken = new Map(); this.invites = new Map(); this.nextTribe = 1; this.B = new Buildings(); this.D = new Deps(); this.fxT = 0; this.nodes = new Map(); this.fauna = new Fauna(this); this.fauna.spawnAll(); this.timer = setInterval(() => this.tick(), DT * 1000); }
   get humans() { let n = 0; for (const p of this.players.values()) if (!p.bot) n++; return n; }
   get count() { return this.players.size; }
   spawnPoint() { for (let i = 0; i < 40; i++) { const a = Math.random() * 6.283, r = this.half * (.2 + Math.random() * .5), x = Math.cos(a) * r, z = Math.sin(a) * r; if (this.T.terrainH(x, z) > 1.5) return { x, z }; } return { x: 0, z: 0 }; }
@@ -23,7 +24,7 @@ export class Room {
     this.players.set(id, p); this.broadcast(Object.assign({ t: 'join' }, this.pub(p)));
     return p;
   }
-  leave(p) { this.players.delete(p.id); this.invites.delete(p.id); this.broadcast({ t: 'leave', id: p.id }); }
+  leave(p) { if (p.mount) this.dismount(p); this.players.delete(p.id); this.invites.delete(p.id); this.broadcast({ t: 'leave', id: p.id }); }
   setTribe(p, tid) { const old = p.tid; if (old.startsWith('s:') && old !== tid) { this.B.changeOwner(old, tid); this.D.changeOwner(old, tid); this.broadcast({ t: 'powner', from: old, to: tid }); } p.tid = tid; this.tribeOfToken.set(p.token, tid); this.broadcast(Object.assign({ t: 'tribe' }, this.pub(p))); }
   invite(p, targetId) {
     const q = this.players.get(targetId); if (!q || q.bot || q === p || p.dead > 0) return;
@@ -87,6 +88,12 @@ export class Room {
     else if (m.t === 'lpick') this.pickBag(p, +m.id);
     else if (m.t === 'bed') this.setBed(p, +m.id);
     else if (m.t === 'gard') this.garden(p, +m.id, String(m.act));
+    else if (m.t === 'ndep') this.nodeDepleted(p, m);
+    else if (m.t === 'ahit') this.animalHit(p, +m.id, String(m.weapon || 'fists'), false);
+    else if (m.t === 'abutcher') this.animalHit(p, +m.id, String(m.weapon || 'fists'), true);
+    else if (m.t === 'tame') this.tame(p, +m.id, String(m.item));
+    else if (m.t === 'mount') this.mount(p, +m.id);
+    else if (m.t === 'dismount') this.dismount(p);
   }
   // ---- construcción (autoritativa)
   near(p, c, R) { return Math.hypot(c.x - p.x, c.z - p.z) <= R && Math.abs(c.y - p.y) < 14; }
@@ -195,13 +202,41 @@ export class Room {
     }
     for (const b of [...this.D.bags.values()]) if (this.t > b.expire) { this.D.bags.delete(b.id); this.broadcast({ t: 'lx', id: b.id }); }
   }
+  // ciclo de día y noche compartido: 600 s por día, empieza por la mañana (igual que el cliente)
+  phase() { return ((this.t + 42) / 600) % 1; }
+  sunElev() { const p = this.phase(); return p < .72 ? Math.sin(Math.PI * p / .72) : -Math.sin(Math.PI * (p - .72) / .28) * .7; }
+  // ---- recursos compartidos (árboles, rocas…): quien los agota los agota para todos, y reaparecen con el tiempo
+  nodeDepleted(p, m) {
+    const id = m.id | 0; if (id < 0 || id > 200000 || this.nodes.has(id) || this.t < (p.ndT || 0)) return; p.ndT = this.t + .15;
+    const rt = Math.max(60, Math.min(900, +m.rt || 300)); this.nodes.set(id, this.t + rt); this.broadcast({ t: 'nd', id, by: p.id });
+  }
+  tickNodes() { for (const [id, at] of [...this.nodes]) if (this.t >= at) { this.nodes.delete(id); this.broadcast({ t: 'nr', id }); } }
+  // ---- fauna
+  animalHit(p, id, weapon, butcher) {
+    const a = this.fauna.map.get(id); if (!a || p.dead > 0 || p.cd > 0) return; const w = WEAPONS[weapon] || WEAPONS.fists;
+    if (Math.hypot(a.x - p.x, a.z - p.z) > w[1] + 1.4) return; p.cd = .35; this.broadcast({ t: 'swing', id: p.id });
+    if (butcher || a.dead) { if (a.dead) this.fauna.butcher(a, p, Math.max(w[0] * .8, 6)); return; }
+    if (a.owner === p.tid) return; this.fauna.hurt(a, w[0], p);
+    this.broadcast({ t: 'ahit', id: a.id });
+  }
+  tame(p, id, item) {
+    const a = this.fauna.map.get(id); if (!a || a.dead || a.owner || p.dead > 0) return this.send(p, { t: 'give', items: [[item, 1]] }); const D = ANI[a.type];
+    if (!D.tameFood || !D.tameFood.includes(item) || Math.hypot(a.x - p.x, a.z - p.z) > 4) return this.send(p, { t: 'give', items: [[item, 1]] });
+    a.tame = Math.min(100, a.tame + (a.type === 'horse' ? 34 : 26)); a.provoked = 0; this.send(p, { t: 'tameprog', id, v: Math.round(a.tame) });
+    if (a.tame >= 100) { a.owner = p.tid; a.tame = 100; this.broadcast({ t: 'tamed', id, name: p.name }); }
+  }
+  mount(p, id) {
+    const a = this.fauna.map.get(id); if (!a || a.dead || a.owner !== p.tid || !ANI[a.type].mount || a.rider || p.mount || p.dead > 0 || Math.hypot(a.x - p.x, a.z - p.z) > 4.5) return;
+    a.rider = p.id; p.mount = id; this.send(p, { t: 'mounted', id });
+  }
+  dismount(p) { const a = p.mount && this.fauna.map.get(p.mount); if (a) a.rider = 0; p.mount = 0; this.send(p, { t: 'mounted', id: 0 }); }
   // posición enviada por el cliente (predicción); el servidor la valida para frenar teletransportes y velocidades imposibles
   setPos(p, m, now) {
     if (p.dead > 0) return;
     const x = +m.x, y = +m.y, z = +m.z; if (!Number.isFinite(x + y + z)) return;
     const dt = Math.min(1, Math.max(.02, (now - (p.lastPos || now - 50)) / 1000)); p.lastPos = now; p.cs = true;
     const d = Math.hypot(x - p.x, z - p.z), lim = this.half * .99;
-    if (d > 16 * dt + 2.5 || Math.abs(x) > lim || Math.abs(z) > lim) { p.strikes = (p.strikes || 0) + 1; if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'correct', x: p.x, y: p.y, z: p.z })); return; }
+    if (d > (p.mount ? 22 : 16) * dt + 2.5 || Math.abs(x) > lim || Math.abs(z) > lim) { p.strikes = (p.strikes || 0) + 1; if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'correct', x: p.x, y: p.y, z: p.z })); return; }
     p.x = x; p.y = y; p.z = z; if (Number.isFinite(+m.yaw)) p.yaw = +m.yaw; if (Number.isFinite(+m.pitch)) p.pitch = +m.pitch;
   }
   find(id) { const q = this.players.get(id); return q && q.dead <= 0 ? q : null; }
@@ -219,7 +254,7 @@ export class Room {
     for (const q of this.players.values()) { if (q === p || q.dead > 0 || q.tid === p.tid) continue; const dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz); if (d < bd && (dx * fx + dz * fz) / (d || 1) > .3) { bd = d; best = q; } }
     if (best) this.hurt(best, DMG, p);
   }
-  hurt(q, dmg, by, cause) { if (!(dmg > 0)) return; if ((by || cause === 'trap' || cause === 'fire' || cause === 'explosion') && by !== q && cause !== 'selfdmg' && q.prot > this.t) return; if (by && by.prot > this.t) by.prot = 0; q.hp -= dmg; q.regenT = this.t + 10; this.broadcast({ t: 'hit', id: q.id, hp: Math.max(0, Math.round(q.hp)), by: by ? by.id : 0 }); if (q.hp <= 0 && !(q.dead > 0)) { q.dead = 4; q.deaths++; if (by) by.kills++; this.broadcast({ t: 'kill', victim: q.id, killer: by ? by.id : 0, cause: cause || '' }); } }
+  hurt(q, dmg, by, cause) { if (!(dmg > 0)) return; if ((by || cause === 'trap' || cause === 'fire' || cause === 'explosion' || cause === 'animal') && by !== q && cause !== 'selfdmg' && q.prot > this.t) return; if (by && by.prot > this.t) by.prot = 0; q.hp -= dmg; q.regenT = this.t + 10; this.broadcast({ t: 'hit', id: q.id, hp: Math.max(0, Math.round(q.hp)), by: by ? by.id : 0 }); if (q.hp <= 0 && !(q.dead > 0)) { q.dead = 4; q.deaths++; if (by) by.kills++; this.broadcast({ t: 'kill', victim: q.id, killer: by ? by.id : 0, cause: cause || '' }); } }
   tick() {
     this.t += DT;
     for (const p of this.players.values()) {
@@ -236,15 +271,16 @@ export class Room {
       if (ny > this.sea - 1.1 && Math.abs(ny - p.y) < 1.3 + Math.abs(p.vy) * DT) { p.x = nx * k; p.z = nz * k; }
       const g = this.T.terrainH(p.x, p.z); if (i.jump && p.y <= g + .05) p.vy = 7; p.vy -= 22 * DT; p.y += p.vy * DT; if (p.y <= g) { p.y = g; p.vy = 0; }
     }
-    this.tickDeps(DT);
+    this.tickDeps(DT); this.tickNodes(); this.fauna.update(DT); this.isNight = this.sunElev() < -.02; if (this.t >= (this.timeT || 0)) { this.timeT = this.t + 10; this.broadcast({ t: 'time', phase: +this.phase().toFixed(4), day: Math.floor((this.t + 42) / 600) + 1 }); }
     this.snapshot();
   }
   snapshot() {
     const list = [...this.players.values()];
     for (const me of list) {
       if (!me.ws || me.ws.readyState !== 1) continue;
-      const near = []; for (const q of list) { if (Math.hypot(q.x - me.x, q.z - me.z) > RADIUS && q !== me) continue; near.push([q.id, +q.x.toFixed(2), +q.y.toFixed(2), +q.z.toFixed(2), +q.yaw.toFixed(3), Math.max(0, Math.round(q.hp)), q.dead > 0 ? 1 : 0]); }
-      me.ws.send(JSON.stringify({ t: 'snap', n: Math.round(this.t * 20), me: me.id, p: near }));
+      const near = []; for (const q of list) { if (Math.hypot(q.x - me.x, q.z - me.z) > RADIUS && q !== me) continue; near.push([q.id, +q.x.toFixed(2), +q.y.toFixed(2), +q.z.toFixed(2), +q.yaw.toFixed(3), Math.max(0, Math.round(q.hp)), q.dead > 0 ? 1 : 0, q.mount ? 1 : 0]); }
+      const an = []; for (const a of this.fauna.map.values()) if (Math.hypot(a.x - me.x, a.z - me.z) <= RADIUS) an.push(this.fauna.pub(a));
+      me.ws.send(JSON.stringify({ t: 'snap', n: Math.round(this.t * 20), me: me.id, p: near, a: an }));
     }
   }
   broadcast(m) { const s = JSON.stringify(m); for (const p of this.players.values()) if (p.ws && p.ws.readyState === 1) p.ws.send(s); }

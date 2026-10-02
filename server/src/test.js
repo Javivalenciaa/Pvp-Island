@@ -104,6 +104,29 @@ const hpP = pd.hp; pd.prot = room.t + 10; pa.tid = 's:tok-ana'; pa.prot = 0; pa.
   near(-140); send(a, { t: 'place', dep: Object.assign({ t: 'bed', r: 0 }, at(-140)) }); await sleep(120); const bed = [...room.D.map.values()].find((d) => d.t === 'bed'); pa.x = bed.x + 1; pa.z = bed.z; send(a, { t: 'bed', id: bed.id }); await sleep(100); ok(pa.bed === bed.id, 'se fija la cama como punto de reaparición');
   pa.hp = 1; room.hurt(pa, 5, pb); await sleep(100); send(a, { t: 'drop', slots: [{ id: 'wood', n: 30 }] }); send(a, { t: 'respawn' }); await sleep(1700); ok(Math.hypot(pa.x - bed.x, pa.z - bed.z) < 1 && room.D.bags.size >= 1, 'al morir suelta lo que llevaba y reaparece en su cama');
 }
+// recursos compartidos y fauna
+{
+  const send = (c, m) => c.ws.send(JSON.stringify(m)), has = (c, f) => c.other.some(f);
+  ok(room.fauna.map.size >= 30, 'el servidor simula la fauna: ' + room.fauna.map.size + ' animales');
+  send(a, { t: 'ndep', id: 7, rt: 120 }); await sleep(150); ok(has(b, (m) => m.t === 'nd' && m.id === 7) && room.nodes.has(7), 'un árbol agotado se agota para todos');
+  room.nodes.set(7, room.t - 1); await sleep(150); ok(has(b, (m) => m.t === 'nr' && m.id === 7), 'el recurso reaparece pasado el tiempo');
+  const e3 = await client('Fer', 'tok-fer', 'isla'); await sleep(200); ok(e3.welcome.phase >= 0 && e3.welcome.day >= 1, 'el servidor envía la hora del día'); e3.ws.close();
+  // domar y montar un caballo
+  for (const p of [pa, pb]) { p.dead = 0; p.cs = true; p.hp = 100; p.prot = 0; p.cd = 0; p.tid = 's:' + p.token; p.mount = 0; }
+  const horse = room.fauna.spawn('horse'); horse.x = pa.x + 2; horse.z = pa.z; horse.y = pa.y; horse.timer = 999; const hsx = horse.x;
+  send(a, { t: 'tame', id: horse.id, item: 'apple' }); send(a, { t: 'tame', id: horse.id, item: 'apple' }); send(a, { t: 'tame', id: horse.id, item: 'apple' }); await sleep(250);
+  ok(horse.owner === pa.tid, 'tres manzanas doman al caballo');
+  send(b, { t: 'mount', id: horse.id }); await sleep(100); ok(!horse.rider, 'otra tribu no puede montarlo');
+  horse.x = pa.x + 1; horse.z = pa.z; send(a, { t: 'mount', id: horse.id }); await sleep(120); ok(horse.rider === pa.id && has(a, (m) => m.t === 'mounted' && m.id === horse.id), 'el dueño monta el caballo');
+  const px = pa.x; send(a, { t: 'pos', x: px + 1.6, y: pa.y, z: pa.z, yaw: 0 }); await sleep(120); ok(Math.abs(horse.x - pa.x) < .01, 'el caballo sigue al jinete');
+  send(a, { t: 'dismount' }); await sleep(100); ok(!horse.rider && !pa.mount, 'desmontar');
+  // cazar y despiezar
+  const deer = room.fauna.spawn('deer'); deer.x = pa.x + 2; deer.z = pa.z; deer.y = pa.y; deer.timer = 999; deer.hp = 5;
+  send(a, { t: 'ahit', id: deer.id, weapon: 'iron_sword' }); await sleep(150); ok(deer.dead > 0, 'el ciervo cae de un golpe');
+  pa.cd = 0; send(a, { t: 'abutcher', id: deer.id, weapon: 'iron_sword' }); await sleep(150); ok(a.other.some((m) => m.t === 'give' && m.items.some((i) => i[0] === 'raw_meat')), 'despiezar da carne');
+  // un lobo ataca a quien se acerca
+  const wolf = room.fauna.spawn('wolf'); wolf.x = pa.x + 6; wolf.z = pa.z; wolf.y = room.T.terrainH(wolf.x, wolf.z); pa.y = room.T.terrainH(pa.x, pa.z); pa.hp = 100; pa.prot = 0; srv.setBots(false); await sleep(1500); ok(pa.hp < 100, 'un lobo hostil ataca al jugador: ' + pa.hp); room.fauna.map.delete(wolf.id);
+}
 b.ws.close(); await sleep(200); ok(room.humans === 3 && room.count === 8, 'al salir un humano entra un bot: ' + room.humans + '/' + room.count);
 // los bots se mueven y combaten solos
 srv.close(); process.exit(process.exitCode || 0);
