@@ -1319,7 +1319,7 @@ let terrainMat = null;
           vec3 band = mix(vec3(0.5, 0.2, 0.09), vec3(0.9, 0.52, 0.22), 0.5 + 0.5 * sin(th * 1.9 + tM1 * 4.0)); tc = mix(tc, band, bio.x * max(wRock, smoothstep(6.0, 9.0, th) * 0.55));
           float wSw = bio.y * (1.0 - wRock); tc = mix(tc, mix(cForest, cDirt, 0.45) * vec3(0.62, 0.7, 0.45), wSw * 0.85);
           tc = mix(tc, cForest * vec3(0.72, 1.0, 0.65), bio.z * 0.55 * (1.0 - wRock));
-          float bcv = texture2D(tBio, (bi + 0.5) / bn).a; tc = mix(tc, mix(cSand, cRock, 0.45) * vec3(0.6, 0.47, 0.38), smoothstep(0.1, 0.6, bcv)); }
+          float bcv = texture2D(tBio, (bi + 0.5) / bn).a; tc = mix(tc, cRock * vec3(0.95, 0.78, 0.62), smoothstep(0.1, 0.6, bcv)); }
         tc = pow(tc, vec3(2.2));
         float twet = 1.0 - smoothstep(wl - 0.1, wl + 0.7, th);
         tc *= mix(1.0, 0.6, max(twet, uWet * 0.4) * (1.0 - wSnow));
@@ -1497,8 +1497,8 @@ const tmpNear = [];
   }
 }
 // ---------------------------------------------------------------- cuevas: parte del mapa (zanja + túnel + sala tallados; el techo es una malla con la superficie original)
-const caveLight = new THREE.PointLight(0xffb070, 0, 42, 1.2); scene.add(caveLight);
-const caveMats = { arch: new THREE.MeshStandardMaterial({ color: 0x8a6544, roughness: 1, flatShading: true }), rock: null, boulder: new THREE.MeshStandardMaterial({ color: 0x8a7254, roughness: 1, flatShading: true }), moss: new THREE.MeshStandardMaterial({ color: 0x4f7a2f, roughness: 1, flatShading: true }), under: new THREE.MeshStandardMaterial({ color: 0x4d4f55, roughness: 1, envMapIntensity: 0, side: THREE.BackSide }), glow: new THREE.MeshBasicMaterial({ color: 0xff9a3c }), stone: new THREE.MeshStandardMaterial({ color: 0x77716a, roughness: 1, flatShading: true }) };
+const caveLight = new THREE.PointLight(0xffd6a8, 0, 42, 1.2); scene.add(caveLight);
+const caveMats = { arch: new THREE.MeshStandardMaterial({ color: new THREE.Color(0xa87a50).convertSRGBToLinear(), roughness: 1, flatShading: true }), rock: null, boulder: new THREE.MeshStandardMaterial({ color: new THREE.Color(0x8a7254).convertSRGBToLinear(), roughness: 1, flatShading: true }), moss: new THREE.MeshStandardMaterial({ color: new THREE.Color(0x4f7a2f).convertSRGBToLinear(), roughness: 1, flatShading: true }), under: new THREE.MeshStandardMaterial({ color: new THREE.Color(0x4d4f55).convertSRGBToLinear(), roughness: 1, envMapIntensity: 0, side: THREE.BackSide }), glow: new THREE.MeshBasicMaterial({ color: 0xff9a3c }), stone: new THREE.MeshStandardMaterial({ color: new THREE.Color(0x77716a).convertSRGBToLinear(), roughness: 1, flatShading: true }) };
 const caveRoofs = [];
 function buildCaveArch(c) {
   const NU = 12, NT = 16, pos = [], idx = [], u0 = -1.4, u1 = c.u1 + 1.2, hr = (a, b) => hash2(Math.round(a * 31) + c.id * 97, Math.round(b * 17));
@@ -2194,7 +2194,7 @@ for (const poi of POIS) {
     for (let k = 0; k < 6; k++) poiBox(g, .5 + r(), .4 + r() * .4, .5 + r() * .6, (r() - .5) * 14, .2, (r() - .5) * 14, tierMats[2], false, r(), r() * 3, r());
     addCrate(g, poi, 0, 0);
   } else if (poi.type === 'obelisk') {
-    const mDark = new THREE.MeshStandardMaterial({ color: 0x0c0d10, roughness: .6, metalness: 0, flatShading: true }), mRune = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 1.5, .4) });
+    const mDark = new THREE.MeshStandardMaterial({ color: new THREE.Color(0x1a1c21).convertSRGBToLinear(), roughness: .6, metalness: 0, flatShading: true }), mRune = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 1.5, .4) });
     poiBox(g, 5.4, .5, 5.4, 0, .1, 0, tierMats[2], true); poiBox(g, 3.6, .5, 3.6, 0, .55, 0, tierMats[2], true);
     const ob = new THREE.Mesh(new THREE.CylinderGeometry(.55, 1.15, 10, 4, 1), mDark); ob.position.y = 5.8; ob.rotation.y = .4; ob.castShadow = true; g.add(ob);
     const tip = new THREE.Mesh(new THREE.ConeGeometry(.55, 1.1, 4), mDark); tip.position.y = 11.3; tip.rotation.y = .4; g.add(tip);
@@ -2252,12 +2252,12 @@ for (const poi of POIS) {
   const nearPoi = (x, z) => POIS.some((q) => Math.hypot(x - q.x, z - q.z) < q.r + 6) || Math.hypot(x - SPAWN.x, z - SPAWN.z) < 12 || CAVES.some((c) => Math.hypot(x - (c.x + c.dx * 8), z - (c.z + c.dz * 8)) < 30);
   const place = (count, test, fn) => { let n = 0; for (let t = 0; t < count * 60 && n < count; t++) { const x = (dr() * 2 - 1) * HALF * .93, z = (dr() * 2 - 1) * HALF * .93; if (nearLake(x, z, 1.3)) continue; const h = terrainH(x, z); if (h < 1.3 || nearPoi(x, z) || !test(x, z, h)) continue; fn(x, h, z); n++; } };
   const inst = (geo, mat, list, shadow) => { if (!list.length) return; const m = new THREE.InstancedMesh(geo, mat, list.length); const d = new THREE.Object3D(); list.forEach((q, i) => { d.position.set(q.x, q.y, q.z); d.rotation.set(q.rx || 0, q.ry || 0, q.rz || 0); d.scale.set(q.sx || q.s, q.sy || q.s, q.sz || q.s); d.updateMatrix(); m.setMatrixAt(i, d.matrix); }); m.castShadow = false; m.receiveShadow = true; m.frustumCulled = false; decorRoot.add(m); };
-  const mk = (c, o) => new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: .95, flatShading: true }, o || {}));
+  const mk = (c, o) => new THREE.MeshStandardMaterial(Object.assign({ color: new THREE.Color(c).convertSRGBToLinear(), roughness: .95, flatShading: true }, o || {}));
   // cactus
   { const trunk = new THREE.CylinderGeometry(.26, .32, 2.6, 7).translate(0, 1.3, 0), arm = (sx, y) => { const a = new THREE.CylinderGeometry(.16, .18, 1.1, 6).translate(0, .55, 0).rotateZ(-sx * .35).translate(sx * .5, y, 0); const b = new THREE.CylinderGeometry(.16, .16, .55, 6).translate(sx * .86, y + .1, 0).rotateZ(0); return [a, b]; };
     const geo = mergeGeos([trunk, ...arm(1, 1.2), ...arm(-1, 1.7)]), list = [];
     place(Math.round(90 * AREA2), (x, z) => biomeAt(x, z).desert > .45 && slopeAt(x, z) < .5, (x, h, z) => list.push({ x, y: h - .05, z, ry: dr() * 6.28, s: .7 + dr() * 1.1 }));
-    inst(geo, mk(0x2e6a30), list); }
+    inst(geo, mk(0x3f8a3c), list); }
   // agaves (rosetas de hojas) y arbustos secos, como en el desierto de referencia
   { const blades = []; for (let k = 0; k < 11; k++) { const a = k / 11 * 6.283, tilt = .75 + (k % 3) * .22; blades.push(new THREE.ConeGeometry(.13, 1.5 - (k % 3) * .2, 4, 1).translate(0, .75, 0).rotateZ(tilt).rotateY(a)); }
     const agave = mergeGeos(blades), A = [];
@@ -2274,11 +2274,11 @@ for (const poi of POIS) {
   // agujas de roca (desierto y montañas) con colisión
   { const geo = jitterGeo(new THREE.ConeGeometry(1.5, 12, 7, 3).translate(0, 6, 0), .5, 77), list = [];
     place(Math.round(70 * AREA2), (x, z, h) => (biomeAt(x, z).desert > .4 || h > 12) && slopeAt(x, z) < .6, (x, h, z) => { const s = .5 + dr() * 1.4; list.push({ x, y: h - .6, z, ry: dr() * 6.28, sx: s, sy: s * (.7 + dr() * .8), sz: s }); staticBoxes.push({ minX: x - .7 * s, maxX: x + .7 * s, minY: h, maxY: h + 12 * s * .6, minZ: z - .7 * s, maxZ: z + .7 * s }); });
-    inst(geo, mk(0xa0562c), list); }
+    inst(geo, mk(0xc4743a), list); }
   // arcos naturales de arenisca (medio toro) con colisión en las patas
   { const arc = jitterGeo(new THREE.TorusGeometry(4.6, 1.5, 7, 16, Math.PI), .45, 56), Ar = [];
     place(Math.round(10 * AREA2), (x, z, h) => (biomeAt(x, z).desert > .3 || h > 10) && slopeAt(x, z) < .3, (x, h, z) => { const ry = dr() * 3.14, c = Math.cos(ry), sn = Math.sin(ry); Ar.push({ x, y: h - .9, z, ry, sx: 1.1, sy: 1 + dr() * .5, sz: 1 }); for (const sd of [-1, 1]) { const px = x + c * 4.6 * 1.1 * sd, pz = z - sn * 4.6 * 1.1 * sd, ph = terrainH(px, pz); staticBoxes.push({ minX: px - 1.3, maxX: px + 1.3, minY: ph, maxY: ph + 5, minZ: pz - 1.3, maxZ: pz + 1.3 }); } });
-    inst(arc, mk(0xa4592b), Ar); }
+    inst(arc, mk(0xb8683a), Ar); }
   // troncos caídos y peñascos sueltos
   { const log = new THREE.CylinderGeometry(.42, .5, 5, 8).rotateZ(Math.PI / 2).translate(0, .4, 0), L = [];
     place(Math.round(180 * AREA2), (x, z) => forestAt(x, z) > .45 && slopeAt(x, z) < .4, (x, h, z) => L.push({ x, y: h, z, ry: dr() * 6.28, sx: .7 + dr() * .8, sy: .8 + dr() * .6, sz: .8 + dr() * .6 }));
@@ -2286,7 +2286,7 @@ for (const poi of POIS) {
     const rock = jitterGeo(new THREE.DodecahedronGeometry(1, 0), .3, 91), R = [];
     place(Math.round(200 * AREA2), (x, z) => slopeAt(x, z) < .8, (x, h, z) => { const s = .5 + dr() * 1.6; R.push({ x, y: h + s * .25, z, rx: dr() * 3, ry: dr() * 3, rz: dr() * 3, sx: s * (1 + dr() * .5), sy: s * .7, sz: s * (1 + dr() * .5) }); });
     const Rd = []; place(Math.round(240 * AREA2), (x, z) => biomeAt(x, z).desert > .3 && slopeAt(x, z) < .9, (x, h, z) => { const s = .5 + dr() * 1.8; Rd.push({ x, y: h + s * .25, z, rx: dr() * 3, ry: dr() * 3, rz: dr() * 3, sx: s * (1 + dr() * .5), sy: s * .75, sz: s * (1 + dr() * .5) }); });
-    inst(rock, mk(0x8a8c88), R); inst(rock, mk(0xa4562a), Rd); }
+    inst(rock, mk(0x8a8c88), R); inst(rock, mk(0xb5622f), Rd); }
 }
 rebuildColliders();
 function openCrate(c) {
@@ -4185,7 +4185,7 @@ function updateSky() {
   else { scene.fog.near = lerp(60, 15, weather.rain); scene.fog.far = lerp(320, 140, Math.max(ov * .5, weather.rain)); }
   { const cd = caveDark(player.pos.x, player.pos.z, player.pos.y); sun.intensity *= 1 - cd; ambL.intensity *= 1 - cd; hemi.intensity *= 1 - cd * .65; terrainMat.envMapIntensity = .45 * (1 - cd * .95);
     if (cd > 0) { scene.fog.color.lerp(cTmp.setRGB(.06, .028, .01), cd); scene.fog.near = lerp(scene.fog.near, 3, cd); scene.fog.far = lerp(scene.fog.far, 40, cd); }
-    caveLight.intensity = 2.5 * cd; caveLight.position.set(player.pos.x, player.pos.y + 1.9, player.pos.z); }
+    caveLight.intensity = 2.4 * cd; ambL.intensity += .22 * cd; caveLight.position.set(player.pos.x, player.pos.y + 1.9, player.pos.z); }
   ui.under.hidden = true;
   if (lighthouseBeam) { const nightL = 1 - smooth(-.05, .12, elev); lighthouseBeam.visible = nightL > .02; lighthouseBeam.rotation.y = waterTime.value * .6; POI_MATS.beam.opacity = .13 * nightL; lighthouseLamp.material.color.setRGB(1 + 5 * nightL, .9 + 4 * nightL, .5 + 2 * nightL); }
   let note = '';
