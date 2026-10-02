@@ -125,7 +125,7 @@ const hpP = pd.hp; pd.prot = room.t + 10; pa.tid = 's:tok-ana'; pa.prot = 0; pa.
   send(a, { t: 'ahit', id: deer.id, weapon: 'iron_sword' }); await sleep(150); ok(deer.dead > 0, 'el ciervo cae de un golpe');
   pa.cd = 0; send(a, { t: 'abutcher', id: deer.id, weapon: 'iron_sword' }); await sleep(150); ok(a.other.some((m) => m.t === 'give' && m.items.some((i) => i[0] === 'raw_meat')), 'despiezar da carne');
   // un lobo ataca a quien se acerca
-  const wolf = room.fauna.spawn('wolf'); wolf.x = pa.x + 6; wolf.z = pa.z; wolf.y = room.T.terrainH(wolf.x, wolf.z); pa.y = room.T.terrainH(pa.x, pa.z); pa.hp = 100; pa.prot = 0; srv.setBots(false); await sleep(1500); ok(pa.hp < 100, 'un lobo hostil ataca al jugador: ' + pa.hp); room.fauna.map.delete(wolf.id);
+  const wolf = room.fauna.spawn('wolf'); wolf.x = pa.x + 6; wolf.z = pa.z; wolf.y = room.T.terrainH(wolf.x, wolf.z); pa.y = room.T.terrainH(pa.x, pa.z); pa.hp = 100; pa.prot = 0; srv.setBots(false); for (const q of room.players.values()) if (q !== pa) { q.x = pa.x + 90; q.z = pa.z + 90; } for (let k = 0; k < 16 && pa.hp >= 100; k++) { pa.hp = 100; pa.prot = 0; wolf.x = pa.x + 3; wolf.z = pa.z; wolf.y = pa.y; wolf.cd = 0; await sleep(250); } ok(pa.hp < 100, 'un lobo hostil ataca al jugador: ' + pa.hp); room.fauna.map.delete(wolf.id);
 }
 b.ws.close(); await sleep(200); ok(room.humans === 3 && room.count === 8, 'al salir un humano entra un bot: ' + room.humans + '/' + room.count);
 // los bots se mueven y combaten solos

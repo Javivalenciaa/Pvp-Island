@@ -1062,7 +1062,7 @@ function createTerrain({ world = 640, seed = 0, maxLakes = 4 } = {}) {
       if (best && best.sl < .25 && !LAKES.some((L) => Math.hypot(L.x - best.x, L.z - best.z) < 70)) LAKES.push({ x: best.x, z: best.z, R: 13 + rng() * 6, level: best.h - .4 });
     }
   }
-  function rawHeight(x, z) {
+  function rawHeight0(x, z) {
     let h = baseHeight(x, z);
     for (const L of LAKES) {
       const d = Math.hypot(x - L.x, z - L.z);
@@ -1073,8 +1073,44 @@ function createTerrain({ world = 640, seed = 0, maxLakes = 4 } = {}) {
     }
     return h;
   }
-  const heights = new Float32Array(N * N);
-  for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) heights[iz * N + ix] = rawHeight(-HALF + ix * CELL, -HALF + iz * CELL);
+  // cuevas: el interior es parte del mapa. Se talla en el relieve una zanja que lleva a un túnel y una sala (suelo plano a altura y0);
+  // el techo es la propia superficie original de la montaña, que el cliente dibuja como malla de tejado (roofH) y por la que se puede andar encima.
+  const CAVES = [];
+  const sdRect = (u, v, u0, u1, w) => { const ax = Math.abs(u - (u0 + u1) / 2) - (u1 - u0) / 2, ay = Math.abs(v) - w; return Math.hypot(Math.max(ax, 0), Math.max(ay, 0)) + Math.min(Math.max(ax, ay), 0); };
+  const caveSD = (c, u, v) => Math.min(sdRect(u, v, -1, 9, 1.9), Math.hypot(u - 15, v) - 6.8, Math.hypot(u - 11, v - c.side * 6.8) - 3.2);
+  {
+    const rng = mulberry32(8080 + (seed | 0)), want = WORLD > 800 ? 5 : 3;
+    for (let t = 0; t < 20000 && CAVES.length < want; t++) {
+      const Mt = rng() < .55 ? MOUNT : MOUNT2, a = rng() * 6.283, r = (8 + rng() * 70) * K, wild = rng() < .35, x = wild ? (rng() * 2 - 1) * HALF * .8 : Mt.x + Math.cos(a) * r, z = wild ? (rng() * 2 - 1) * HALF * .8 : Mt.z + Math.sin(a) * r;
+      if (Math.abs(x) > HALF * .88 || Math.abs(z) > HALF * .88) continue;
+      const h = rawHeight0(x, z); if (h < 6 || h > 24) continue;
+      const gx = (rawHeight0(x + 1.5, z) - rawHeight0(x - 1.5, z)) / 3, gz = (rawHeight0(x, z + 1.5) - rawHeight0(x, z - 1.5)) / 3, sl = Math.hypot(gx, gz);
+      if (sl < .38 || sl > .85 || CAVES.some((q) => Math.hypot(q.x - x, q.z - z) < 60 * K) || LAKES.some((L) => Math.hypot(x - L.x, z - L.z) < L.R * 2.2)) continue;
+      const dx = gx / sl, dz = gz / sl, c = { id: CAVES.length, x, z, y: h, y0: h, dx, dz, side: rng() < .5 ? -1 : 1, u1: 0 };
+      const at = (u, v) => rawHeight0(x + dx * u - dz * v, z + dz * u + dx * v);
+      let u1 = -1; for (let u = 0; u <= 12; u += .5) if (at(u, 0) - h >= 3.9) { u1 = u; break; }
+      if (u1 < 0 || u1 > 9) continue; c.u1 = u1;
+      let good = true;
+      for (let u = u1; u <= 24 && good; u += 1.5) for (let v = -10; v <= 10; v += 1.5) { if (caveSD(c, u, v) > 1.8) continue; const d = at(u, v) - h; if (d < 3.7 || d > 15) { good = false; break; } }
+      if (!good) continue;
+      c.ex = x - dx * 3; c.ez = z - dz * 3; CAVES.push(c);
+    }
+  }
+  const caveInfo = (x, z) => {
+    let best = null;
+    for (const c of CAVES) {
+      const rx = x - c.x, rz = z - c.z; if (rx * rx + rz * rz > 1500) continue;
+      const u = rx * c.dx + rz * c.dz, v = -rx * c.dz + rz * c.dx, sd = caveSD(c, u, v); if (sd >= 1.8) continue;
+      const f = 1 - smooth(0, 1.8, sd); if (!best || f > best.f) best = { c, u, v, f, roof: u >= c.u1 };
+    }
+    return best;
+  };
+  function rawHeight(x, z) {
+    const h = rawHeight0(x, z), ci = caveInfo(x, z);
+    return ci ? h - Math.max(0, h - ci.c.y0) * ci.f : h;
+  }
+  const heights = new Float32Array(N * N), heights0 = new Float32Array(N * N);
+  for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) { const x = -HALF + ix * CELL, z = -HALF + iz * CELL, h0 = rawHeight0(x, z); heights0[iz * N + ix] = h0; heights[iz * N + ix] = CAVES.length ? rawHeight(x, z) : h0; }
   function terrainH(x, z) {
     const fx = (x + HALF) / CELL, fz = (z + HALF) / CELL;
     if (fx < 0 || fz < 0 || fx >= SEG || fz >= SEG) return -8;
@@ -1105,24 +1141,17 @@ function createTerrain({ world = 640, seed = 0, maxLakes = 4 } = {}) {
     out.jungle *= (1 - out.desert) * (1 - out.swamp) * smooth(1.8, 3.5, h) * (1 - smooth(15, 21, h));
     return out;
   };
-  // cuevas/minas: boca en la ladera de una montaña; el interior es una sala aparte, fuera del mapa (se entra con un teletransporte validado por el servidor)
-  const CAVES = [];
-  {
-    const rng = mulberry32(8080 + (seed | 0)), want = WORLD > 800 ? 5 : 3;
-    for (let t = 0; t < 6000 && CAVES.length < want; t++) {
-      const Mt = rng() < .55 ? MOUNT : MOUNT2, a = rng() * 6.283, r = (10 + rng() * 55) * K, x = Mt.x + Math.cos(a) * r, z = Mt.z + Math.sin(a) * r, h = terrainH(x, z);
-      if (h < 9 || h > 34 || Math.abs(x) > HALF * .9 || Math.abs(z) > HALF * .9) continue;
-      const gx = (terrainH(x + 1.5, z) - terrainH(x - 1.5, z)) / 3, gz = (terrainH(x, z + 1.5) - terrainH(x, z - 1.5)) / 3, sl = Math.hypot(gx, gz);
-      if (sl < .35 || sl > 1.2 || CAVES.some((c) => Math.hypot(c.x - x, c.z - z) < 80 * K) || LAKES.some((L) => Math.hypot(x - L.x, z - L.z) < L.R * 2)) continue;
-      const id = CAVES.length, dx = -gx / sl, dz = -gz / sl;
-      CAVES.push({ id, x, z, y: h, dx, dz, ex: x + dx * 3.2, ez: z + dz * 3.2, in: { x: HALF + 300 + id * 400, y: -40, z: 0, R: 13, H: 5.5 } });
-    }
-  }
   const forestAt = (x, z) => { const b = biomeAt(x, z); return Math.min(1, forestBase(x, z) * (1 - b.desert * .95) + b.jungle * .9 + b.swamp * .25); };
+  // altura de la superficie original (el tejado de las cuevas) con la misma interpolación que terrainH
+  function roofH(x, z) {
+    const fx = (x + HALF) / CELL, fz = (z + HALF) / CELL; if (fx < 0 || fz < 0 || fx >= SEG || fz >= SEG) return -8;
+    const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, i = iz * N + ix;
+    return lerp(lerp(heights0[i], heights0[i + 1], tx), lerp(heights0[i + N], heights0[i + N + 1], tx), tz);
+  }
   const slopeAt = (x, z) => Math.hypot(terrainH(x + 1, z) - terrainH(x - 1, z), terrainH(x, z + 1) - terrainH(x, z - 1)) / 2;
   const lakeAt = (x, z) => { for (const L of LAKES) if ((x - L.x) ** 2 + (z - L.z) ** 2 < L.R * L.R) return L; return null; };
   const nearLake = (x, z, f) => LAKES.some((L) => Math.hypot(x - L.x, z - L.z) < L.R * f);
-  return { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake, biomeAt, BIOMES, CAVES };
+  return { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake, biomeAt, BIOMES, CAVES, caveInfo, roofH, heights0 };
 }
 
 const MAPS = {
@@ -1131,7 +1160,7 @@ const MAPS = {
 };
 const MAP_ID = (location.search.match(/[?&]map=(\w+)/) || [])[1] in MAPS ? location.search.match(/[?&]map=(\w+)/)[1] : 'isla';
 const TERRAIN = createTerrain({ world: MAPS[MAP_ID].world, seed: MAPS[MAP_ID].seed });
-const { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake, biomeAt, BIOMES, CAVES } = TERRAIN;
+const { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake, biomeAt, BIOMES, CAVES, caveInfo, roofH, heights0 } = TERRAIN;
 // @@terrain-end
 
 // textura de control que leen los shaders: R altura, G hierba, B nivel del agua más cercana, A bosque
@@ -1142,10 +1171,10 @@ for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) {
   const slope = Math.hypot(hx, hz) / (CELL * 2);
   let level = 0; for (const L of LAKES) if (Math.hypot(x - L.x, z - L.z) < L.R * 1.6) level = L.level;
   const grass = smooth(level + 1.9, level + 2.7, h) * (1 - smooth(.55, .85, slope)) * (1 - smooth(20, 26, h)) * (lakeAt(x, z) ? 0 : 1);
-  ctlData[i * 4] = h; ctlData[i * 4 + 1] = grass; ctlData[i * 4 + 2] = level; ctlData[i * 4 + 3] = forestAt(x, z);
+  ctlData[i * 4] = h; ctlData[i * 4 + 1] = (CAVES.length && caveInfo(x, z)) ? 0 : grass; ctlData[i * 4 + 2] = level; ctlData[i * 4 + 3] = forestAt(x, z);
 }
 const bioData = new Float32Array(N * N * 4);
-for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) { const i = iz * N + ix, b = biomeAt(-HALF + ix * CELL, -HALF + iz * CELL); bioData[i * 4] = b.desert; bioData[i * 4 + 1] = b.swamp; bioData[i * 4 + 2] = b.jungle; ctlData[i * 4 + 1] *= 1 - b.desert * .97; }
+for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) { const i = iz * N + ix, b = biomeAt(-HALF + ix * CELL, -HALF + iz * CELL); bioData[i * 4] = b.desert; bioData[i * 4 + 1] = b.swamp; bioData[i * 4 + 2] = b.jungle; { const ci = CAVES.length ? caveInfo(-HALF + ix * CELL, -HALF + iz * CELL) : null; bioData[i * 4 + 3] = ci ? ci.f : 0; } ctlData[i * 4 + 1] *= 1 - b.desert * .97; }
 const bioTex = new THREE.DataTexture(bioData, N, N, THREE.RGBAFormat, THREE.FloatType); bioTex.minFilter = bioTex.magFilter = THREE.NearestFilter; bioTex.needsUpdate = true;
 const ctlTex = new THREE.DataTexture(ctlData, N, N, THREE.RGBAFormat, THREE.FloatType);
 ctlTex.minFilter = ctlTex.magFilter = THREE.NearestFilter; ctlTex.needsUpdate = true;
@@ -1174,7 +1203,7 @@ const SEA_AMP = .32, LAKE_AMP = .05;
 const WAVES = [[.8, .6, .349, .55], [-.45, .89, .571, .3], [.24, -.97, .628, .15]].map(([x, z, k, a]) => { const l = Math.hypot(x, z); return [x / l, z / l, k, a, Math.sqrt(9.8 * k)]; });
 function waveH(x, z, amp) { let h = 0; const t = waterTime.value; for (const w of WAVES) h += amp * w[3] * Math.sin(w[2] * (w[0] * x + w[1] * z) - w[4] * t); return h; }
 const _ws = { y: 0, wet: false, fresh: false };
-function waterSurfaceAt(x, z) { if (x > HALF + 100) { _ws.y = -99; _ws.wet = false; _ws.fresh = false; return _ws; } const L = lakeAt(x, z); _ws.y = (L ? L.level : 0) + waveH(x, z, L ? LAKE_AMP : SEA_AMP); _ws.fresh = !!L; _ws.wet = terrainH(x, z) < _ws.y; return _ws; }
+function waterSurfaceAt(x, z) { const L = lakeAt(x, z); _ws.y = (L ? L.level : 0) + waveH(x, z, L ? LAKE_AMP : SEA_AMP); _ws.fresh = !!L; _ws.wet = terrainH(x, z) < _ws.y; return _ws; }
 function isWet(x, z) { const L = lakeAt(x, z); return terrainH(x, z) < (L ? L.level : 0) + .25; }
 const WAVE_GLSL = `uniform float uTime; uniform float uAmp; varying float vH; varying vec2 vWXZ;
 vec3 waveH(vec2 p) {
@@ -1220,6 +1249,7 @@ function makeWaterMat(color, amp, mask, opacity, level) {
   return mat;
 }
 
+let terrainMat = null;
 {
   const geo = new THREE.PlaneGeometry(WORLD, WORLD, SEG, SEG); geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
@@ -1228,7 +1258,7 @@ function makeWaterMat(color, amp, mask, opacity, level) {
     pos.setY(k, heights[iz * N + ix]);
   }
   geo.computeVertexNormals();
-  const terrainMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .93, metalness: 0, envMapIntensity: .45 });
+  terrainMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .93, metalness: 0, envMapIntensity: .45 });
   terrainMat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, { tGrass: { value: texGrass }, tForest: { value: texForest }, tDirt: { value: texDirt }, tRock: { value: texRock }, tSand: { value: texSand }, tSnow: { value: texSnow }, tNoise: { value: texNoise }, tBio: { value: bioTex }, tDetailN: { value: texDetailN }, uTime: waterTime, uWet: WEATHER.wet }, CTL);
     sh.vertexShader = 'varying vec3 vWPos; varying vec3 vWN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);');
@@ -1263,7 +1293,8 @@ function makeWaterMat(color, amp, mask, opacity, level) {
           vec3 b0 = mix(texture2D(tBio, (bi + 0.5) / bn).rgb, texture2D(tBio, (bi + vec2(1.5, 0.5)) / bn).rgb, bt.x), b1 = mix(texture2D(tBio, (bi + vec2(0.5, 1.5)) / bn).rgb, texture2D(tBio, (bi + 1.5) / bn).rgb, bt.x); vec3 bio = mix(b0, b1, bt.y);
           float wDes = bio.x * (1.0 - wRock) * (1.0 - wSnow); tc = mix(tc, cSand * vec3(1.12, 0.95, 0.72) * (0.9 + tM1 * 0.25), wDes * 0.92);
           float wSw = bio.y * (1.0 - wRock); tc = mix(tc, mix(cForest, cDirt, 0.45) * vec3(0.62, 0.7, 0.45), wSw * 0.85);
-          tc = mix(tc, cForest * vec3(0.72, 1.0, 0.65), bio.z * 0.55 * (1.0 - wRock)); }
+          tc = mix(tc, cForest * vec3(0.72, 1.0, 0.65), bio.z * 0.55 * (1.0 - wRock));
+          float bcv = texture2D(tBio, (bi + 0.5) / bn).a; tc = mix(tc, mix(cDirt, cRock, 0.55) * vec3(0.42, 0.4, 0.4), smoothstep(0.1, 0.6, bcv)); }
         tc = pow(tc, vec3(2.2));
         float twet = 1.0 - smoothstep(wl - 0.1, wl + 0.7, th);
         tc *= mix(1.0, 0.6, max(twet, uWet * 0.4) * (1.0 - wSnow));
@@ -1399,6 +1430,7 @@ const tmpNear = [];
   const ok = (type, x, z, mode) => {
     const h = terrainH(x, z), s = slopeAt(x, z);
     if (Math.hypot(x - SPAWN.x, z - SPAWN.z) < 5 || nearLake(x, z, 1.15) || POIS.some((q) => Math.hypot(x - q.x, z - q.z) < q.r + 3)) return false;
+    if (CAVES.some((c) => Math.hypot(x - (c.x + c.dx * 12), z - (c.z + c.dz * 12)) < 24)) return false;
     if ((type === 'appletree' || type === 'berry') && biomeAt(x, z).desert > .35) return false;
     if (type === 'appletree') return h > 1.8 && h < 13 && s < .45;
     if (type === 'berry') return h > 1.3 && h < 14 && s < .5;
@@ -1424,7 +1456,7 @@ const tmpNear = [];
     }
   }
   // minerales dentro de las cuevas (mismo orden en todos los clientes: los ids de nodo coinciden con los del servidor)
-  for (const c of CAVES) for (const [type, cnt] of [['ore', 5], ['sulfur', 3], ['rock', 4]]) for (let k = 0; k < cnt; k++) { const a = rng() * 6.283, r = c.in.R * (.45 + rng() * .42); addNode(type, c.in.x + Math.cos(a) * r, c.in.z + Math.sin(a) * r, c.in.y); }
+  for (const c of CAVES) for (const [type, cnt] of [['ore', 5], ['sulfur', 3], ['rock', 4]]) for (let k = 0; k < cnt; k++) { const a = rng() * 6.283, r = 1.6 + rng() * 4.4, u = 15 + Math.cos(a) * r, v = Math.sin(a) * r; addNode(type, c.x + c.dx * u - c.dz * v, c.z + c.dz * u + c.dx * v); }
   // garantiza recursos cerca de la playa para empezar rápido
   const guarantee = [['tree', 5, 9, 22], ['rock', 3, 8, 20], ['bush', 3, 6, 16], ['berry', 2, 6, 18], ['appletree', 1, 10, 26]];
   for (const [type, want, rmin, rmax] of guarantee) {
@@ -1435,47 +1467,39 @@ const tmpNear = [];
     }
   }
 }
-// ---------------------------------------------------------------- cuevas: bocas en las montañas e interiores aparte
-const caveLight = new THREE.PointLight(0xffd9a8, 0, 42, 1.2); scene.add(caveLight);
-const caveRoot = new THREE.Group(); scene.add(caveRoot);
-{
-  const mRock = new THREE.MeshStandardMaterial({ color: 0x6f7480, roughness: 1, envMapIntensity: 0, flatShading: true, side: THREE.DoubleSide });
-  const mFloor = new THREE.MeshStandardMaterial({ color: 0x4b4a4d, roughness: 1, envMapIntensity: 0, flatShading: true });
-  const mGlow = new THREE.MeshBasicMaterial({ color: 0xff9a3c }), mDark = new THREE.MeshBasicMaterial({ color: 0x000000 }), mWood = new THREE.MeshStandardMaterial({ color: 0x5b4126, roughness: .9, envMapIntensity: 0 });
+// ---------------------------------------------------------------- cuevas: parte del mapa (zanja + túnel + sala tallados; el techo es una malla con la superficie original)
+const caveLight = new THREE.PointLight(0xffd9a8, 0, 36, 1.3); scene.add(caveLight);
+const caveMats = { under: new THREE.MeshStandardMaterial({ color: 0x4d4f55, roughness: 1, envMapIntensity: 0, side: THREE.BackSide }), glow: new THREE.MeshBasicMaterial({ color: 0xff9a3c }), stone: new THREE.MeshStandardMaterial({ color: 0x77716a, roughness: 1, flatShading: true }) };
+const caveRoofs = [];
+function buildCaveRoofs() {
   for (const c of CAVES) {
-    const I = c.in, g = new THREE.Group(); g.position.set(I.x, I.y, I.z); caveRoot.add(g);
-    const wall = new THREE.Mesh(jitterGeo(new THREE.CylinderGeometry(I.R, I.R, I.H, 30, 5, true), 1.5, c.id * 5 + 1), mRock); wall.position.y = I.H / 2; g.add(wall);
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(I.R + 1.5, 30).rotateX(-Math.PI / 2), mFloor); g.add(floor);
-    const ceil = new THREE.Mesh(jitterGeo(new THREE.CircleGeometry(I.R + 1.5, 30, 0).rotateX(Math.PI / 2), .5, c.id * 5 + 2), mRock); ceil.position.y = I.H; g.add(ceil);
-    const cr = mulberry32(900 + c.id);
-    for (let k = 0; k < 26; k++) { const a = cr() * 6.283, r = Math.sqrt(cr()) * (I.R - 1), up = k % 3 === 0, h = .8 + cr() * 1.8; const m = new THREE.Mesh(new THREE.ConeGeometry(.28 + cr() * .35, h, 6), mRock); m.position.set(Math.cos(a) * r, up ? h / 2 : I.H - h / 2, Math.sin(a) * r); if (!up) m.rotation.x = Math.PI; g.add(m); }
-    for (let k = 0; k < 7; k++) { const a = cr() * 6.283, r = I.R * (.55 + cr() * .4), m = new THREE.Mesh(new THREE.OctahedronGeometry(.25 + cr() * .2), mGlow); m.position.set(Math.cos(a) * r, .3, Math.sin(a) * r); m.rotation.set(cr() * 3, cr() * 3, cr() * 3); g.add(m); }
-    // salida: marco de madera con luz en el lado oeste
-    const ex = new THREE.Group(); ex.position.set(-I.R + .6, 0, 0); g.add(ex);
-    for (const sz of [-1.3, 1.3]) { const post = new THREE.Mesh(new THREE.BoxGeometry(.35, 3, .35), mWood); post.position.set(0, 1.5, sz); ex.add(post); const lamp = new THREE.Mesh(new THREE.SphereGeometry(.16, 8, 6), mGlow); lamp.position.set(.3, 2.7, sz); ex.add(lamp); }
-    const lin = new THREE.Mesh(new THREE.BoxGeometry(.4, .35, 3.2), mWood); lin.position.y = 3.1; ex.add(lin);
-    // boca en la montaña: óvalo negro entre rocas
-    const m = new THREE.Group(); m.position.set(c.x, c.y + 1.3, c.z); m.rotation.y = Math.atan2(c.dx, c.dz); scene.add(m);
-    const hole = new THREE.Mesh(new THREE.CircleGeometry(1.55, 16), mDark); hole.scale.set(1.15, 1.25, 1); hole.position.z = .45; m.add(hole);
-    for (let k = 0; k < 9; k++) { const a = Math.PI * (k / 8), rk = new THREE.Mesh(new THREE.DodecahedronGeometry(.4 + cr() * .25, 0), mRock); rk.position.set(Math.cos(a) * 2.25, Math.sin(a) * 2.6 - .9, .1 + cr() * .15); rk.scale.set(1, 1.2, 1); rk.rotation.set(cr() * 3, cr() * 3, cr() * 3); m.add(rk); }
-    for (const sd of [-1, 1]) { const lamp = new THREE.Mesh(new THREE.SphereGeometry(.14, 8, 6), mGlow); lamp.position.set(sd * 1.9, -.4, .9); m.add(lamp); }
+    const pos = [], nor = [], hAt = (ix, iz) => heights0[clamp(iz, 0, N - 1) * N + clamp(ix, 0, N - 1)];
+    const ix0 = Math.max(0, Math.floor((c.x - 40 + HALF) / CELL)), ix1 = Math.min(N - 2, Math.ceil((c.x + 40 + HALF) / CELL)), iz0 = Math.max(0, Math.floor((c.z - 40 + HALF) / CELL)), iz1 = Math.min(N - 2, Math.ceil((c.z + 40 + HALF) / CELL));
+    const corner = (ix, iz) => { const x = -HALF + ix * CELL, z = -HALF + iz * CELL, ci = caveInfo(x, z); return ci && ci.c === c && ci.u >= c.u1 - 1 ? ci : null; };
+    const push = (ix, iz) => { const x = -HALF + ix * CELL, z = -HALF + iz * CELL; pos.push(x, heights0[iz * N + ix], z); const gx = (hAt(ix + 1, iz) - hAt(ix - 1, iz)) / (2 * CELL), gz = (hAt(ix, iz + 1) - hAt(ix, iz - 1)) / (2 * CELL), l = Math.hypot(gx, 1, gz); nor.push(-gx / l, 1 / l, -gz / l); };
+    for (let iz = iz0; iz <= iz1; iz++) for (let ix = ix0; ix <= ix1; ix++) {
+      if (!(corner(ix, iz) || corner(ix + 1, iz) || corner(ix, iz + 1) || corner(ix + 1, iz + 1))) continue;
+      push(ix, iz); push(ix, iz + 1); push(ix + 1, iz); push(ix + 1, iz); push(ix, iz + 1); push(ix + 1, iz + 1);
+    }
+    if (!pos.length) continue;
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    const top = new THREE.Mesh(g, terrainMat); top.castShadow = true; top.receiveShadow = true; top.frustumCulled = false; scene.add(top);
+    const und = new THREE.Mesh(g, caveMats.under); und.frustumCulled = false; scene.add(und); caveRoofs.push(top, und);
+    // dos braseros en la boca para encontrarla de lejos
+    for (const sd of [-1, 1]) { const bx = c.x + c.dx * (c.u1 - 1.5) - c.dz * sd * 2.7, bz = c.z + c.dz * (c.u1 - 1.5) + c.dx * sd * 2.7, by = terrainH(bx, bz);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(.22, .3, .7, 7), caveMats.stone); base.position.set(bx, by + .35, bz); scene.add(base);
+      const fl = new THREE.Mesh(new THREE.SphereGeometry(.2, 8, 6), caveMats.glow); fl.position.set(bx, by + .85, bz); fl.scale.y = 1.4; scene.add(fl); }
   }
 }
-function caveNear() {
-  if (player.cave != null) { const c = CAVES[player.cave]; return Math.hypot(player.pos.x - (c.in.x - c.in.R + 2.5), player.pos.z - c.in.z) < 4 ? { c, out: true } : null; }
-  for (const c of CAVES) if ((Math.hypot(player.pos.x - c.ex, player.pos.z - c.ez) < 4.5 || Math.hypot(player.pos.x - c.x, player.pos.z - c.z) < 4.5) && Math.abs(player.pos.y - c.y) < 7) return { c, out: false };
-  return null;
+// 0 fuera, 1 dentro del todo: oscurece el ambiente y enciende la antorcha del jugador
+function caveDark(x, z, feet) {
+  const ci = caveInfo(x, z); if (!ci || ci.u < ci.c.u1 - 2 || feet > roofH(x, z) - 1.2) return 0;
+  return smooth(ci.c.u1 - 2, ci.c.u1 + 3, ci.u);
 }
-function applyCaveTp(m) {
-  player.pos.set(m.x, m.y, m.z); player.vel.set(0, 0, 0); player.cave = m.cave >= 0 ? m.cave : null; player.onGround = true;
-  const c = m.cave >= 0 ? CAVES[m.cave] : null, o = CAVES.find((q) => Math.hypot(q.ex - m.x, q.ez - m.z) < 1);
-  player.yaw = c ? -Math.PI / 2 : o ? Math.atan2(-o.dx, -o.dz) : player.yaw; player.pitch = -.05; if (c) toast('Estás en una mina: hay minerales y nadie te ve desde fuera', 'info');
-}
-function caveAction() {
-  const cv = caveNear(); if (!cv || state !== 'playing') return false;
-  if (NET.on) { netSend({ t: 'cave', id: cv.c.id, dir: cv.out ? 'out' : 'in' }); return true; }
-  const c = cv.c; applyCaveTp(cv.out ? { x: c.ex, y: terrainH(c.ex, c.ez), z: c.ez, cave: -1 } : { x: c.in.x - c.in.R + 2.5, y: c.in.y, z: c.in.z, cave: c.id }); return true;
-}
+// suelo sobre la sala: si estás sobre el tejado, caminas por la superficie original
+function roofGround(x, z, feet) { const ci = caveInfo(x, z); if (ci && ci.roof) { const r = roofH(x, z); if (feet > r - 1.4) return r; } return -1e9; }
+function roofCeiling(x, z, feet) { const ci = caveInfo(x, z); if (ci && ci.roof) { const r = roofH(x, z); if (feet < r - 1.4) return r - .25; } return Infinity; }
+buildCaveRoofs();
 const nodeMeshes = [];
 const instOwner = new Map();
 function makeInst(geo, color, count, opts) {
@@ -2005,7 +2029,7 @@ function updateDeployables(dt) {
     } else if (d.t === 'mine') {
       for (const b of bots) if (Math.hypot(b.pos.x - d.x, b.pos.z - d.z) < 1.3) { removeDeployable(d); explode(new THREE.Vector3(d.x, d.y + .3, d.z), 4, 170, { pieceMult: .2, src: 'trap' }); break; }
     } else if (d.t === 'garden' && d.planted && d.grow < 1) { d.grow = Math.min(1, d.grow + dt / 300 * (weather.rain > .3 ? 1.6 : 1)); setGarden(d); }
-    else if (d.t === 'collector' && weather.rain > .3 && d.water < 10) { d.water = Math.min(10, d.water + dt / 10); setCollector(d); }
+    else if (d.t === 'collector' && !NET.on && weather.rain > .3 && d.water < 10) { d.water = Math.min(10, d.water + dt / 10); setCollector(d); }
   }
   if (siege.active && clock - siege.baseHitT < 1 && clock - bellT > 15 && deployables.some((d) => d.t === 'bell')) {
     const base = baseTarget(); if (base && Math.hypot(base.x - player.pos.x, base.z - player.pos.z) > 35) { bellT = clock; sfx.bell(); toast('¡La campana suena: están atacando tu base!', 'bad'); }
@@ -2128,11 +2152,11 @@ function openCrate(c) {
 // ---------------------------------------------------------------- física de personajes
 const GRAV = 22, STEP = .55, WATER_FLOOR = -1.25;
 function groundAt(x, z, feet, floor) {
-  let g = Math.max(terrainH(x, z), floor === undefined ? WATER_FLOOR : floor);
+  let g = Math.max(terrainH(x, z), floor === undefined ? WATER_FLOOR : floor); if (CAVES.length) g = Math.max(g, roofGround(x, z, feet));
   for (const b of colliders) if (b.maxY <= feet + STEP + .01 && x > b.minX - .05 && x < b.maxX + .05 && z > b.minZ - .05 && z < b.maxZ + .05 && b.maxY > g) g = b.maxY;
   return g;
 }
-function ceilingAt(x, z, feet) { let c = Infinity; for (const b of colliders) if (b.minY > feet + .5 && x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ && b.minY < c) c = b.minY; return c; }
+function ceilingAt(x, z, feet) { let c = CAVES.length ? roofCeiling(x, z, feet) : Infinity; for (const b of colliders) if (b.minY > feet + .5 && x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ && b.minY < c) c = b.minY; return c; }
 function resolve(e) {
   const r = e.radius;
   nodesNear(e.pos.x, e.pos.z, 3, tmpNear);
@@ -2153,16 +2177,10 @@ function resolve(e) {
   }
 }
 function moveEntity(e, vx, vz, dt) {
-  if (e.cave != null) { // dentro de una cueva: suelo plano y paredes circulares
-    const I = CAVES[e.cave].in; e.pos.x += vx * dt; e.pos.z += vz * dt;
-    const dx = e.pos.x - I.x, dz = e.pos.z - I.z, dd = Math.hypot(dx, dz), lim = I.R - .7; if (dd > lim) { e.pos.x = I.x + dx / dd * lim; e.pos.z = I.z + dz / dd * lim; }
-    const wasG = e.onGround; e.vel.y -= GRAV * dt; e.pos.y += e.vel.y * dt;
-    if (e.pos.y + e.height > I.y + I.H - .3) { e.pos.y = I.y + I.H - .3 - e.height; if (e.vel.y > 0) e.vel.y = 0; }
-    if (e.pos.y <= I.y) { if (!wasG && e.vel.y < -1) e.impact = e.vel.y; e.pos.y = I.y; if (e.vel.y < 0) e.vel.y = 0; e.onGround = true; } else e.onGround = false;
-    e.swimming = false; return;
-  }
+  const ox = e.pos.x, oz = e.pos.z;
   e.pos.x += vx * dt; e.pos.z += vz * dt;
   resolve(e); resolve(e);
+  if (e.onGround && !e.swimming && groundAt(e.pos.x, e.pos.z, e.pos.y, -60) - e.pos.y > 1.15) { e.pos.x = ox; e.pos.z = oz; e.vel.x = 0; e.vel.z = 0; } // las paredes de roca no se escalan
   const lim = HALF * .97, rr = Math.hypot(e.pos.x, e.pos.z); if (rr > lim) { e.pos.x *= lim / rr; e.pos.z *= lim / rr; }
   const g = groundAt(e.pos.x, e.pos.z, e.pos.y, e.buoyant ? -60 : WATER_FLOOR);
   const wasGround = e.onGround;
@@ -3698,7 +3716,7 @@ function primaryAction() {
   if (tool.type === 'hammer' && (a.kind === 'piece' || a.kind === 'dep')) { repairTarget(a); if (s && inv.wear(sel, 1)) toast('El martillo se ha roto', 'bad'); return; }
   if (a.kind === 'dep' && a.dep.t === 'barrel') { damageDep(a.dep, tool.dmg); return; }
   if (a.kind === 'node') {
-    const r = harvest(a.n, tool, tier);
+    const r = harvest(a.n, tool, tier); if (NET.on) netSend({ t: "swing" });
     if (r.st === 'tier') { toast(`Necesitas ${a.n.def.better} para la ${a.n.def.name.toLowerCase()}`, 'bad'); sfx.bad(); return; }
     if (r.st === 'wrong') { toast(`Necesitas ${a.n.def.better}`, 'bad'); sfx.bad(); return; }
     if (r.st !== 'ok') return;
@@ -3717,7 +3735,6 @@ function primaryAction() {
   }
 }
 function interact() {
-  if (caveAction()) return;
   const a = aim;
   const useful = a && a.d <= 3.5 && (a.kind === 'animal' || a.kind === 'piece' || a.kind === 'dep' || a.kind === 'crate' || a.kind === 'loot');
   if (!useful && rainDrinkable()) { if (clock >= nextDrink) { nextDrink = clock + .6; player.thirst = Math.min(100, player.thirst + 5); stats.drank = (stats.drank || 0) + 1; sfx.drink(); toast('Agua de lluvia', 5, 'w:rain'); } return; }
@@ -3944,7 +3961,6 @@ function updateHint() {
     const s = inv.slots[sel];
     h = waterAim.fresh ? `<span>Agua dulce</span><span><span class="key">E</span>Beber${s && s.id === 'waterskin' ? ' · <span class="key">Clic</span>Llenar el odre' : ''}</span>` : '<span>Agua salada</span><span class="warn">No se puede beber</span>';
   }
-  if (!h && !buildMode && !placement) { const cv = caveNear(); if (cv) h = cv.out ? '<span>Salida de la cueva</span><span><span class="key">E</span>Salir</span>' : '<span>Cueva</span><span><span class="key">E</span>Entrar</span>'; }
   if (ui.hint.innerHTML !== h) ui.hint.innerHTML = h;
 }
 function renderBuildBar() {
@@ -4017,8 +4033,9 @@ function updateSky() {
   ui.clockT.textContent = `Día ${dayCount} · ${String(H).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   if (player.underwater && state !== 'menu') { scene.fog.color.set(player.underFresh ? '#2c6a5c' : '#1b5367').convertSRGBToLinear().multiplyScalar(.5); scene.fog.near = .5; scene.fog.far = player.underFresh ? 14 : 26; }
   else { scene.fog.near = lerp(60, 15, weather.rain); scene.fog.far = lerp(320, 140, Math.max(ov * .5, weather.rain)); }
-  if (player.cave != null) { sun.intensity = 0; hemi.intensity = .45; scene.fog.color.setRGB(.012, .01, .008); scene.fog.near = 3; scene.fog.far = 38; }
-  caveLight.intensity = player.cave != null ? 2.6 : 0; caveLight.position.set(player.pos.x, player.pos.y + 1.9, player.pos.z);
+  { const cd = caveDark(player.pos.x, player.pos.z, player.pos.y); sun.intensity *= 1 - cd; hemi.intensity *= 1 - cd * .65; terrainMat.envMapIntensity = .45 * (1 - cd * .95);
+    if (cd > 0) { scene.fog.color.lerp(cTmp.setRGB(.012, .01, .008), cd); scene.fog.near = lerp(scene.fog.near, 3, cd); scene.fog.far = lerp(scene.fog.far, 40, cd); }
+    caveLight.intensity = 2.8 * cd; caveLight.position.set(player.pos.x, player.pos.y + 1.9, player.pos.z); }
   ui.under.hidden = true;
   if (lighthouseBeam) { const nightL = 1 - smooth(-.05, .12, elev); lighthouseBeam.visible = nightL > .02; lighthouseBeam.rotation.y = waterTime.value * .6; POI_MATS.beam.opacity = .13 * nightL; lighthouseLamp.material.color.setRGB(1 + 5 * nightL, .9 + 4 * nightL, .5 + 2 * nightL); }
   let note = '';
@@ -4053,8 +4070,9 @@ const rain = (() => {
   });
   const m = new THREE.LineSegments(g, mat); m.frustumCulled = false; m.visible = false; scene.add(m); return m;
 })();
+function netWeather(st) { if (st !== wxState) { wxState = st; if (st === 'rain' || st === 'storm') toast(st === 'storm' ? 'Se acerca una tormenta' : 'Empieza a llover', 'info'); } }
 function updateWeather(dt) {
-  if ((wxTimer -= dt) <= 0) {
+  if (!(NET.on) && (wxTimer -= dt) <= 0) {
     const r = Math.random(); const prev = wxState;
     wxState = r < .42 ? 'clear' : r < .68 ? 'cloudy' : r < .9 ? 'rain' : 'storm';
     wxTimer = 120 + Math.random() * 220;
@@ -4282,14 +4300,14 @@ function updateRemotes(dt) {
     const px = r.pos.x, pz = r.pos.z, k = 1 - Math.exp(-14 * dt);
     r.pos.lerp(r.tgt, k); r.yaw = lerpAngle(r.yaw, r.tyaw + Math.PI, k);
     const moved = Math.hypot(r.pos.x - px, r.pos.z - pz); r.b.walk += moved; r.b.swing = Math.min(1, r.b.swing + dt * 2.8);
-    r.g.visible = (r.pos.y < -20) === (player.cave != null); r.g.position.copy(r.pos); r.g.rotation.order = 'YXZ'; r.g.rotation.y = r.yaw;
+    r.g.position.copy(r.pos); r.g.rotation.order = 'YXZ'; r.g.rotation.y = r.yaw;
     animViking(r.b, dt, moved);
     r.g.rotation.x = r.dead ? -1.5 : 0; r.g.position.y = r.pos.y - (r.dead ? .1 : 0) + (r.mounted ? .95 : 0);
   }
 }
 function netMsg(m) {
   if (m.t === 'welcome') {
-    dayPhase = m.phase; dayCount = m.day; NET.id = m.id; NET.tid = m.tid; NET.tribe = m.tribe; $('#btnTLeave').hidden = !m.tribe; NET.roster.clear(); for (const q of m.roster) NET.roster.set(q.id, q);
+    dayPhase = m.phase; dayCount = m.day; if (m.wx) wxState = m.wx; NET.id = m.id; NET.tid = m.tid; NET.tribe = m.tribe; $('#btnTLeave').hidden = !m.tribe; NET.roster.clear(); for (const q of m.roster) NET.roster.set(q.id, q);
     player.pos.set(m.x, terrainH(m.x, m.z) + .1, m.z); player.vel.set(0, 0, 0); player.hp = 100; NET.on = true; document.body.classList.add('online-on');
     $('#netStatus').textContent = ''; startGame(); if (m.tribe) toast(`Tribu: ${m.tribe}`, 'info');
   } else if (m.t === 'snap') netSnap(m);
@@ -4309,9 +4327,9 @@ function netMsg(m) {
     if (k && v) toast(`${k.name} ha abatido a ${v.name}`, m.killer === NET.id ? 'info' : undefined);
     if (m.victim === NET.id) netDie(k ? k.name : '', m.cause);
     else if (m.killer === NET.id) { stats.kills = (stats.kills || 0) + 1; }
-  } else if (m.t === 'tp') { applyCaveTp(m); }
+  }
   else if (m.t === 'correct') { player.pos.set(m.x, m.y, m.z); player.vel.set(0, 0, 0); }
-  else if (m.t === 'respawn') { if (NET.wantRespawn) { NET.wantRespawn = false; player.cave = null; player.pos.set(m.x, terrainH(m.x, m.z) + .1, m.z); player.vel.set(0, 0, 0); player.hp = 100; player.hunger = Math.max(player.hunger, 70); player.thirst = Math.max(player.thirst, 70); player.air = 1; $('#death').hidden = true; startGame(); } }
+  else if (m.t === 'respawn') { if (NET.wantRespawn) { NET.wantRespawn = false; player.pos.set(m.x, terrainH(m.x, m.z) + .1, m.z); player.vel.set(0, 0, 0); player.hp = 100; player.hunger = Math.max(player.hunger, 70); player.thirst = Math.max(player.thirst, 70); player.air = 1; $('#death').hidden = true; startGame(); } }
   else if (m.t === 'chat') chatAdd(m.from, m.text, m.tribe, false);
   else if (m.t === 'full') { $('#netStatus').textContent = 'La sala está llena'; netClose(); }
   else if (m.t === 'rooms') { NET.rooms = m.rooms; renderRooms(); }
@@ -4326,7 +4344,7 @@ function netMsg(m) {
     if (m.by === NET.id) for (const it of m.items || []) { const c = pieceCost(it.kind, it.tier); for (const k in c) { const back = Math.floor(c[k] / 2); if (back) giveItem(k, back); } }
     sfx.build();
   }
-  else if (m.t === 'time') { dayPhase = m.phase; dayCount = m.day; }
+  else if (m.t === 'time') { dayPhase = m.phase; dayCount = m.day; if (m.wx) netWeather(m.wx); }
   else if (m.t === 'nodes') { for (const id of m.list) netNode(id, true); }
   else if (m.t === 'nd') { if (m.by !== NET.id) netNode(m.id, false); }
   else if (m.t === 'nr') { const n = nodes[m.id]; if (n && n.depleted) { n.depleted = false; n.hp = n.def.hp; n.acc.fill(0); n.fall = null; fallers.delete(n); writeNode(n); } }
@@ -4340,7 +4358,8 @@ function netMsg(m) {
   else if (m.t === 'ddeny') { giveItem(m.key, 1); toast(m.why, 'bad'); sfx.bad(); }
   else if (m.t === 'dd') { const d = NET.deps.get(m.id); if (d) { burst(new THREE.Vector3(d.x, d.y + .5, d.z), 'wood', 8, 1.2); removeDeployable(d); NET.deps.delete(m.id); if (chestOpen === d) togglePanel(); } if (m.by === NET.id && m.refund) giveItem(m.refund, 1); }
   else if (m.t === 'dh') { const d = NET.deps.get(m.id); if (d) { const dmg = d.hp > m.hp; d.hp = m.hp; if (dmg && Math.hypot(d.x - player.pos.x, d.z - player.pos.z) < 40) { sfx.wood(); burst(new THREE.Vector3(d.x, d.y + .6, d.z), 'wood', 3); } } }
-  else if (m.t === 'da') { const d = NET.deps.get(m.id); if (d) { if (m.ammo != null) d.ammo = m.ammo; if (m.armed != null) { d.armed = m.armed; if (d.jaws) setTrap(d); sfx.clank(); } if (m.planted != null) { d.planted = m.planted; d.grow = m.grow || 0; if (d.plants) setGarden(d); } } }
+  else if (m.t === 'cwater') { if (m.mode === 'fill') { const sl = inv.slots[sel]; if (sl && sl.id === 'waterskin') { inv.slots[sel] = { id: 'waterskin_full', n: 1, dur: m.k }; inv.touch(); sfx.drink(); toast('Odre lleno', 'info'); } } else { player.thirst = Math.min(100, player.thirst + 20); sfx.drink(); stats.drank = (stats.drank || 0) + 1; toast('Agua', 20, 'w:drink'); } }
+  else if (m.t === 'da') { const d = NET.deps.get(m.id); if (d) { if (m.water != null) { d.water = m.water; if (d.t === 'collector') setCollector(d); } if (m.ammo != null) d.ammo = m.ammo; if (m.armed != null) { d.armed = m.armed; if (d.jaws) setTrap(d); sfx.clank(); } if (m.planted != null) { d.planted = m.planted; d.grow = m.grow || 0; if (d.plants) setGarden(d); } } }
   else if (m.t === 'dammo') { const d = NET.deps.get(m.id); if (d) { if (m.ammo != null) { d.ammo = m.ammo; toast(`Cargada: ${d.ammo}/${DEP_DEFS[d.t].turret.cap} ${ITEMS[DEP_DEFS[d.t].turret.ammo].name.toLowerCase()}`, 'info'); sfx.craft(); } if (m.refund > 0) giveItem(DEP_DEFS[d.t].turret.ammo, m.refund); } }
   else if (m.t === 'chest') { const d = NET.deps.get(m.id); if (d) { m.slots.forEach((sl, i) => { d.inv.slots[i] = sl && ITEMS[sl.id] ? sl : null; }); d.inv.touch(); chestOpen = d; if (!panelOpen) togglePanel(); else renderPanel(true); } }
   else if (m.t === 'boom') { explode(new THREE.Vector3(m.x, m.y, m.z), m.R, m.dmg, {}); }
@@ -4413,7 +4432,10 @@ function netUse(d) {
   if (d.t === 'beartrap') { netSend({ t: 'arm', id: d.sid }); return; }
   if (d.t === 'garden') { if (!d.planted) { if (!inv.remove('seeds', 1)) { toast('Necesitas semillas (de los arbustos de bayas o fabrícalas con bayas)', 'bad'); return; } netSend({ t: 'gard', id: d.sid, act: 'plant' }); sfx.bush(); } else if (d.grow < 1) toast(`Aún está creciendo (${Math.round(d.grow * 100)}%)`, 'info'); else netSend({ t: 'gard', id: d.sid, act: 'harvest' }); return; }
   if (d.t === 'bed') { netSend({ t: 'bed', id: d.sid }); return; }
-  if (d.t === 'collector') { toast('Los recolectores de lluvia aún no funcionan en línea', 'info'); return; }
+  if (d.t === 'collector') {
+    if (d.water < 1) { toast('Está vacío. Se llena cuando llueve.', 'info'); return; }
+    const sl = inv.slots[sel]; netSend({ t: 'coll', id: d.sid, act: sl && sl.id === 'waterskin' ? 'fill' : 'drink' }); return;
+  }
   if (STATION_NAMES[d.t] && !panelOpen) togglePanel();
 }
 function netPiece(d) {
@@ -4475,6 +4497,7 @@ function netTick(dt) {
     if (NET.invT >= .9) { netSend({ t: 'invite', target: tgt.id }); NET.invT = -3; }
   } else { NET.invT = 0; $('#invring').hidden = true; }
   updateRemotes(dt); updateNetAnimals(dt);
+  if (state === 'playing' && inv.version !== NET.invV && (NET.invT = (NET.invT || 0) - dt) <= 0) { NET.invT = 2; NET.invV = inv.version; const items = {}; for (const sl of inv.slots) if (sl) items[sl.id] = (items[sl.id] || 0) + sl.n; netSend({ t: 'inv', items }); }
   if (state === 'playing' && (NET.sendT -= dt) <= 0) { NET.sendT = .05; netSend({ t: 'pos', x: +player.pos.x.toFixed(2), y: +player.pos.y.toFixed(2), z: +player.pos.z.toFixed(2), yaw: +player.yaw.toFixed(3), pitch: +player.pitch.toFixed(3) }); }
 }
 function remoteHit(r, weapon, extra) { netSend(Object.assign({ t: weapon === 'bow' || weapon === 'crossbow' ? 'shot' : 'attack', target: r.id, weapon }, extra || {})); }
@@ -4634,7 +4657,7 @@ function updateNodes(dt) {
     slowTick = 0;
     if (!NET.on) for (const n of nodes) if (n.depleted && !n.fall && clock >= n.respawnAt && Math.hypot(n.x - player.pos.x, n.z - player.pos.z) > 25) { n.depleted = false; n.hp = n.def.hp; n.acc.fill(0); writeNode(n); }
     for (const q of POIS) if (!q.found && Math.hypot(q.x - player.pos.x, q.z - player.pos.z) < 55) { q.found = true; toast('Has descubierto: ' + q.name, 'info'); sfx.craft(); }
-    if (player.cave == null) for (const c of CAVES) if (!c.found && Math.hypot(c.x - player.pos.x, c.z - player.pos.z) < 40) { c.found = true; toast('Has descubierto una cueva', 'info'); sfx.craft(); }
+    for (const c of CAVES) if (!c.found && Math.hypot(c.x - player.pos.x, c.z - player.pos.z) < 40) { c.found = true; toast('Has descubierto una cueva', 'info'); sfx.craft(); }
     updateObjective(); renderPanel();
   }
 }
@@ -4727,7 +4750,7 @@ setLang(LANG);
 requestAnimationFrame(frame);
 // gancho de pruebas: avanza la simulación sin depender de los FPS
 window.__isla = { deployables, remoteRoot, pressR(v) { mouseR = v; }, remotes: () => NET.remotes.values(), NET, netMsg, netSend, remoteHit, hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
-  BIOMES, biomeAt, CAVES, player, inv, nodes, pieces, animals, spawnAnimal, LAKES, waterSurfaceAt, stats, giveItem, spawnBot, terrainH, spawn: SPAWN, scene, refreshEnv, renderer, POIS, destroyPiece, post, weather, setWeather(w) { wxState = w; wxTimer = 999; }, ctlData, N, CELL, HALF, camera, pieceRoot, get state() { return state; }, get aim() { return aim; }, get placement() { return placement; }, get waterAim() { return waterAim; },
+  BIOMES, biomeAt, CAVES, caveDark, caveInfo, roofH, player, inv, nodes, pieces, animals, spawnAnimal, LAKES, waterSurfaceAt, stats, giveItem, spawnBot, terrainH, spawn: SPAWN, scene, refreshEnv, renderer, POIS, destroyPiece, post, weather, setWeather(w) { wxState = w; wxTimer = 999; }, ctlData, N, CELL, HALF, camera, pieceRoot, get state() { return state; }, get aim() { return aim; }, get placement() { return placement; }, get waterAim() { return waterAim; },
   sim(sec, hold) { const n = Math.round(sec / .05); for (let k = 0; k < n; k++) { if (hold) mouseL = true; if (hold === 'click' && k === 0) clickQueued = true; waterTime.value += .05; scene.updateMatrixWorld(); tick(.05, performance.now()); } if (hold) mouseL = false; },
   setPhase(p) { dayPhase = p; } };
 })();

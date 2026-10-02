@@ -7,7 +7,7 @@ const WEAPONS = { fists: [4, 3.2], stone_axe: [13, 3.8], stone_pick: [13, 3.8], 
 const PROT = process.env.PROT_SECONDS !== undefined ? +process.env.PROT_SECONDS : 30;
 const SPEED = 4.8, SPRINT = 7.8, RADIUS = 160, HP = 100, REACH = 2.6, DMG = 14, ATK_CD = .6;
 export class Room {
-  constructor(mapId, maxPlayers = 20) { this.mapId = mapId; this.map = MAPS[mapId]; this.T = createTerrain({ world: this.map.world, seed: this.map.seed }); this.half = this.map.world / 2; this.sea = 0; this.max = maxPlayers; this.players = new Map(); this.nextId = 1; this.t = 0; this.tribeInfo = new Map(); this.tribeOfToken = new Map(); this.invites = new Map(); this.nextTribe = 1; this.B = new Buildings(); this.D = new Deps(); this.fxT = 0; this.nodes = new Map(); this.fauna = new Fauna(this); this.fauna.spawnAll(); this.timer = setInterval(() => this.tick(), DT * 1000); }
+  constructor(mapId, maxPlayers = 20) { this.mapId = mapId; this.map = MAPS[mapId]; this.T = createTerrain({ world: this.map.world, seed: this.map.seed }); this.half = this.map.world / 2; this.sea = 0; this.max = maxPlayers; this.players = new Map(); this.nextId = 1; this.t = 0; this.tribeInfo = new Map(); this.tribeOfToken = new Map(); this.invites = new Map(); this.nextTribe = 1; this.B = new Buildings(); this.D = new Deps(); this.fxT = 0; this.wx = { state: 'clear', until: 200 }; this.nodes = new Map(); this.fauna = new Fauna(this); this.fauna.spawnAll(); this.timer = setInterval(() => this.tick(), DT * 1000); }
   get humans() { let n = 0; for (const p of this.players.values()) if (!p.bot) n++; return n; }
   get count() { return this.players.size; }
   spawnPoint() { for (let i = 0; i < 300; i++) { const a = Math.random() * 6.283, r = this.half * (.2 + Math.random() * .62), x = Math.cos(a) * r, z = Math.sin(a) * r, h = this.T.terrainH(x, z); if (h > 1.6 && h < 12 && this.T.slopeAt(x, z) < .28 && !this.T.nearLake(x, z, 1.5)) return { x, z }; } return { x: 0, z: 0 }; }
@@ -60,7 +60,6 @@ export class Room {
     const now = performance.now();
     if (m.t === 'input') { const i = p.input; i.mx = Math.max(-1, Math.min(1, +m.mx || 0)); i.mz = Math.max(-1, Math.min(1, +m.mz || 0)); i.sprint = !!m.sprint; i.jump = !!m.jump; if (Number.isFinite(m.yaw)) p.yaw = m.yaw; }
     else if (m.t === 'pos') this.setPos(p, m, now);
-    else if (m.t === 'cave') this.cave(p, m);
     else if (m.t === 'attack') { if (m.target != null) this.meleeHit(p, +m.target, String(m.weapon || 'fists')); else this.attack(p); }
     else if (m.t === 'shot') this.shotHit(p, +m.target, String(m.weapon || 'bow'), +m.charge || 1);
     else if (m.t === 'selfdmg') { if (p.dead <= 0) this.hurt(p, Math.max(0, Math.min(35, +m.amt || 0)), null, m.cause); }
@@ -89,6 +88,8 @@ export class Room {
     else if (m.t === 'lpick') this.pickBag(p, +m.id);
     else if (m.t === 'bed') this.setBed(p, +m.id);
     else if (m.t === 'gard') this.garden(p, +m.id, String(m.act));
+    else if (m.t === 'coll') this.collect(p, +m.id, String(m.act));
+    else if (m.t === 'inv') this.invReport(p, m.items);
     else if (m.t === 'ndep') this.nodeDepleted(p, m);
     else if (m.t === 'ahit') this.animalHit(p, +m.id, String(m.weapon || 'fists'), false);
     else if (m.t === 'abutcher') this.animalHit(p, +m.id, String(m.weapon || 'fists'), true);
@@ -100,7 +101,7 @@ export class Room {
   near(p, c, R) { return Math.hypot(c.x - p.x, c.z - p.z) <= R && Math.abs(c.y - p.y) < 14; }
   deny(p, key, why) { if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'pdeny', key, why })); }
   build(p, d) {
-    if (p.dead > 0) return; if (p.cave != null) return this.deny(p, d.key, 'No se puede construir en una cueva'); const probe = Object.assign({}, d, { tier: 0 });
+    if (p.dead > 0) return; const probe = Object.assign({}, d, { tier: 0 });
     const res = this.B.place(probe, p.tid, this.B.countOf(p.tid)); if (!res.ok) return this.deny(p, d.key, res.why);
     if (!this.near(p, pieceCenter(res.p), 16)) { this.B.map.delete(res.p.key); return this.deny(p, d.key, 'Está demasiado lejos'); }
     this.broadcast({ t: 'pb', p: this.B.pub(res.p) });
@@ -124,9 +125,20 @@ export class Room {
   }
   // ---- objetos colocables
   depNear(p, d, R) { return Math.hypot(d.x - p.x, d.z - p.z) <= R && Math.abs(d.y - p.y) < 8; }
-  send(p, m) { if (p && p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify(m)); }
+  send(p, m) { if (p && p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify(m)); if (p && m.t === 'give' && Array.isArray(m.items)) for (const [id, n] of m.items) this.grant(p, id, n); }
+  // detección de inventarios inflados: el cliente informa de su mochila; las ganancias que no explican el servidor (botín, cofres) se acumulan y, si son desorbitadas, se expulsa
+  grant(p, id, n) { p.grants = p.grants || {}; p.grants[id] = (p.grants[id] || 0) + (n | 0); }
+  flag(p, why) { p.flags = (p.flags || 0) + 1; console.warn('sospechoso', p.name, why); if (p.flags >= 3 && p.ws) { this.send(p, { t: 'kick', why: 'Inventario no válido' }); p.ws.close(); } }
+  invReport(p, items) {
+    if (!items || typeof items !== 'object' || p.bot) return; const clean = {}; let keys = 0;
+    for (const id in items) { if (++keys > 80) return; const n = +items[id]; if (id.length > 24 || !Number.isFinite(n) || n < 0 || n > 1e6) return; clean[id] = n | 0; }
+    const prev = p.inv, now = this.t; p.inv = clean; const g = p.grants || {}; p.grants = {};
+    if (!prev) return; const dt = Math.max(0, now - (p.invT || now)); p.invT = now; p.gainWin = p.gainWin || {};
+    for (const id in clean) { const gain = clean[id] - (prev[id] || 0) - (g[id] || 0); p.gainWin[id] = Math.max(0, (p.gainWin[id] || 0) * Math.exp(-dt / 10)) + Math.max(0, gain); if (p.gainWin[id] > 400) { p.gainWin[id] = 0; this.flag(p, 'ganancia de ' + id); } }
+  }
+  chestOut(p, d, slots) { const before = {}, after = {}; for (const s of d.slots) if (s) before[s.id] = (before[s.id] || 0) + s.n; for (const s of slots) if (s) after[s.id] = (after[s.id] || 0) + s.n; for (const id in after) if (after[id] - (before[id] || 0) > 400) this.flag(p, 'cofre ' + id); for (const id in before) if (before[id] > (after[id] || 0)) this.grant(p, id, before[id] - (after[id] || 0)); }
   placeDep(p, d) {
-    if (p.dead > 0) return; if (p.cave != null) return this.send(p, { t: 'ddeny', key: String(d.t), why: 'No se puede colocar nada en una cueva' }); const t = String(d.t), x = +d.x, y = +d.y, z = +d.z;
+    if (p.dead > 0) return; const t = String(d.t), x = +d.x, y = +d.y, z = +d.z;
     const fail = (why) => this.send(p, { t: 'ddeny', key: t, why });
     if (!DEF[t] || !Number.isFinite(x + y + z)) return fail('Objeto no válido');
     if (Math.hypot(x - p.x, z - p.z) > 14) return fail('Está demasiado lejos');
@@ -153,6 +165,7 @@ export class Room {
   chestOpen(p, id) { const d = this.D.map.get(id); if (!d || d.t !== 'chest' || d.owner !== p.tid || !this.depNear(p, d, 6)) return this.notice(p, 'No puedes abrir este cofre'); this.send(p, { t: 'chest', id, slots: d.slots }); }
   chestSet(p, id, slots) {
     const d = this.D.map.get(id); if (!d || d.t !== 'chest' || d.owner !== p.tid || !this.depNear(p, d, 8) || !Array.isArray(slots) || slots.length !== 24) return;
+    this.chestOut(p, d, slots.map((s) => (s && typeof s.id === 'string' ? { id: s.id.slice(0, 24), n: Math.min(999, s.n | 0) } : null)));
     d.slots = slots.map((s) => (s && typeof s.id === 'string' && s.n > 0 ? { id: s.id.slice(0, 24), n: Math.min(999, s.n | 0), dur: s.dur } : null));
   }
   setBed(p, id) { const d = this.ownDep(p, id); if (d && d.t === 'bed') { p.bed = id; this.notice(p, 'Reaparecerás en esta cama'); } }
@@ -160,6 +173,10 @@ export class Room {
     const d = this.ownDep(p, id); if (!d || d.t !== 'garden' || !this.depNear(p, d, 5)) return;
     if (act === 'plant' && !d.planted) { d.planted = true; d.grow = 0; this.broadcast({ t: 'da', id, planted: true, grow: 0 }); }
     else if (act === 'harvest' && d.planted && d.grow >= 1) { d.planted = false; d.grow = 0; this.broadcast({ t: 'da', id, planted: false, grow: 0 }); this.send(p, { t: 'give', items: [['berries', 6], ['apple', 3], ['seeds', 2]] }); }
+  }
+  collect(p, id, act) {
+    const d = this.ownDep(p, id); if (!d || d.t !== 'collector' || !this.depNear(p, d, 5) || d.water < 1) return;
+    const k = act === 'fill' ? Math.min(5, Math.floor(d.water)) : 1; d.water -= k; this.send(p, { t: 'cwater', mode: act === 'fill' ? 'fill' : 'drink', k }); this.broadcast({ t: 'da', id, water: +d.water.toFixed(1) });
   }
   // ---- explosiones: daño en área a jugadores, construcciones y objetos
   clientExplode(p, kind, x, y, z) {
@@ -184,6 +201,7 @@ export class Room {
     for (const d of [...this.D.map.values()]) {
       if (d.cd > 0) d.cd -= dt; const T = DEF[d.t].turret;
       if (d.t === 'garden' && d.planted && d.grow < 1) d.grow = Math.min(1, d.grow + dt / 300);
+      else if (d.t === 'collector') { if (this.wx.state !== 'clear' && this.wx.state !== 'cloudy' && d.water < 10) { d.water = Math.min(10, d.water + dt / 10); if (Math.floor(d.water * 2) !== d.wsent) { d.wsent = Math.floor(d.water * 2); this.broadcast({ t: 'da', id: d.id, water: +d.water.toFixed(1) }); } } }
       else if (T && d.ammo > 0) {
         const es = this.enemiesNear(d, T.range, T.min || 0); if (!es.length) continue;
         if (d.cd > 0) continue; d.cd = T.cd; const tgt = d.t === 'mortar' ? es.sort((a, b) => b[1] - a[1])[0][0] : es.sort((a, b) => a[1] - b[1])[0][0];
@@ -236,25 +254,12 @@ export class Room {
     if (p.dead > 0) return;
     const x = +m.x, y = +m.y, z = +m.z; if (!Number.isFinite(x + y + z)) return;
     const dt = Math.min(1, Math.max(.02, (now - (p.lastPos || now - 50)) / 1000)); p.lastPos = now; p.cs = true;
-    const d = Math.hypot(x - p.x, z - p.z), lim = this.half * .99, cv = p.cave != null ? this.T.CAVES[p.cave] : null;
-    const out = cv ? Math.hypot(x - cv.in.x, z - cv.in.z) > cv.in.R + 3 : Math.abs(x) > lim || Math.abs(z) > lim;
-    if (d > (p.mount ? 22 : 16) * dt + 2.5 || out) { p.strikes = (p.strikes || 0) + 1; if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'correct', x: p.x, y: p.y, z: p.z })); return; }
+    const d = Math.hypot(x - p.x, z - p.z), lim = this.half * .99;
+    if (d > (p.mount ? 22 : 16) * dt + 2.5 || Math.abs(x) > lim || Math.abs(z) > lim) { p.strikes = (p.strikes || 0) + 1; if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'correct', x: p.x, y: p.y, z: p.z })); return; }
     p.x = x; p.y = y; p.z = z; if (Number.isFinite(+m.yaw)) p.yaw = +m.yaw; if (Number.isFinite(+m.pitch)) p.pitch = +m.pitch;
   }
-  // entrar o salir de una cueva: el servidor comprueba que estés junto a la boca (o junto a la salida del interior) y te teletransporta
-  cave(p, m) {
-    if (p.dead > 0 || p.mount) return; const now = this.t; if (now < (p.caveT || 0)) return;
-    const C = this.T.CAVES;
-    if (m.dir === 'in' && p.cave == null) {
-      const c = C[m.id | 0]; if (!c || Math.hypot(p.x - c.ex, p.z - c.ez) > 8 || Math.abs(p.y - c.y) > 8) return;
-      p.cave = c.id; p.x = c.in.x - c.in.R + 2.5; p.z = c.in.z; p.y = c.in.y; p.cs = true; p.lastPos = 0;
-    } else if (m.dir === 'out' && p.cave != null) {
-      const c = C[p.cave]; if (Math.hypot(p.x - (c.in.x - c.in.R + 2.5), p.z - c.in.z) > 7) return;
-      p.cave = null; p.x = c.ex; p.z = c.ez; p.y = this.T.terrainH(c.ex, c.ez); p.cs = true; p.lastPos = 0;
-    } else return;
-    p.caveT = now + 1;
-    if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'tp', x: p.x, y: p.y, z: p.z, cave: p.cave == null ? -1 : p.cave }));
-  }
+  // el clima es del servidor: todos ven llover a la vez
+  tickWeather() { if (this.t < this.wx.until) return; const r = Math.random(); this.wx.state = r < .42 ? 'clear' : r < .68 ? 'cloudy' : r < .9 ? 'rain' : 'storm'; this.wx.until = this.t + 120 + Math.random() * 220; }
   find(id) { const q = this.players.get(id); return q && q.dead <= 0 ? q : null; }
   meleeHit(p, id, weapon) {
     if (p.cd > 0 || p.dead > 0) return; this.broadcast({ t: 'swing', id: p.id }); const w = WEAPONS[weapon] || WEAPONS.fists, q = this.find(id); p.cd = .35; if (!q || q === p || q.tid === p.tid) return;
@@ -277,7 +282,7 @@ export class Room {
       if (p.bot && p.brain) p.brain(this, p);
       if (p.cd > 0) p.cd -= DT;
       if (p.hp < HP && p.dead <= 0 && this.t > (p.regenT || 0)) p.hp = Math.min(HP, p.hp + DT * 1.2);
-      if (p.dead > 0) { if (p.bot || p.wantRespawn) p.dead -= DT; if (p.dead <= 0) { p.wantRespawn = false; const bd = p.bed && this.D.map.get(p.bed), sp = bd && bd.owner === p.tid ? { x: bd.x, z: bd.z } : this.spawnPoint(); p.x = sp.x; p.z = sp.z; p.y = bd && bd.owner === p.tid ? bd.y + .7 : this.T.terrainH(p.x, p.z); p.dropped = false; p.cave = null; p.hp = HP; p.prot = this.t + Math.min(20, PROT); if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'respawn', x: p.x, y: p.y, z: p.z })); } continue; }
+      if (p.dead > 0) { if (p.bot || p.wantRespawn) p.dead -= DT; if (p.dead <= 0) { p.wantRespawn = false; const bd = p.bed && this.D.map.get(p.bed), sp = bd && bd.owner === p.tid ? { x: bd.x, z: bd.z } : this.spawnPoint(); p.x = sp.x; p.z = sp.z; p.y = bd && bd.owner === p.tid ? bd.y + .7 : this.T.terrainH(p.x, p.z); p.dropped = false; p.hp = HP; p.prot = this.t + Math.min(20, PROT); if (p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'respawn', x: p.x, y: p.y, z: p.z })); } continue; }
       if (p.cs) continue;
       const i = p.input, len = Math.hypot(i.mx, i.mz) || 1, sp = i.sprint ? SPRINT : SPEED;
       // mz>0 = adelante; yaw igual que el cliente (-sin, -cos)
@@ -287,7 +292,7 @@ export class Room {
       if (ny > this.sea - 1.1 && Math.abs(ny - p.y) < 1.3 + Math.abs(p.vy) * DT) { p.x = nx * k; p.z = nz * k; }
       const g = this.T.terrainH(p.x, p.z); if (i.jump && p.y <= g + .05) p.vy = 7; p.vy -= 22 * DT; p.y += p.vy * DT; if (p.y <= g) { p.y = g; p.vy = 0; }
     }
-    this.tickDeps(DT); this.tickNodes(); this.fauna.update(DT); this.isNight = this.sunElev() < -.02; if (this.t >= (this.timeT || 0)) { this.timeT = this.t + 10; this.broadcast({ t: 'time', phase: +this.phase().toFixed(4), day: Math.floor((this.t + 42) / 600) + 1 }); }
+    this.tickDeps(DT); this.tickNodes(); this.fauna.update(DT); this.isNight = this.sunElev() < -.02; if (this.t >= (this.timeT || 0)) { this.timeT = this.t + 10; this.tickWeather(); this.broadcast({ t: 'time', phase: +this.phase().toFixed(4), day: Math.floor((this.t + 42) / 600) + 1, wx: this.wx.state }); }
     this.snapshot();
   }
   snapshot() {

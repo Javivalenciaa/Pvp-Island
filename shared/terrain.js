@@ -39,7 +39,7 @@ export function createTerrain({ world = 640, seed = 0, maxLakes = 4 } = {}) {
       if (best && best.sl < .25 && !LAKES.some((L) => Math.hypot(L.x - best.x, L.z - best.z) < 70)) LAKES.push({ x: best.x, z: best.z, R: 13 + rng() * 6, level: best.h - .4 });
     }
   }
-  function rawHeight(x, z) {
+  function rawHeight0(x, z) {
     let h = baseHeight(x, z);
     for (const L of LAKES) {
       const d = Math.hypot(x - L.x, z - L.z);
@@ -50,8 +50,44 @@ export function createTerrain({ world = 640, seed = 0, maxLakes = 4 } = {}) {
     }
     return h;
   }
-  const heights = new Float32Array(N * N);
-  for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) heights[iz * N + ix] = rawHeight(-HALF + ix * CELL, -HALF + iz * CELL);
+  // cuevas: el interior es parte del mapa. Se talla en el relieve una zanja que lleva a un túnel y una sala (suelo plano a altura y0);
+  // el techo es la propia superficie original de la montaña, que el cliente dibuja como malla de tejado (roofH) y por la que se puede andar encima.
+  const CAVES = [];
+  const sdRect = (u, v, u0, u1, w) => { const ax = Math.abs(u - (u0 + u1) / 2) - (u1 - u0) / 2, ay = Math.abs(v) - w; return Math.hypot(Math.max(ax, 0), Math.max(ay, 0)) + Math.min(Math.max(ax, ay), 0); };
+  const caveSD = (c, u, v) => Math.min(sdRect(u, v, -1, 9, 1.9), Math.hypot(u - 15, v) - 6.8, Math.hypot(u - 11, v - c.side * 6.8) - 3.2);
+  {
+    const rng = mulberry32(8080 + (seed | 0)), want = WORLD > 800 ? 5 : 3;
+    for (let t = 0; t < 20000 && CAVES.length < want; t++) {
+      const Mt = rng() < .55 ? MOUNT : MOUNT2, a = rng() * 6.283, r = (8 + rng() * 70) * K, wild = rng() < .35, x = wild ? (rng() * 2 - 1) * HALF * .8 : Mt.x + Math.cos(a) * r, z = wild ? (rng() * 2 - 1) * HALF * .8 : Mt.z + Math.sin(a) * r;
+      if (Math.abs(x) > HALF * .88 || Math.abs(z) > HALF * .88) continue;
+      const h = rawHeight0(x, z); if (h < 6 || h > 24) continue;
+      const gx = (rawHeight0(x + 1.5, z) - rawHeight0(x - 1.5, z)) / 3, gz = (rawHeight0(x, z + 1.5) - rawHeight0(x, z - 1.5)) / 3, sl = Math.hypot(gx, gz);
+      if (sl < .38 || sl > .85 || CAVES.some((q) => Math.hypot(q.x - x, q.z - z) < 60 * K) || LAKES.some((L) => Math.hypot(x - L.x, z - L.z) < L.R * 2.2)) continue;
+      const dx = gx / sl, dz = gz / sl, c = { id: CAVES.length, x, z, y: h, y0: h, dx, dz, side: rng() < .5 ? -1 : 1, u1: 0 };
+      const at = (u, v) => rawHeight0(x + dx * u - dz * v, z + dz * u + dx * v);
+      let u1 = -1; for (let u = 0; u <= 12; u += .5) if (at(u, 0) - h >= 3.9) { u1 = u; break; }
+      if (u1 < 0 || u1 > 9) continue; c.u1 = u1;
+      let good = true;
+      for (let u = u1; u <= 24 && good; u += 1.5) for (let v = -10; v <= 10; v += 1.5) { if (caveSD(c, u, v) > 1.8) continue; const d = at(u, v) - h; if (d < 3.7 || d > 15) { good = false; break; } }
+      if (!good) continue;
+      c.ex = x - dx * 3; c.ez = z - dz * 3; CAVES.push(c);
+    }
+  }
+  const caveInfo = (x, z) => {
+    let best = null;
+    for (const c of CAVES) {
+      const rx = x - c.x, rz = z - c.z; if (rx * rx + rz * rz > 1500) continue;
+      const u = rx * c.dx + rz * c.dz, v = -rx * c.dz + rz * c.dx, sd = caveSD(c, u, v); if (sd >= 1.8) continue;
+      const f = 1 - smooth(0, 1.8, sd); if (!best || f > best.f) best = { c, u, v, f, roof: u >= c.u1 };
+    }
+    return best;
+  };
+  function rawHeight(x, z) {
+    const h = rawHeight0(x, z), ci = caveInfo(x, z);
+    return ci ? h - Math.max(0, h - ci.c.y0) * ci.f : h;
+  }
+  const heights = new Float32Array(N * N), heights0 = new Float32Array(N * N);
+  for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) { const x = -HALF + ix * CELL, z = -HALF + iz * CELL, h0 = rawHeight0(x, z); heights0[iz * N + ix] = h0; heights[iz * N + ix] = CAVES.length ? rawHeight(x, z) : h0; }
   function terrainH(x, z) {
     const fx = (x + HALF) / CELL, fz = (z + HALF) / CELL;
     if (fx < 0 || fz < 0 || fx >= SEG || fz >= SEG) return -8;
@@ -82,22 +118,15 @@ export function createTerrain({ world = 640, seed = 0, maxLakes = 4 } = {}) {
     out.jungle *= (1 - out.desert) * (1 - out.swamp) * smooth(1.8, 3.5, h) * (1 - smooth(15, 21, h));
     return out;
   };
-  // cuevas/minas: boca en la ladera de una montaña; el interior es una sala aparte, fuera del mapa (se entra con un teletransporte validado por el servidor)
-  const CAVES = [];
-  {
-    const rng = mulberry32(8080 + (seed | 0)), want = WORLD > 800 ? 5 : 3;
-    for (let t = 0; t < 6000 && CAVES.length < want; t++) {
-      const Mt = rng() < .55 ? MOUNT : MOUNT2, a = rng() * 6.283, r = (10 + rng() * 55) * K, x = Mt.x + Math.cos(a) * r, z = Mt.z + Math.sin(a) * r, h = terrainH(x, z);
-      if (h < 9 || h > 34 || Math.abs(x) > HALF * .9 || Math.abs(z) > HALF * .9) continue;
-      const gx = (terrainH(x + 1.5, z) - terrainH(x - 1.5, z)) / 3, gz = (terrainH(x, z + 1.5) - terrainH(x, z - 1.5)) / 3, sl = Math.hypot(gx, gz);
-      if (sl < .35 || sl > 1.2 || CAVES.some((c) => Math.hypot(c.x - x, c.z - z) < 80 * K) || LAKES.some((L) => Math.hypot(x - L.x, z - L.z) < L.R * 2)) continue;
-      const id = CAVES.length, dx = -gx / sl, dz = -gz / sl;
-      CAVES.push({ id, x, z, y: h, dx, dz, ex: x + dx * 3.2, ez: z + dz * 3.2, in: { x: HALF + 300 + id * 400, y: -40, z: 0, R: 13, H: 5.5 } });
-    }
-  }
   const forestAt = (x, z) => { const b = biomeAt(x, z); return Math.min(1, forestBase(x, z) * (1 - b.desert * .95) + b.jungle * .9 + b.swamp * .25); };
+  // altura de la superficie original (el tejado de las cuevas) con la misma interpolación que terrainH
+  function roofH(x, z) {
+    const fx = (x + HALF) / CELL, fz = (z + HALF) / CELL; if (fx < 0 || fz < 0 || fx >= SEG || fz >= SEG) return -8;
+    const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, i = iz * N + ix;
+    return lerp(lerp(heights0[i], heights0[i + 1], tx), lerp(heights0[i + N], heights0[i + N + 1], tx), tz);
+  }
   const slopeAt = (x, z) => Math.hypot(terrainH(x + 1, z) - terrainH(x - 1, z), terrainH(x, z + 1) - terrainH(x, z - 1)) / 2;
   const lakeAt = (x, z) => { for (const L of LAKES) if ((x - L.x) ** 2 + (z - L.z) ** 2 < L.R * L.R) return L; return null; };
   const nearLake = (x, z, f) => LAKES.some((L) => Math.hypot(x - L.x, z - L.z) < L.R * f);
-  return { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake, biomeAt, BIOMES, CAVES };
+  return { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake, biomeAt, BIOMES, CAVES, caveInfo, roofH, heights0 };
 }

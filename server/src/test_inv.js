@@ -1,0 +1,13 @@
+import WebSocket from 'ws';
+import { createServer } from './index.js';
+const ok = (c, m) => { console.log((c ? 'OK   ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const srv = createServer({ port: 0, minPlayers: 0 }); await new Promise((r) => srv.wss.on('listening', r)); const port = srv.wss.address().port;
+const ws = new WebSocket('ws://localhost:' + port); const msgs = []; let closed = false; await new Promise((r) => ws.on('open', r)); ws.on('message', (d) => msgs.push(JSON.parse(d))); ws.on('close', () => { closed = true; });
+ws.send(JSON.stringify({ t: 'join', name: 'Tramposo', token: 'cheat', map: 'isla' })); await sleep(300);
+const room = srv.rooms[0], p = [...room.players.values()][0], inv = (items) => ws.send(JSON.stringify({ t: 'inv', items }));
+inv({ wood: 10 }); await sleep(80); inv({ wood: 60, stone: 20 }); await sleep(80); ok(!p.flags, 'recolectar con normalidad no levanta sospechas');
+room.send(p, { t: 'give', items: [['raw_meat', 300]] }); inv({ wood: 60, stone: 20, raw_meat: 300 }); await sleep(80); ok(!p.flags, 'el botín que entrega el servidor se explica');
+inv({ wood: 5000, stone: 20 }); await sleep(80); ok(p.flags === 1, 'una ganancia desorbitada se marca');
+inv({ wood: 12000, stone: 20 }); await sleep(80); inv({ wood: 20000, stone: 20 }); await sleep(250); ok(closed && msgs.some((m) => m.t === 'kick'), 'tras varias marcas se expulsa al tramposo');
+srv.close(); process.exit(process.exitCode || 0);

@@ -1,22 +1,19 @@
-import WebSocket from 'ws';
-import { createServer } from './index.js';
+import { createTerrain } from '../../shared/terrain.js';
+import { MAPS } from '../../shared/maps.js';
 const ok = (c, m) => { console.log((c ? 'OK   ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const srv = createServer({ port: 0, minPlayers: 0 }); await new Promise((r) => srv.wss.on('listening', r)); const port = srv.wss.address().port;
-const room = srv.rooms[0], C = room.T.CAVES;
-ok(C.length >= 3, 'el mapa tiene cuevas: ' + C.length);
-const ws = new WebSocket('ws://localhost:' + port); const msgs = []; await new Promise((r) => ws.on('open', r)); ws.on('message', (d) => msgs.push(JSON.parse(d)));
-ws.send(JSON.stringify({ t: 'join', name: 'Ana', token: 'ana', map: 'isla' })); await sleep(300);
-const p = [...room.players.values()][0], c = C[0], send = (m) => ws.send(JSON.stringify(m));
-send({ t: 'cave', id: 0, dir: 'in' }); await sleep(100); ok(p.cave == null, 'lejos de la boca no se puede entrar');
-p.x = c.ex; p.z = c.ez; p.y = c.y; p.prot = 0;
-send({ t: 'cave', id: 0, dir: 'in' }); await sleep(150);
-ok(p.cave === 0 && p.x > room.half + 100 && p.y === c.in.y, 'junto a la boca se entra en la cueva');
-ok(msgs.some((m) => m.t === 'tp' && m.cave === 0), 'el cliente recibe el teletransporte');
-send({ t: 'pos', x: p.x + 3, y: p.y, z: p.z, yaw: 0 }); await sleep(100); ok(Math.abs(p.x - (c.in.x - c.in.R + 2.5 + 3)) < .1, 'dentro de la cueva el movimiento se acepta');
-send({ t: 'pos', x: p.x + 40, y: p.y, z: p.z, yaw: 0 }); await sleep(100); ok(p.x < c.in.x + c.in.R, 'no se puede salir de las paredes de la cueva');
-send({ t: 'build', piece: { kind: 'foundation', i: 1, j: 1, top: 1, bottom: 0, key: 'x' } }); await sleep(100); ok(room.B.map.size === 0, 'no se puede construir dentro');
-send({ t: 'cave', id: 0, dir: 'out' }); await sleep(100); ok(p.cave != null, 'lejos de la salida interior no se puede salir');
-p.x = c.in.x - c.in.R + 2.5; p.z = c.in.z; await sleep(1100);
-send({ t: 'cave', id: 0, dir: 'out' }); await sleep(150); ok(p.cave == null && Math.hypot(p.x - c.ex, p.z - c.ez) < .1, 'junto a la salida se vuelve a la superficie');
-srv.close(); process.exit(process.exitCode || 0);
+for (const [id, mp] of Object.entries(MAPS)) {
+  const T = createTerrain({ world: mp.world, seed: mp.seed });
+  ok(T.CAVES.length >= 3, id + ': tiene cuevas (' + T.CAVES.length + ')');
+  for (const c of T.CAVES) {
+    const at = (u, v) => [c.x + c.dx * u - c.dz * v, c.z + c.dz * u + c.dx * v];
+    // andando de fuera hacia dentro: el suelo nunca sube más de lo que se puede escalar y acaba plano a la altura y0
+    let maxStep = 0, prev = null; for (let u = -6; u <= 16; u += .5) { const [x, z] = at(u, 0), h = T.terrainH(x, z); if (prev !== null) maxStep = Math.max(maxStep, Math.abs(h - prev)); prev = h; }
+    const [cx, cz] = at(15, 0); const [tx, tz] = at(u1(c) + 1, 0);
+    ok(maxStep < 1.1, `${id} cueva ${c.id}: se entra andando (salto máx. ${maxStep.toFixed(2)} m cada 0,5 m)`);
+    ok(Math.abs(T.terrainH(cx, cz) - c.y0) < .05 && Math.abs(T.terrainH(tx, tz) - c.y0) < .05, `${id} cueva ${c.id}: suelo plano dentro`);
+    ok(T.roofH(cx, cz) - T.terrainH(cx, cz) >= 3.5, `${id} cueva ${c.id}: techo a ${(T.roofH(cx, cz) - T.terrainH(cx, cz)).toFixed(1)} m de altura`);
+    const [wx, wz] = at(15, 9.5); ok(T.terrainH(wx, wz) - c.y0 > 3, `${id} cueva ${c.id}: paredes de roca`);
+    ok(!!T.caveInfo(cx, cz) && T.caveInfo(cx, cz).roof, `${id} cueva ${c.id}: caveInfo detecta el interior`);
+  }
+}
+function u1(c) { return c.u1; }

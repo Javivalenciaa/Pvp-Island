@@ -1,0 +1,18 @@
+import WebSocket from 'ws';
+import { createServer } from './index.js';
+const ok = (c, m) => { console.log((c ? 'OK   ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const srv = createServer({ port: 0, minPlayers: 0 }); await new Promise((r) => srv.wss.on('listening', r)); const port = srv.wss.address().port;
+const conn = async (name, token) => { const ws = new WebSocket('ws://localhost:' + port); await new Promise((r) => ws.on('open', r)); ws.send(JSON.stringify({ t: 'join', name, token, map: 'isla' })); await sleep(250); return ws; };
+const room = srv.rooms[0], send = (ws, m) => ws.send(JSON.stringify(m));
+const a = await conn('Dueño', 'dueno'), b = await conn('Raider', 'raider');
+const pa = [...room.players.values()].find((p) => p.name === 'Dueño'), pb = [...room.players.values()].find((p) => p.name === 'Raider');
+pa.prot = 0; pb.prot = 0; const ix = Math.round(pa.x / 3), jz = Math.round(pa.z / 3), top = room.T.terrainH(pa.x, pa.z) + 1;
+send(a, { t: 'build', piece: { kind: 'foundation', key: `F${ix},${jz}`, i: ix, j: jz, L: 0, top, bottom: top - 1 } }); await sleep(150);
+ok(room.B.map.size === 1, 'el dueño construye');
+a.close(); await sleep(300);
+ok(!room.players.has(pa.id), 'el dueño se ha desconectado');
+pb.x = ix * 3 + 1.5; pb.z = jz * 3 + 1.5 + 1; pb.y = top; const f = room.B.get(`F${ix},${jz}`), hp0 = f.hp;
+send(b, { t: 'phit', key: f.key, weapon: 'iron_axe' }); await sleep(150);
+ok(f.hp < hp0, 'sin protección al desconectarse: la base recibe daño con su dueño fuera (' + hp0 + ' -> ' + f.hp + ')');
+srv.close(); process.exit(process.exitCode || 0);
