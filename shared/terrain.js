@@ -82,6 +82,17 @@ export function createTerrain({ world = 640, seed = 0, maxLakes = 4 } = {}) {
     }
     return best;
   };
+  // pórtico de entrada: un arco de roca de 6 m de ancho y 4,3 m de alto que cubre la zanja hasta donde empieza el techo
+  const ARCH_W = 3, ARCH_H = 4.3;
+  const archTop = (c, v) => Math.abs(v) >= ARCH_W ? c.y0 : c.y0 + ARCH_H * Math.sqrt(1 - (v / ARCH_W) ** 2);
+  const archInfo = (x, z) => {
+    for (const c of CAVES) {
+      const rx = x - c.x, rz = z - c.z; if (rx * rx + rz * rz > 400) continue;
+      const u = rx * c.dx + rz * c.dz, v = -rx * c.dz + rz * c.dx;
+      if (u >= -1.4 && u <= c.u1 + 1.2 && Math.abs(v) < ARCH_W) return { c, u, v, top: archTop(c, v) };
+    }
+    return null;
+  };
   function rawHeight(x, z) {
     const h = rawHeight0(x, z), ci = caveInfo(x, z);
     return ci ? h - Math.max(0, h - ci.c.y0) * ci.f : h;
@@ -128,5 +139,5 @@ export function createTerrain({ world = 640, seed = 0, maxLakes = 4 } = {}) {
   const slopeAt = (x, z) => Math.hypot(terrainH(x + 1, z) - terrainH(x - 1, z), terrainH(x, z + 1) - terrainH(x, z - 1)) / 2;
   const lakeAt = (x, z) => { for (const L of LAKES) if ((x - L.x) ** 2 + (z - L.z) ** 2 < L.R * L.R) return L; return null; };
   const nearLake = (x, z, f) => LAKES.some((L) => Math.hypot(x - L.x, z - L.z) < L.R * f);
-  return { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake, biomeAt, BIOMES, CAVES, caveInfo, roofH, heights0 };
+  return { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake, biomeAt, BIOMES, CAVES, caveInfo, roofH, heights0, archInfo, archTop, ARCH_W, ARCH_H };
 }

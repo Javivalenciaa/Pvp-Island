@@ -12,7 +12,7 @@ block = f"""// @@terrain-begin (generado por tools/sync_terrain.py desde shared/
 const MAPS = {m.group(1)};
 const MAP_ID = (location.search.match(/[?&]map=(\\w+)/) || [])[1] in MAPS ? location.search.match(/[?&]map=(\\w+)/)[1] : 'isla';
 const TERRAIN = createTerrain({{ world: MAPS[MAP_ID].world, seed: MAPS[MAP_ID].seed }});
-const {{ WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake, biomeAt, BIOMES, CAVES, caveInfo, roofH, heights0 }} = TERRAIN;
+const {{ WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake, biomeAt, BIOMES, CAVES, caveInfo, roofH, heights0, archInfo, archTop, ARCH_W, ARCH_H }} = TERRAIN;
 // @@terrain-end"""
 s = open(P).read()
 if '// @@terrain-begin' in s:
