@@ -117,6 +117,7 @@ body.touch #bottom{transform:scale(.68);transform-origin:bottom center}
 #tCrouch{right:calc(110px + env(safe-area-inset-right,0px));bottom:calc(100px + env(safe-area-inset-bottom,0px));width:56px;height:56px;font-size:9px!important}
 #ttop button{width:48px;height:34px;border-radius:8px;font-size:10px;top:calc(64px + env(safe-area-inset-top,0px))}
 #tBag{right:calc(12px + env(safe-area-inset-right,0px))}#tBuild{right:calc(66px + env(safe-area-inset-right,0px))}#tMap{right:calc(120px + env(safe-area-inset-right,0px))}#tPause{right:calc(174px + env(safe-area-inset-right,0px))}
+#tinv #tChat{right:calc(280px + env(safe-area-inset-right,0px))}
 #tinv button{width:74px;height:42px;border-radius:10px;font-size:11px;right:calc(200px + env(safe-area-inset-right,0px));bottom:calc(210px + env(safe-area-inset-bottom,0px))}
 #tbuild{display:none}#tbuild.on{display:block}
 #tbuild button{width:74px;height:42px;border-radius:10px;font-size:11px;right:calc(200px + env(safe-area-inset-right,0px));bottom:calc(150px + env(safe-area-inset-bottom,0px))}
@@ -263,7 +264,7 @@ body.touch #bottom{transform:scale(.68);transform-origin:bottom center}
       <button type="button" id="tAtk">HIT</button><button type="button" id="tJump">JUMP</button><button type="button" id="tUse">USE</button><button type="button" id="tCrouch">CROUCH</button>
     </div>
     <div id="ttop"><button type="button" id="tBag">BAG</button><button type="button" id="tBuild">BUILD</button><button type="button" id="tMap">MAP</button><button type="button" id="tPause">II</button></div>
-    <div id="tinv"><button type="button" id="tInvite">INVITE</button></div>
+    <div id="tinv"><button type="button" id="tInvite">INVITE</button><button type="button" id="tChat">CHAT</button></div>
     <div id="tbuild"><button type="button" id="tRot">ROTATE</button><button type="button" id="tDem">PICK UP</button></div>
   </div>
   <div id="chat"><div id="chatlog"></div><input id="chatin" maxlength="120" autocomplete="off" hidden></div>
@@ -4221,6 +4222,7 @@ if (isTouch) { fallbackLook = true; document.body.classList.add('touch'); }
   hold($('#tJump'), () => { keys.Space = true; }, () => { keys.Space = false; });
   tap($('#tUse'), () => fireKey('KeyE')); tap($('#tBag'), () => fireKey('Tab')); tap($('#tBuild'), () => fireKey('KeyB')); tap($('#tMap'), () => fireKey('KeyM')); tap($('#tPause'), () => pauseGame());
   hold($('#tInvite'), () => { NET.touchInvite = true; }, () => { NET.touchInvite = false; });
+  tap($('#tChat'), () => chatOpen());
   tap($('#tRot'), () => fireKey('KeyR')); tap($('#tDem'), () => fireKey('KeyX'));
   tap($('#tCrouch'), () => { keys.KeyC = !keys.KeyC; $('#tCrouch').classList.toggle('on', keys.KeyC); });
   // mirar arrastrando sobre la escena

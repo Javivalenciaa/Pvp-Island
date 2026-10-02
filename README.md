@@ -21,11 +21,14 @@ Juego de supervivencia multijugador PvP para navegador (pensado para CrazyGames)
 | Recursos compartidos, fauna del servidor, domar y montar caballos, día/noche común | Hecho |
 | Persistencia en JSON (piezas, objetos, cofres, tribus) y guía de despliegue gratis | Hecho (`docs/DEPLOY.md`) |
 | Mapa Cordillera de 960 m, biomas (desierto, pantano, jungla) y punto de aparición en terreno llano | Hecho |
-| Cuevas/minas: boca en la montaña, interior aparte con minerales, entrada/salida validadas por el servidor, sin construcción dentro | Hecho (`npm test`) |
-| Inventario y crafting validados por el servidor | Pendiente (hoy los confía al cliente) |
-| Interfaz táctil en línea, clima sincronizado, recolectores en línea, prueba de carga con 20 jugadores reales | Pendiente |
+| Cuevas/minas **dentro del mapa**: zanja + túnel + sala talladas en la montaña, se entra andando, se puede construir dentro y encima del techo se camina | Hecho (`test_cave.js` + pruebas en navegador) |
+| Clima sincronizado, recolectores de lluvia online, animación de golpes remota, botón de chat e invitar en táctil | Hecho |
+| Sin protección al desconectarse: tus construcciones siguen siendo atacables (`test_offline.js`) | Hecho (decisión de diseño) |
+| Detector de inventarios inflados (marca y expulsa), prueba de carga (`npm run load`), paquete CrazyGames (`tools/package_crazygames.py`) | Hecho |
+| Inventario y crafting con autoridad total del servidor | Pendiente (hoy el cliente manda; solo hay detección de abusos gruesos) |
+| Prueba de rendimiento en GPU real con 20 jugadores | Pendiente (el servidor aguanta 20 jugadores con ~1,3 ms por tick) |
 
-Limitaciones conocidas: el inventario/crafting es del cliente (se puede hacer trampa con un cliente modificado), el daño parcial a recursos no se sincroniza y el clima es local. `SERVER_URL` en el cliente es un marcador hasta tener dominio.
+Limitaciones conocidas: el inventario/crafting es del cliente (un cliente modificado puede hacer trampa en cantidades pequeñas), el daño parcial a recursos no se sincroniza. `SERVER_URL` en el cliente es un marcador hasta tener dominio.
 
 ## Probar el servidor
 
