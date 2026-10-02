@@ -22,7 +22,7 @@ export function createTerrain({ world = 640, seed = 0, maxLakes = 4 } = {}) {
     const m2 = Math.exp(-((x - MOUNT2.x) ** 2 + (z - MOUNT2.z) ** 2) / (2 * 48 * 48 * K * K)) * 30 * (.5 + .5 * ridge);
     return (2.2 + hills + m1 + m2) * mask - 7 * (1 - mask);
   }
-  const forestAt = (x, z) => smooth(.42, .64, fbm(x * .011 + 40 + so, z * .011 + so, 3));
+  const forestBase = (x, z) => smooth(.42, .64, fbm(x * .011 + 40 + so, z * .011 + so, 3));
   const LAKES = [];
   {
     const rng = mulberry32(777 + (seed | 0));
@@ -58,8 +58,33 @@ export function createTerrain({ world = 640, seed = 0, maxLakes = 4 } = {}) {
     const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, i = iz * N + ix;
     return lerp(lerp(heights[i], heights[i + 1], tx), lerp(heights[i + N], heights[i + N + 1], tx), tz);
   }
+  // biomas: desierto (seco, casi sin árboles), pantano (bajo y húmedo) y jungla (arbolado denso). Manchas con centro fijo por semilla.
+  const BIOMES = [];
+  {
+    const rng = mulberry32(5150 + (seed | 0)), big = WORLD > 800;
+    const want = [['desert', .3], ['jungle', .26], ['swamp', .28], ...(big ? [['jungle', .2], ['desert', .2]] : [])];
+    for (const [type, rr] of want) {
+      let best = null;
+      for (let t = 0; t < 400; t++) {
+        const a = rng() * 6.283, r = HALF * (.18 + rng() * .5), x = Math.cos(a) * r, z = Math.sin(a) * r, R = HALF * rr * (.85 + rng() * .3);
+        if (BIOMES.some((q) => Math.hypot(q.x - x, q.z - z) < (q.R + R) * .85) || Math.hypot(x - MOUNT.x, z - MOUNT.z) < 40 * K || Math.hypot(x - MOUNT2.x, z - MOUNT2.z) < 40 * K) continue;
+        let land = 0; for (let k = 0; k < 24; k++) { const aa = k / 24 * 6.283, h = baseHeight(x + Math.cos(aa) * R * .6, z + Math.sin(aa) * R * .6); if (h > 1.8 && h < 12) land++; }
+        if (!best || land > best.land) best = { type, x, z, R, land };
+      }
+      if (best && best.land >= 8) BIOMES.push(best);
+    }
+  }
+  const biomeAt = (x, z) => {
+    const h = terrainH(x, z), n = fbm(x * .02 + 9 + so, z * .02 - 5 + so, 3) - .5, out = { desert: 0, swamp: 0, jungle: 0 };
+    for (const q of BIOMES) { const d = Math.hypot(x - q.x, z - q.z) / q.R + n * .55; out[q.type] = Math.max(out[q.type], 1 - smooth(.62, 1.0, d)); }
+    out.desert *= (1 - smooth(13, 19, h)) * smooth(1.2, 2.4, h);
+    out.swamp *= (1 - smooth(8, 12, h)) * smooth(.8, 1.8, h) * (1 - out.desert);
+    out.jungle *= (1 - out.desert) * (1 - out.swamp) * smooth(1.8, 3.5, h) * (1 - smooth(15, 21, h));
+    return out;
+  };
+  const forestAt = (x, z) => { const b = biomeAt(x, z); return Math.min(1, forestBase(x, z) * (1 - b.desert * .95) + b.jungle * .9 + b.swamp * .25); };
   const slopeAt = (x, z) => Math.hypot(terrainH(x + 1, z) - terrainH(x - 1, z), terrainH(x, z + 1) - terrainH(x, z - 1)) / 2;
   const lakeAt = (x, z) => { for (const L of LAKES) if ((x - L.x) ** 2 + (z - L.z) ** 2 < L.R * L.R) return L; return null; };
   const nearLake = (x, z, f) => LAKES.some((L) => Math.hypot(x - L.x, z - L.z) < L.R * f);
-  return { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake };
+  return { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake, biomeAt, BIOMES };
 }

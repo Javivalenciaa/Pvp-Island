@@ -1045,7 +1045,7 @@ function createTerrain({ world = 640, seed = 0, maxLakes = 4 } = {}) {
     const m2 = Math.exp(-((x - MOUNT2.x) ** 2 + (z - MOUNT2.z) ** 2) / (2 * 48 * 48 * K * K)) * 30 * (.5 + .5 * ridge);
     return (2.2 + hills + m1 + m2) * mask - 7 * (1 - mask);
   }
-  const forestAt = (x, z) => smooth(.42, .64, fbm(x * .011 + 40 + so, z * .011 + so, 3));
+  const forestBase = (x, z) => smooth(.42, .64, fbm(x * .011 + 40 + so, z * .011 + so, 3));
   const LAKES = [];
   {
     const rng = mulberry32(777 + (seed | 0));
@@ -1081,19 +1081,44 @@ function createTerrain({ world = 640, seed = 0, maxLakes = 4 } = {}) {
     const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, i = iz * N + ix;
     return lerp(lerp(heights[i], heights[i + 1], tx), lerp(heights[i + N], heights[i + N + 1], tx), tz);
   }
+  // biomas: desierto (seco, casi sin árboles), pantano (bajo y húmedo) y jungla (arbolado denso). Manchas con centro fijo por semilla.
+  const BIOMES = [];
+  {
+    const rng = mulberry32(5150 + (seed | 0)), big = WORLD > 800;
+    const want = [['desert', .3], ['jungle', .26], ['swamp', .28], ...(big ? [['jungle', .2], ['desert', .2]] : [])];
+    for (const [type, rr] of want) {
+      let best = null;
+      for (let t = 0; t < 400; t++) {
+        const a = rng() * 6.283, r = HALF * (.18 + rng() * .5), x = Math.cos(a) * r, z = Math.sin(a) * r, R = HALF * rr * (.85 + rng() * .3);
+        if (BIOMES.some((q) => Math.hypot(q.x - x, q.z - z) < (q.R + R) * .85) || Math.hypot(x - MOUNT.x, z - MOUNT.z) < 40 * K || Math.hypot(x - MOUNT2.x, z - MOUNT2.z) < 40 * K) continue;
+        let land = 0; for (let k = 0; k < 24; k++) { const aa = k / 24 * 6.283, h = baseHeight(x + Math.cos(aa) * R * .6, z + Math.sin(aa) * R * .6); if (h > 1.8 && h < 12) land++; }
+        if (!best || land > best.land) best = { type, x, z, R, land };
+      }
+      if (best && best.land >= 8) BIOMES.push(best);
+    }
+  }
+  const biomeAt = (x, z) => {
+    const h = terrainH(x, z), n = fbm(x * .02 + 9 + so, z * .02 - 5 + so, 3) - .5, out = { desert: 0, swamp: 0, jungle: 0 };
+    for (const q of BIOMES) { const d = Math.hypot(x - q.x, z - q.z) / q.R + n * .55; out[q.type] = Math.max(out[q.type], 1 - smooth(.62, 1.0, d)); }
+    out.desert *= (1 - smooth(13, 19, h)) * smooth(1.2, 2.4, h);
+    out.swamp *= (1 - smooth(8, 12, h)) * smooth(.8, 1.8, h) * (1 - out.desert);
+    out.jungle *= (1 - out.desert) * (1 - out.swamp) * smooth(1.8, 3.5, h) * (1 - smooth(15, 21, h));
+    return out;
+  };
+  const forestAt = (x, z) => { const b = biomeAt(x, z); return Math.min(1, forestBase(x, z) * (1 - b.desert * .95) + b.jungle * .9 + b.swamp * .25); };
   const slopeAt = (x, z) => Math.hypot(terrainH(x + 1, z) - terrainH(x - 1, z), terrainH(x, z + 1) - terrainH(x, z - 1)) / 2;
   const lakeAt = (x, z) => { for (const L of LAKES) if ((x - L.x) ** 2 + (z - L.z) ** 2 < L.R * L.R) return L; return null; };
   const nearLake = (x, z, f) => LAKES.some((L) => Math.hypot(x - L.x, z - L.z) < L.R * f);
-  return { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake };
+  return { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake, biomeAt, BIOMES };
 }
 
 const MAPS = {
   isla: { name: 'Isla del Hierro', seed: 0, world: 640 },
-  cordillera: { name: 'Cordillera Helada', seed: 90210, world: 640 },
+  cordillera: { name: 'Cordillera Helada', seed: 90210, world: 960 },
 };
 const MAP_ID = (location.search.match(/[?&]map=(\w+)/) || [])[1] in MAPS ? location.search.match(/[?&]map=(\w+)/)[1] : 'isla';
 const TERRAIN = createTerrain({ world: MAPS[MAP_ID].world, seed: MAPS[MAP_ID].seed });
-const { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake } = TERRAIN;
+const { WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake, biomeAt, BIOMES } = TERRAIN;
 // @@terrain-end
 
 // textura de control que leen los shaders: R altura, G hierba, B nivel del agua más cercana, A bosque
@@ -1106,6 +1131,9 @@ for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) {
   const grass = smooth(level + 1.9, level + 2.7, h) * (1 - smooth(.55, .85, slope)) * (1 - smooth(20, 26, h)) * (lakeAt(x, z) ? 0 : 1);
   ctlData[i * 4] = h; ctlData[i * 4 + 1] = grass; ctlData[i * 4 + 2] = level; ctlData[i * 4 + 3] = forestAt(x, z);
 }
+const bioData = new Float32Array(N * N * 4);
+for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) { const i = iz * N + ix, b = biomeAt(-HALF + ix * CELL, -HALF + iz * CELL); bioData[i * 4] = b.desert; bioData[i * 4 + 1] = b.swamp; bioData[i * 4 + 2] = b.jungle; ctlData[i * 4 + 1] *= 1 - b.desert * .97; }
+const bioTex = new THREE.DataTexture(bioData, N, N, THREE.RGBAFormat, THREE.FloatType); bioTex.minFilter = bioTex.magFilter = THREE.NearestFilter; bioTex.needsUpdate = true;
 const ctlTex = new THREE.DataTexture(ctlData, N, N, THREE.RGBAFormat, THREE.FloatType);
 ctlTex.minFilter = ctlTex.magFilter = THREE.NearestFilter; ctlTex.needsUpdate = true;
 const CTL = { tCtl: { value: ctlTex }, uCtl: { value: new THREE.Vector3(HALF, CELL, N) } };
@@ -1189,9 +1217,9 @@ function makeWaterMat(color, amp, mask, opacity, level) {
   geo.computeVertexNormals();
   const terrainMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .93, metalness: 0, envMapIntensity: .45 });
   terrainMat.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, { tGrass: { value: texGrass }, tForest: { value: texForest }, tDirt: { value: texDirt }, tRock: { value: texRock }, tSand: { value: texSand }, tSnow: { value: texSnow }, tNoise: { value: texNoise }, tDetailN: { value: texDetailN }, uTime: waterTime, uWet: WEATHER.wet }, CTL);
+    Object.assign(sh.uniforms, { tGrass: { value: texGrass }, tForest: { value: texForest }, tDirt: { value: texDirt }, tRock: { value: texRock }, tSand: { value: texSand }, tSnow: { value: texSnow }, tNoise: { value: texNoise }, tBio: { value: bioTex }, tDetailN: { value: texDetailN }, uTime: waterTime, uWet: WEATHER.wet }, CTL);
     sh.vertexShader = 'varying vec3 vWPos; varying vec3 vWN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);');
-    sh.fragmentShader = `varying vec3 vWPos; varying vec3 vWN; uniform sampler2D tGrass; uniform sampler2D tForest; uniform sampler2D tDirt; uniform sampler2D tRock; uniform sampler2D tSand; uniform sampler2D tSnow; uniform sampler2D tNoise; uniform sampler2D tDetailN; uniform float uTime; uniform float uWet;
+    sh.fragmentShader = `varying vec3 vWPos; varying vec3 vWN; uniform sampler2D tGrass; uniform sampler2D tForest; uniform sampler2D tDirt; uniform sampler2D tRock; uniform sampler2D tSand; uniform sampler2D tSnow; uniform sampler2D tNoise; uniform sampler2D tBio; uniform sampler2D tDetailN; uniform float uTime; uniform float uWet;
       ${CTL_GLSL}
       float caustic(vec2 p, float t) { vec2 q = p * 0.55; float c = 0.0; for (int i = 0; i < 3; i++) { q += vec2(sin(q.y * 1.7 + t * 0.9), cos(q.x * 1.3 - t * 0.7)) * 0.6; c += abs(sin(q.x + q.y)); } return pow(max(1.0 - c / 3.0, 0.0), 3.0) * 2.5; }
       ` + sh.fragmentShader
@@ -1218,6 +1246,11 @@ function makeWaterMat(color, amp, mask, opacity, level) {
         tc = mix(tc, cSand, wSand);
         tc = mix(tc, cRock, wRock);
         tc = mix(tc, cSnow, wSnow);
+        { vec2 bf = clamp((vWPos.xz + uCtl.x) / uCtl.y, vec2(0.0), vec2(uCtl.z - 1.001)); vec2 bi = floor(bf), bt = bf - bi; float bn = uCtl.z;
+          vec3 b0 = mix(texture2D(tBio, (bi + 0.5) / bn).rgb, texture2D(tBio, (bi + vec2(1.5, 0.5)) / bn).rgb, bt.x), b1 = mix(texture2D(tBio, (bi + vec2(0.5, 1.5)) / bn).rgb, texture2D(tBio, (bi + 1.5) / bn).rgb, bt.x); vec3 bio = mix(b0, b1, bt.y);
+          float wDes = bio.x * (1.0 - wRock) * (1.0 - wSnow); tc = mix(tc, cSand * vec3(1.12, 0.95, 0.72) * (0.9 + tM1 * 0.25), wDes * 0.92);
+          float wSw = bio.y * (1.0 - wRock); tc = mix(tc, mix(cForest, cDirt, 0.45) * vec3(0.62, 0.7, 0.45), wSw * 0.85);
+          tc = mix(tc, cForest * vec3(0.72, 1.0, 0.65), bio.z * 0.55 * (1.0 - wRock)); }
         tc = pow(tc, vec3(2.2));
         float twet = 1.0 - smoothstep(wl - 0.1, wl + 0.7, th);
         tc *= mix(1.0, 0.6, max(twet, uWet * 0.4) * (1.0 - wSnow));
@@ -1347,12 +1380,18 @@ function nodesNear(x, z, r, out) {
 const tmpNear = [];
 {
   const rng = mulberry32(1337);
-  const plan = [['ore', 95], ['sulfur', 70], ['rock', 330], ['tree', 760], ['appletree', 100], ['bush', 340], ['berry', 160]];
-  const ok = (type, x, z) => {
+  const AREA = (WORLD / 640) ** 2, KM = WORLD / 640;
+  const plan = [['ore', 95], ['sulfur', 70], ['rock', 330], ['tree', 760], ['appletree', 100], ['bush', 340], ['berry', 160]].map(([t, c]) => [t, Math.round(c * (t === 'ore' || t === 'sulfur' ? Math.min(AREA, 1.6) : AREA))]);
+  plan.push(['tree', Math.round(520 * AREA), 'jungle'], ['rock', Math.round(120 * AREA), 'desert'], ['bush', Math.round(120 * AREA), 'swamp']);
+  const ok = (type, x, z, mode) => {
     const h = terrainH(x, z), s = slopeAt(x, z);
     if (Math.hypot(x - SPAWN.x, z - SPAWN.z) < 5 || nearLake(x, z, 1.15) || POIS.some((q) => Math.hypot(x - q.x, z - q.z) < q.r + 3)) return false;
+    if ((type === 'appletree' || type === 'berry') && biomeAt(x, z).desert > .35) return false;
     if (type === 'appletree') return h > 1.8 && h < 13 && s < .45;
     if (type === 'berry') return h > 1.3 && h < 14 && s < .5;
+    if (mode === 'jungle') return h > 1.8 && h < 20 && s < .5 && biomeAt(x, z).jungle > .45;
+    if (mode === 'desert') return h > 1.5 && s < .6 && biomeAt(x, z).desert > .5;
+    if (mode === 'swamp') return h > .9 && s < .4 && biomeAt(x, z).swamp > .4;
     if (type === 'tree') return h > 1.8 && h < 25 && s < .55 && (forestAt(x, z) > .3 || hash2(x * 3 | 0, z * 3 | 0) < .05);
     if (type === 'bush') return h > 1.3 && h < 15 && s < .5;
     if (type === 'rock') return h > .9 && h < 26 && s < .9;
@@ -1361,13 +1400,13 @@ const tmpNear = [];
   };
   const free = (x, z, d) => { nodesNear(x, z, d, tmpNear); for (const n of tmpNear) if ((n.x - x) ** 2 + (n.z - z) ** 2 < d * d) return false; return true; };
   const addNode = (type, x, z) => { const n = { type, def: NODES[type], x, z, y: terrainH(x, z), rot: rng() * 6.283, s: .85 + rng() * .4, variant: (() => { const v = rng(); return v < .45 ? 0 : v < .78 ? 1 : 2; })(), hp: NODES[type].hp, acc: NODES[type].yields.map(() => 0), depleted: false, respawnAt: 0, shake: 0, parts: [] }; nodes.push(n); gridAdd(n); return n; };
-  for (const [type, count] of plan) {
+  for (const [type, count, mode] of plan) {
     let placed = 0;
     for (let t = 0; t < count * 40 && placed < count; t++) {
       let x, z;
-      if (type === 'ore' || type === 'sulfur') { const M2 = (type === 'sulfur' ? rng() < .6 : rng() < .3) ? MOUNT2 : MOUNT, a = rng() * 6.283, r = Math.sqrt(rng()) * (M2 === MOUNT ? 85 : 60); x = M2.x + Math.cos(a) * r; z = M2.z + Math.sin(a) * r; }
+      if (type === 'ore' || type === 'sulfur') { const M2 = (type === 'sulfur' ? rng() < .6 : rng() < .3) ? MOUNT2 : MOUNT, a = rng() * 6.283, r = Math.sqrt(rng()) * (M2 === MOUNT ? 85 : 60) * KM; x = M2.x + Math.cos(a) * r; z = M2.z + Math.sin(a) * r; }
       else { x = (rng() * 2 - 1) * HALF * .92; z = (rng() * 2 - 1) * HALF * .92; }
-      if (!ok(type, x, z) || !free(x, z, type === 'bush' || type === 'berry' ? 2.2 : 3.2)) continue;
+      if (!ok(type, x, z, mode) || !free(x, z, mode === 'jungle' ? 2.3 : type === 'bush' || type === 'berry' ? 2.2 : 3.2)) continue;
       addNode(type, x, z); placed++;
     }
   }
@@ -4007,7 +4046,7 @@ function buildMapBase() {
     else if (h < 1.9) col = [214, 196, 146];
     else if (h > 34) col = [236, 240, 244];
     else if (h > 22 || slopeAt(x, z) > .6) col = [128, 124, 116];
-    else { const f = forestAt(x, z); col = [Math.round(108 - 50 * f), Math.round(146 - 50 * f), Math.round(74 - 30 * f)]; }
+    else { const f = forestAt(x, z), bm = biomeAt(x, z); col = [Math.round(108 - 50 * f), Math.round(146 - 50 * f), Math.round(74 - 30 * f)]; if (bm.desert > .45) col = [214, 188, 120]; else if (bm.swamp > .4) col = [78, 98, 62]; else if (bm.jungle > .45) col = [40, 112, 52]; }
     const sh = h > 0 ? clamp(1 + ((terrainH(x - 2, z - 2) - terrainH(x + 2, z + 2)) * .18), .65, 1.3) : 1;
     const k = (j * S + i) * 4; d[k] = col[0] * sh; d[k + 1] = col[1] * sh; d[k + 2] = col[2] * sh; d[k + 3] = 255;
   }
@@ -4617,7 +4656,7 @@ setLang(LANG);
 requestAnimationFrame(frame);
 // gancho de pruebas: avanza la simulación sin depender de los FPS
 window.__isla = { deployables, remoteRoot, pressR(v) { mouseR = v; }, remotes: () => NET.remotes.values(), NET, netMsg, netSend, remoteHit, hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
-  player, inv, nodes, pieces, animals, spawnAnimal, LAKES, waterSurfaceAt, stats, giveItem, spawnBot, terrainH, spawn: SPAWN, scene, refreshEnv, renderer, POIS, destroyPiece, post, weather, setWeather(w) { wxState = w; wxTimer = 999; }, ctlData, N, CELL, HALF, camera, pieceRoot, get state() { return state; }, get aim() { return aim; }, get placement() { return placement; }, get waterAim() { return waterAim; },
+  BIOMES, biomeAt, player, inv, nodes, pieces, animals, spawnAnimal, LAKES, waterSurfaceAt, stats, giveItem, spawnBot, terrainH, spawn: SPAWN, scene, refreshEnv, renderer, POIS, destroyPiece, post, weather, setWeather(w) { wxState = w; wxTimer = 999; }, ctlData, N, CELL, HALF, camera, pieceRoot, get state() { return state; }, get aim() { return aim; }, get placement() { return placement; }, get waterAim() { return waterAim; },
   sim(sec, hold) { const n = Math.round(sec / .05); for (let k = 0; k < n; k++) { if (hold) mouseL = true; if (hold === 'click' && k === 0) clickQueued = true; waterTime.value += .05; scene.updateMatrixWorld(); tick(.05, performance.now()); } if (hold) mouseL = false; },
   setPhase(p) { dayPhase = p; } };
 })();
