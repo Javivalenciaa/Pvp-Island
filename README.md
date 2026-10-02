@@ -15,12 +15,16 @@ Juego de supervivencia multijugador PvP para navegador (pensado para CrazyGames)
 | Cliente en línea: menú de salas, nombre y tribu, avatares vikingos con nombre | Hecho (probado con navegador real) |
 | PvP: golpes, flechas y ballesta con daño calculado en el servidor, muerte y reaparición | Hecho |
 | Anti-trampas básico: posición validada, daño por arma, sin fuego amigo | Hecho |
-| Construcción y raideo sincronizados por el servidor | Siguiente |
-| Domar animales y monturas | Pendiente |
-| Mapas grandes, biomas nuevos y cuevas/minas como interiores | Pendiente |
-| Persistencia (SQLite) y despliegue gratuito | Pendiente |
+| Tribus (máx. 3, invitación con clic derecho mantenido) y chat global (`/t` para tribu) | Hecho |
+| Construcción, mejora de materiales, puertas y raideo sincronizados por el servidor | Hecho |
+| Objetos, trampas, torretas, explosivos, cofres y bolsas de botín en el servidor | Hecho |
+| Recursos compartidos, fauna del servidor, domar y montar caballos, día/noche común | Hecho |
+| Persistencia en JSON (piezas, objetos, cofres, tribus) y guía de despliegue gratis | Hecho (`docs/DEPLOY.md`) |
+| Mapas más grandes, biomas nuevos y cuevas/minas como interiores | Pendiente |
+| Inventario y crafting validados por el servidor | Pendiente (hoy los confía al cliente) |
+| Interfaz táctil en línea, clima sincronizado, recolectores en línea, prueba de carga con 20 jugadores reales | Pendiente |
 
-Por ahora los recursos (árboles, rocas) y los animales son locales en cada cliente, y la construcción está desactivada en línea hasta que el servidor la controle.
+Limitaciones conocidas: el inventario/crafting es del cliente (se puede hacer trampa con un cliente modificado), el daño parcial a recursos no se sincroniza y el clima es local. `SERVER_URL` en el cliente es un marcador hasta tener dominio.
 
 ## Probar el servidor
 

@@ -1,0 +1,27 @@
+import fs from 'node:fs';
+import path from 'node:path';
+// Guardado en JSON por mapa: piezas, objetos, tribus y nodos agotados. Escritura atómica (tmp + rename).
+export function snapshotRoom(r) {
+  return {
+    v: 1, savedAt: Date.now(), nextTribe: r.nextTribe, nextDep: r.D.next,
+    tribes: [...r.tribeInfo], tokens: [...r.tribeOfToken],
+    pieces: [...r.B.map.values()], deps: [...r.D.map.values()].map((d) => ({ ...d, cd: 0 })),
+  };
+}
+export function restoreRoom(r, s) {
+  if (!s || s.v !== 1) return false;
+  r.nextTribe = s.nextTribe || 1; r.tribeInfo = new Map(s.tribes || []); r.tribeOfToken = new Map(s.tokens || []);
+  for (const p of s.pieces || []) r.B.map.set(p.key, p);
+  for (const d of s.deps || []) { r.D.map.set(d.id, d); }
+  r.D.next = Math.max(s.nextDep || 1, ...[...r.D.map.keys()].map((k) => k + 1), 1);
+  return true;
+}
+export function saveRoom(r, dir) {
+  if (!dir) return; fs.mkdirSync(dir, { recursive: true });
+  const f = path.join(dir, r.mapId + '.json'), tmp = f + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(snapshotRoom(r))); fs.renameSync(tmp, f);
+}
+export function loadRoom(r, dir) {
+  if (!dir) return false; const f = path.join(dir, r.mapId + '.json');
+  try { return restoreRoom(r, JSON.parse(fs.readFileSync(f, 'utf8'))); } catch (e) { return false; }
+}

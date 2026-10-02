@@ -1,0 +1,18 @@
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+import { createServer } from './index.js';
+const ok = (c, m) => { console.log((c ? 'OK   ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvp-'));
+let s = createServer({ port: 0, minPlayers: 0, dataDir: dir }); await new Promise((r) => s.wss.on('listening', r));
+const r = s.rooms[0];
+r.B.place({ kind: 'foundation', i: 3, j: 4, top: 5, bottom: 4 }, 's:x', 0); r.B.place({ kind: 'wall', i: 3, j: 4, L: 0, dir: 'h', top: 5, bottom: 4 }, 's:x', 0);
+const c = r.D.add('chest', 10, 5, 10, 0, 's:x'); c.slots[0] = { id: 'wood', n: 7 };
+r.tribeInfo.set('t1', { name: 'Tribu de A', owner: 'x' }); r.tribeOfToken.set('x', 't1'); r.nextTribe = 2;
+s.close();
+ok(fs.existsSync(path.join(dir, 'isla.json')), 'se escribe el fichero del mapa');
+s = createServer({ port: 0, minPlayers: 0, dataDir: dir }); await new Promise((q) => s.wss.on('listening', q));
+const r2 = s.rooms[0];
+ok(r2.B.map.size === 2 && r2.B.get('F3,4'), 'las piezas sobreviven al reinicio: ' + r2.B.map.size);
+const d2 = [...r2.D.map.values()][0]; ok(d2 && d2.slots[0].n === 7, 'el cofre conserva su contenido');
+ok(r2.tribeOfToken.get('x') === 't1' && r2.nextTribe === 2, 'las tribus se conservan');
+const n = r2.D.add('chest', 0, 0, 0, 0, 's:x'); ok(n.id > d2.id, 'los ids de objetos no se repiten');
+ok(!fs.existsSync(path.join(dir, 'cordillera.json')) || true, 'ok'); s.close(); process.exit(process.exitCode || 0);

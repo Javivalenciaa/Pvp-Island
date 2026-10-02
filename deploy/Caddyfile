@@ -1,0 +1,4 @@
+# Sustituye por tu dominio (apuntado a la IP de la VM). Caddy obtiene el certificado solo y sirve wss://
+game.tudominio.com {
+	reverse_proxy 127.0.0.1:8080
+}

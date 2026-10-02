@@ -2,9 +2,12 @@ import { WebSocketServer } from 'ws';
 import { Room } from './room.js';
 import { brain, botName } from './bots.js';
 import { MAPS } from '../../shared/maps.js';
+import { loadRoom, saveRoom } from './persist.js';
 // Dos servidores de hasta 20 jugadores: uno por mapa. Si no hay jugadores humanos suficientes se rellenan con bots.
-export function createServer({ port = 8080, maxPlayers = 20, minPlayers = 8 } = {}) {
+export function createServer({ port = 8080, maxPlayers = 20, minPlayers = 8, dataDir = null } = {}) {
   const rooms = Object.keys(MAPS).map((id) => new Room(id, maxPlayers));
+  rooms.forEach((r) => loadRoom(r, dataDir));
+  const saver = dataDir ? setInterval(() => rooms.forEach((r) => { try { saveRoom(r, dataDir); } catch (e) { console.error('guardado', e.message); } }), 30000) : null;
   let botN = 0, botsOn = true;
   const addBot = (room) => { const n = botN++; const p = room.join(botName(n) + (n >= 12 ? n : ''), null, null, true, 'tb' + Math.floor(n / 3)); if (p && botsOn) p.brain = brain; return p; };
   const balance = (room) => { // bots hasta minPlayers; los bots dejan sitio a los humanos
@@ -37,6 +40,6 @@ export function createServer({ port = 8080, maxPlayers = 20, minPlayers = 8 } = 
     });
     ws.on('close', () => { if (me && room) { room.leave(me); balance(room); } });
   });
-  return { wss, rooms, setBots(v) { botsOn = v; for (const r of rooms) for (const p of r.players.values()) if (p.bot) p.brain = v ? brain : null; }, close() { rooms.forEach((r) => r.close()); wss.close(); } };
+  return { wss, rooms, setBots(v) { botsOn = v; for (const r of rooms) for (const p of r.players.values()) if (p.bot) p.brain = v ? brain : null; }, close() { if (saver) { clearInterval(saver); rooms.forEach((r) => saveRoom(r, dataDir)); } rooms.forEach((r) => r.close()); wss.close(); } };
 }
-if (process.argv[1] && process.argv[1].endsWith('index.js')) { const port = +process.env.PORT || 8080; createServer({ port, minPlayers: process.env.MIN_PLAYERS !== undefined ? +process.env.MIN_PLAYERS : 8 }); console.log('Servidor en el puerto', port); }
+if (process.argv[1] && process.argv[1].endsWith('index.js')) { const port = +process.env.PORT || 8080; const srv = createServer({ port, dataDir: process.env.DATA_DIR || null, minPlayers: process.env.MIN_PLAYERS !== undefined ? +process.env.MIN_PLAYERS : 8 }); console.log('Servidor en el puerto', port, process.env.DATA_DIR ? '(guardando en ' + process.env.DATA_DIR + ')' : '(sin persistencia)'); for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { srv.close(); process.exit(0); }); }
