@@ -54,7 +54,7 @@ Genera `dist/pvp-island-crazygames.zip` para subir a CrazyGames. Para GitHub Pag
 ## Mantenimiento
 - **Actualizar:** `cd /opt/pvp-island && sudo git pull && cd server && sudo npm ci --omit=dev && sudo systemctl restart pvp-island`.
 - **Copias:** el estado (construcciones, cofres, tribus) está en `/var/lib/pvp-island`. Copia esa carpeta de vez en cuando.
-- **Variables** (en `/etc/systemd/system/pvp-island.service`): `PORT`, `DATA_DIR`, `MIN_PLAYERS` (bots mínimos por mapa; ponlo a `0` si no quieres bots).
+- **Variables** (en `/etc/systemd/system/pvp-island.service`): `PORT`, `DATA_DIR`, `BOT_TARGETS` (jugadores que aparecen en cada mapa contando bots, p. ej. `isla=6,cordillera=7`; cada mapa varía ±1 de vez en cuando para parecer vivo; `BOT_DRIFT=0` lo desactiva). Tras cambiarlas: `sudo systemctl daemon-reload && sudo systemctl restart pvp-island`.
 - Oracle recupera VMs Always Free **inactivas** (CPU muy baja durante días). Un servidor con jugadores no suele tener problema; si quieres asegurarte, entra de vez en cuando.
 
 Alternativa con Docker: `docker build -f deploy/Dockerfile -t pvp-island .` y `docker run -d --restart=always -p 8080:8080 -v pvp:/data pvp-island` (Caddy igualmente delante).

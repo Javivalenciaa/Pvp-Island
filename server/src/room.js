@@ -309,6 +309,6 @@ export class Room {
   }
   broadcast(m) { const s = JSON.stringify(m); for (const p of this.players.values()) if (p.ws && p.ws.readyState === 1) p.ws.send(s); }
   broadcastTribe(tid, m) { const s = JSON.stringify(m); for (const p of this.players.values()) if (p.tid === tid && p.ws && p.ws.readyState === 1) p.ws.send(s); }
-  info() { return { map: this.mapId, name: this.map.name, players: this.humans, bots: this.count - this.humans, max: this.max }; }
+  info() { return { map: this.mapId, name: this.map.name, players: this.count, humans: this.humans, bots: this.count - this.humans, max: this.max }; }
   close() { clearInterval(this.timer); }
 }

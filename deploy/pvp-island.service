@@ -3,7 +3,7 @@ Description=Pvp-Island game server
 After=network.target
 [Service]
 WorkingDirectory=/opt/pvp-island/server
-Environment=PORT=8080 DATA_DIR=/var/lib/pvp-island MIN_PLAYERS=8
+Environment=PORT=8080 DATA_DIR=/var/lib/pvp-island BOT_TARGETS=isla=6,cordillera=7
 ExecStart=/usr/bin/node src/index.js
 Restart=always
 User=pvp

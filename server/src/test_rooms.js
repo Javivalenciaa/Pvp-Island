@@ -1,0 +1,14 @@
+import WebSocket from 'ws';
+import { createServer } from './index.js';
+const ok = (c, m) => { console.log((c ? 'OK   ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const srv = createServer({ port: 0, minPlayers: { isla: 6, cordillera: 7 } }); await new Promise((r) => srv.wss.on('listening', r)); const port = srv.wss.address().port;
+const list = async () => { const ws = new WebSocket('ws://localhost:' + port); const msgs = []; await new Promise((r) => ws.on('open', r)); ws.on('message', (d) => msgs.push(JSON.parse(d))); ws.send(JSON.stringify({ t: 'list' })); await sleep(250); ws.close(); return msgs.find((m) => m.t === 'rooms').rooms; };
+let rooms = await list(); const by = (id) => rooms.find((r) => r.map === id);
+ok(by('isla').players === 6 && by('cordillera').players === 7, 'el menú cuenta a los bots: isla 6/20, cordillera 7/20 (' + by('isla').players + ', ' + by('cordillera').players + ')');
+ok(by('isla').humans === 0, 'y sabe cuántos son humanos');
+const ws = new WebSocket('ws://localhost:' + port); await new Promise((r) => ws.on('open', r)); ws.send(JSON.stringify({ t: 'join', name: 'Ana', token: 'a', map: 'isla' })); await sleep(300);
+rooms = await list(); ok(by('isla').players === 6 && by('isla').humans === 1, 'al entrar un humano la sala sigue en 6 (un bot le deja el sitio)');
+const more = []; for (let i = 0; i < 6; i++) { const w = new WebSocket('ws://localhost:' + port); await new Promise((r) => w.on('open', r)); w.send(JSON.stringify({ t: 'join', name: 'P' + i, token: 'p' + i, map: 'isla' })); more.push(w); } await sleep(400);
+rooms = await list(); ok(by('isla').players === 7 && by('isla').humans === 7 && by('isla').bots === 0, 'con 7 humanos ya no quedan bots y la sala sube a 7');
+srv.close(); process.exit(process.exitCode || 0);

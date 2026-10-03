@@ -40,7 +40,7 @@ Limitaciones conocidas: el inventario/crafting es del cliente (un cliente modifi
 cd server
 npm install
 npm test        # prueba automática con 2 clientes simulados
-npm start       # escucha en el puerto 8080 (PORT para cambiarlo; MIN_PLAYERS = bots mínimos por sala)
+npm start       # escucha en el puerto 8080 (PORT para cambiarlo; BOT_TARGETS=isla=6,cordillera=7 = ocupación base por mapa incluyendo bots)
 ```
 
 Cliente: abre `client/index.html` en el navegador (`?server=ws://localhost:8080`, `?map=cordillera` para el otro mapa, `?offline=1` para jugar solo). Tras tocar `shared/terrain.js`: `python3 tools/sync_terrain.py`.
