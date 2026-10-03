@@ -226,6 +226,10 @@ body.online-on #btnReset,body.online-on #btnNew{display:none}
 @keyframes bootspin{to{transform:rotate(360deg)}}
 body.ready #boot{display:none}
 body:not(.ready) .glass{backdrop-filter:none;-webkit-backdrop-filter:none}
+#menuChar{position:fixed;left:max(2vw,18px);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:10px;z-index:2}
+#menuPrev{width:min(300px,26vw);aspect-ratio:260/360;height:auto;border-radius:12px;background:radial-gradient(circle at 50% 40%,rgba(80,100,78,.55),rgba(10,14,12,.55));border:1px solid var(--line)}
+@media (max-width:1100px){#menuChar{display:none}}
+@media (max-height:520px){#menuChar{display:none}}
 .crd{width:min(860px,100%)}
 .crow{display:flex;gap:18px;flex-wrap:wrap}
 #crPrev{width:260px;height:360px;border-radius:8px;background:radial-gradient(circle at 50% 35%,#3b4a3a,#151a14);flex:0 0 auto;touch-action:none}
@@ -344,6 +348,7 @@ body:not(.ready) .glass{backdrop-filter:none;-webkit-backdrop-filter:none}
 </div></div>
 
 <div id="menu" class="overlay">
+  <div id="menuChar"><canvas id="menuPrev" width="520" height="720"></canvas><button class="btn ghost" id="btnLook" type="button">Personalizar personaje</button></div>
   <div class="card glass">
     <h1 class="brand">Pvp-<span>Island</span></h1>
     <p class="lede">Despiertas en una isla salvaje sin nada. Recoge recursos, caza, doma caballos, construye tu base y forma una tribu de hasta 3 jugadores. Explora desiertos, junglas, pantanos y cuevas, y defiende lo que construyes: aquí nadie está a salvo, ni siquiera cuando te desconectas.</p>
@@ -351,7 +356,6 @@ body:not(.ready) .glass{backdrop-filter:none;-webkit-backdrop-filter:none}
       <button class="btn" id="btnPlay" type="button" disabled>Jugar</button>
       <div id="boot"><i></i><span>Cargando el mundo…</span></div>
       <button class="btn ghost" id="btnNew" type="button" hidden>Nueva partida</button>
-      <button class="btn ghost" id="btnLook" type="button">Personalizar personaje</button>
     </div>
     <p class="records" id="records"></p>
     <div id="netui">
@@ -2975,7 +2979,7 @@ function creatorBuild() {
 }
 function creatorInit() {
   if (creator.r) return;
-  creator.r = new THREE.WebGLRenderer({ canvas: $('#crPrev'), alpha: true, antialias: true }); creator.r.setSize(260, 360, false); creator.r.setPixelRatio(Math.min(2, devicePixelRatio || 1));
+  creator.off = document.createElement('canvas'); creator.r = new THREE.WebGLRenderer({ canvas: creator.off, alpha: true, antialias: true, preserveDrawingBuffer: true }); creator.r.setPixelRatio(1); creator.r.setSize(260, 360, false); creator.r.setClearColor(0x000000, 0);
   creator.r.outputEncoding = THREE.sRGBEncoding; creator.r.toneMapping = THREE.ACESFilmicToneMapping; creator.r.toneMappingExposure = 1.15;
   creator.scene = new THREE.Scene(); creator.cam = new THREE.PerspectiveCamera(32, 260 / 360, .1, 20); creator.cam.position.set(0, .35, 3.9); creator.cam.lookAt(0, .12, 0);
   creator.scene.add(new THREE.HemisphereLight(0xdfeaff, 0x5a4a30, 1.05)); const dl = new THREE.DirectionalLight(0xfff0d8, 2.4); dl.position.set(2, 3, 3); creator.scene.add(dl);
@@ -2996,9 +3000,18 @@ function creatorInit() {
   slider('Cabeza', 'head', .8, 1.3); slider('Altura', 'height', .9, 1.12); slider('Complexión', 'build', .85, 1.25); slider('Largo brazos', 'arms', .85, 1.2); slider('Grosor brazos', 'thick', .7, 1.4);
 }
 function creatorSync() { for (const f of creator.syncs) f(); }
-function creatorLoop() { if (!creator.open) return; requestAnimationFrame(creatorLoop); if (!creator.drag) creator.spin += .012; if (creator.model) creator.model.g.rotation.y = creator.spin; creator.r.render(creator.scene, creator.cam); }
+function creatorBlit(cv) { const g = cv.getContext('2d'); g.clearRect(0, 0, cv.width, cv.height); g.drawImage(creator.off, 0, 0, cv.width, cv.height); }
+function creatorLoop() { if (!creator.open) return; requestAnimationFrame(creatorLoop); if (!creator.drag) creator.spin += .012; if (creator.model) creator.model.g.rotation.y = creator.spin; creator.r.render(creator.scene, creator.cam); creatorBlit($('#crPrev')); }
+// vista previa del personaje en el menú principal: se balancea suavemente
+const menuChar = { on: false, t: 0 };
+function menuCharLoop() {
+  if (!menuChar.on) return; requestAnimationFrame(menuCharLoop); if (creator.open || state !== 'menu' || $('#menu').hidden) return;
+  const cv = $('#menuPrev'); if (!cv || cv.offsetParent === null) return; menuChar.t += .016; if (creator.model) { creator.model.g.rotation.y = Math.sin(menuChar.t * .6) * .55 + .25; creator.model.g.position.y = -.92 * curLook.height + Math.sin(menuChar.t * 1.7) * .012; }
+  creator.r.render(creator.scene, creator.cam); creatorBlit(cv);
+}
+function menuCharStart() { try { creatorInit(); creatorBuild(); } catch (e) { return; } if (!menuChar.on) { menuChar.on = true; menuCharLoop(); } }
 function creatorOpen() { creatorInit(); creator.open = true; $('#creator').hidden = false; $('#menu').style.visibility = 'hidden'; creatorSync(); creatorBuild(); creatorLoop(); }
-function creatorClose(save) { creator.open = false; $('#creator').hidden = true; $('#menu').style.visibility = ''; $('#pause').style.visibility = ''; if (save) { curLook = cleanLook(curLook); try { store.set('pvp-look', JSON.stringify(curLook)); } catch (e) { /* sin almacenamiento */ } applyMyLookMats(); if (NET.on) netSend({ t: 'look', look: curLook }); } }
+function creatorClose(save) { creator.open = false; $('#creator').hidden = true; $('#menu').style.visibility = ''; $('#pause').style.visibility = ''; if (save) { curLook = cleanLook(curLook); } try { creatorBuild(); } catch (e) { /* aún sin modelo */ } menuChar.t = 0; if (save) { curLook = cleanLook(curLook); try { store.set('pvp-look', JSON.stringify(curLook)); } catch (e) { /* sin almacenamiento */ } applyMyLookMats(); if (NET.on) netSend({ t: 'look', look: curLook }); } }
 $('#btnLook').addEventListener('click', creatorOpen); $('#crOk').addEventListener('click', () => creatorClose(true));
 $('#crRand').addEventListener('click', () => { curLook = randomLook(); creatorSync(); creatorBuild(); }); $('#crReset').addEventListener('click', () => { curLook = cleanLook(null); creatorSync(); creatorBuild(); });
 applyMyLookMats();
@@ -3006,7 +3019,7 @@ $('#btnLook2').addEventListener('click', () => { $('#pause').style.visibility = 
 function privacyShow() { const el = $('#privacy'); if (el) el.hidden = false; }
 $('#btnPrivOk').addEventListener('click', () => { $('#privacy').hidden = true; store.set('pvp-priv', '1'); });
 $('#btnPriv').addEventListener('click', privacyShow);
-if (!myLook) setTimeout(() => { if (state === 'menu' && !inCG() && $('#menu') && !$('#menu').hidden) creatorOpen(); }, 400);
+if (!myLook) { curLook = randomLook(); store.set('pvp-look', JSON.stringify(curLook)); }
 $('#btnPlay').addEventListener('click', () => { if (creator.open) creatorClose(true); }, true);
 function vikingModel(type, opts) {
   const V = Object.assign({}, VK[type], opts || {}), g = new THREE.Group(), out = { g, type }, pick = (a) => a[(Math.random() * a.length) | 0];
@@ -5124,7 +5137,7 @@ applyQuality(qualityName);
 updateObjective();
 setLang(LANG);
 requestAnimationFrame(frame);
-requestAnimationFrame(() => requestAnimationFrame(() => { document.body.classList.add('ready'); performance.mark('ready'); const pb = $('#btnPlay'); if (pb && typeof THREE !== 'undefined') pb.disabled = false; (async () => { if (inCG()) { await cgBoot(); cgLoaded(); } await cgAutoPlay(); })(); }));
+requestAnimationFrame(() => requestAnimationFrame(() => { document.body.classList.add('ready'); performance.mark('ready'); const pb = $('#btnPlay'); if (pb && typeof THREE !== 'undefined') pb.disabled = false; menuCharStart(); (async () => { if (inCG()) { await cgBoot(); cgLoaded(); } await cgAutoPlay(); })(); }));
 // gancho de pruebas: avanza la simulación sin depender de los FPS
 window.__isla = { deployables, remoteRoot, pressR(v) { mouseR = v; }, remotes: () => NET.remotes.values(), NET, netMsg, netSend, remoteHit, hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
   caveRoofs, BIOMES, biomeAt, CAVES, caveDark, caveInfo, roofH, player, inv, nodes, pieces, animals, spawnAnimal, LAKES, waterSurfaceAt, stats, giveItem, spawnBot, terrainH, spawn: SPAWN, scene, refreshEnv, renderer, POIS, destroyPiece, post, weather, setWeather(w) { wxState = w; wxTimer = 999; }, ctlData, N, CELL, HALF, camera, pieceRoot, get state() { return state; }, get aim() { return aim; }, get placement() { return placement; }, get waterAim() { return waterAim; },
