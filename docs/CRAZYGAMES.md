@@ -54,6 +54,6 @@ You wake up on a beach with nothing. Gather wood and stone, hunt, tame horses, b
 
 ## Lo que depende de ti
 1. Servidor en marcha con HTTPS (`docs/DEPLOY.md`) y su dominio en el comando de empaquetado.
-2. Portadas: las generadas en `docs/covers/` (revisa en el formulario las medidas exactas que piden).
+2. Portadas: en `docs/covers/` hay una portada horizontal 1920×1080 (`cover_1920x1080.png`) y capturas reales del juego (desierto, bosque, creador de personaje) para la galería. **Las portadas verticales/cuadradas que pida el formulario no están hechas**: revisa las medidas exactas en el Developer Portal y genera/ajusta esas versiones (idealmente con una captura tuya en una GPU real, que saldrá mejor que las mías).
 3. Antes de enviar, prueba el zip con la herramienta *Preview* del Developer Portal y revisa la sección de QA.
 4. Si CrazyGames te pide un enlace a política de privacidad propia, el texto del aviso está en el juego (botón *Privacidad*) y en `docs/PRIVACIDAD.md`.
