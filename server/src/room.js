@@ -7,6 +7,7 @@ import { Buildings, PIECE_DMG, TIER_MULT, TIER_RES, EXP_RES, pieceCenter } from 
 import { Deps, DEF, DEP_DMG, EXPLOSIONS } from './deps.js';
 import { Fauna, ANI } from './animals.js';
 const WEAPONS = { fists: [4, 3.2], stone_axe: [13, 3.8], stone_pick: [13, 3.8], hammer: [10, 3.8], spear: [26, 4.8], iron_axe: [22, 4], iron_pick: [22, 4], iron_sword: [48, 4.2] }, RANGED = { bow: 40, crossbow: 80 };
+const HELD = new Set(['stone_axe', 'stone_pick', 'iron_axe', 'iron_pick', 'hammer', 'spear', 'iron_sword']);
 const PROT = process.env.PROT_SECONDS !== undefined ? +process.env.PROT_SECONDS : 30;
 const SPEED = 4.8, SPRINT = 7.8, RADIUS = 160, HP = 100, REACH = 2.6, DMG = 14, ATK_CD = .6;
 export class Room {
@@ -15,7 +16,7 @@ export class Room {
   get count() { return this.players.size; }
   spawnPoint() { for (let i = 0; i < 300; i++) { const a = Math.random() * 6.283, r = this.half * (.2 + Math.random() * .62), x = Math.cos(a) * r, z = Math.sin(a) * r, h = this.T.terrainH(x, z); if (h > 1.6 && h < 12 && this.T.slopeAt(x, z) < .28 && !this.T.nearLake(x, z, 1.5)) return { x, z }; } return { x: 0, z: 0 }; }
   // Tribus: solo se forman por invitación (máx. 3). Quien no tiene tribu tiene una tribu "solitaria" propia (tid = 's:' + token).
-  pub(p) { const t = this.tribeInfo.get(p.tid); return { id: p.id, name: p.name, tid: p.tid, tribe: t ? t.name : '', bot: p.bot, look: p.look }; }
+  pub(p) { const t = this.tribeInfo.get(p.tid); return { id: p.id, name: p.name, tid: p.tid, tribe: t ? t.name : '', bot: p.bot, look: p.look, held: p.held || '' }; }
   tribeSize(tid) { let n = 0; for (const q of this.players.values()) if (q.tid === tid && !q.bot) n++; return n; }
   members(tid) { return [...this.players.values()].filter((q) => q.tid === tid); }
   notice(p, text) { if (p && p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'notice', text })); }
@@ -93,6 +94,7 @@ export class Room {
     else if (m.t === 'gard') this.garden(p, +m.id, String(m.act));
     else if (m.t === 'coll') this.collect(p, +m.id, String(m.act));
     else if (m.t === 'inv') this.invReport(p, m.items);
+    else if (m.t === 'held') { if (this.t < (p.heldT || 0)) return; p.heldT = this.t + .25; this.setHeld(p, String(m.w || '')); }
     else if (m.t === 'look') { if (this.t < (p.lookT || 0)) return; p.lookT = this.t + 3; const l = cleanLook(m.look); if (l) { p.look = l; this.broadcast({ t: 'look', id: p.id, look: l }); } }
     else if (m.t === 'ndep') this.nodeDepleted(p, m);
     else if (m.t === 'ahit') this.animalHit(p, +m.id, String(m.weapon || 'fists'), false);
@@ -279,6 +281,8 @@ export class Room {
     for (const q of this.players.values()) { if (q === p || q.dead > 0 || q.tid === p.tid) continue; const dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz); if (d < bd && (dx * fx + dz * fz) / (d || 1) > .3) { bd = d; best = q; } }
     if (best) this.hurt(best, DMG, p);
   }
+  // arma o herramienta que lleva cada jugador en la mano (los demás la ven)
+  setHeld(p, w) { w = HELD.has(w) ? w : ''; if ((p.held || '') === w) return; p.held = w; this.broadcast({ t: 'held', id: p.id, w }); }
   get world() { return this._w || (this._w = buildWorld(this.T)); }
   hurt(q, dmg, by, cause) { if (!(dmg > 0)) return; if (by && by !== q) { q.lastBy = by.id; q.lastByT = this.t; } if ((by || cause === 'trap' || cause === 'fire' || cause === 'explosion' || cause === 'animal') && by !== q && cause !== 'selfdmg' && q.prot > this.t) return; if (by && by.prot > this.t) by.prot = 0; q.hp -= dmg; q.regenT = this.t + 10; this.broadcast({ t: 'hit', id: q.id, hp: Math.max(0, Math.round(q.hp)), by: by ? by.id : 0 }); if (q.hp <= 0 && !(q.dead > 0)) { q.dead = 4; q.deaths++; if (by) by.kills++; this.broadcast({ t: 'kill', victim: q.id, killer: by ? by.id : 0, cause: cause || '' }); } }
   tick() {

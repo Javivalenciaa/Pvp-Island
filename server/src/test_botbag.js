@@ -1,0 +1,20 @@
+import { createServer } from './index.js';
+const ok = (c, m) => { console.log((c ? 'OK   ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
+const srv = createServer({ port: 0, minPlayers: { isla: 4, cordillera: 0 } }); await new Promise((r) => srv.wss.on('listening', r));
+const room = srv.rooms[0]; for (const p of room.players.values()) p.prot = 0;
+const msgs = []; const ob = room.broadcast.bind(room); room.broadcast = (m) => { msgs.push(m); return ob(m); };
+for (let i = 0; i < 40; i++) room.tick();
+const bots = [...room.players.values()].filter((p) => p.bot);
+ok(bots.every((p) => p.held !== undefined && p.ai), 'los bots tienen arma asignada');
+ok(msgs.some((m) => m.t === 'held') || bots.every((p) => !p.held), 'el servidor anuncia el arma que lleva cada bot');
+const v = bots[0]; v.ai.gear = 'spear'; v.ai.inv.wood = 12; v.ai.inv.stone = 5; v.ai.inv.meat = 2; room.setHeld(v, 'spear');
+const killer = bots[1]; room.hurt(v, 999, killer, 'melee'); room.tick(); room.tick();
+const lb = msgs.filter((m) => m.t === 'lb'); const bag = [...room.D.bags.values()].find((b) => Math.hypot(b.x - v.x, b.z - v.z) < 1);
+ok(!!bag && lb.length >= 1, 'al matar a un bot deja una mochila donde cae');
+const ids = bag ? bag.slots.map((s) => s.id) : [];
+ok(ids.includes('spear') && ids.includes('wood') && ids.includes('stone') && ids.includes('raw_meat'), 'con su arma y lo que llevaba: ' + ids.join(','));
+const n = room.D.bags.size; for (let i = 0; i < 60; i++) room.tick(); ok(room.D.bags.size === n, 'solo deja una mochila por muerte');
+// humano: arma en mano
+const sock = { readyState: 1, send() {} }; const h = room.join('Hum', 'h', sock); room.onMessage(h, { t: 'held', w: 'iron_sword' }); ok(h.held === 'iron_sword', 'un jugador muestra el arma que lleva en la mano');
+room.t += 1; room.onMessage(h, { t: 'held', w: 'bazooka' }); ok(h.held === '', 'un arma desconocida se ignora (queda con los puños)');
+srv.close(); process.exit(process.exitCode || 0);

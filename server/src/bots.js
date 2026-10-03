@@ -3,9 +3,12 @@
 // fabrican herramientas, cazan, se curan y luchan con criterio (rodean, retroceden, huyen cuando conviene).
 const NAMES = ['Ragnar', 'Freya', 'Bjorn', 'Astrid', 'Ulf', 'Sigrid', 'Leif', 'Ingrid', 'Thor', 'Helga', 'Erik', 'Gudrun', 'Olaf', 'Runa', 'Sven', 'Tyra', 'Harald', 'Liv', 'Knut', 'Yrsa'];
 const DT = 1 / 20, TAU = Math.PI * 2;
-const GEAR = { fists: { dmg: 4, reach: 2.2, chop: 6, mine: 5 }, stone_axe: { dmg: 13, reach: 2.6, chop: 28, mine: 24 }, spear: { dmg: 26, reach: 3.5, chop: 30, mine: 26 }, iron_sword: { dmg: 48, reach: 3.0, chop: 40, mine: 40 } };
+const GEAR = { fists: { dmg: 4, reach: 2.2, chop: 6, mine: 5 }, stone_axe: { dmg: 13, reach: 2.6, chop: 28, mine: 12 }, stone_pick: { dmg: 13, reach: 2.6, chop: 10, mine: 30 }, hammer: { dmg: 10, reach: 2.5, chop: 8, mine: 10 },
+  spear: { dmg: 26, reach: 3.5, chop: 14, mine: 12 }, iron_axe: { dmg: 22, reach: 2.8, chop: 46, mine: 20 }, iron_pick: { dmg: 22, reach: 2.8, chop: 16, mine: 46 }, iron_sword: { dmg: 48, reach: 3.0, chop: 18, mine: 16 } };
+const STARTERS = [['fists', .35], ['stone_axe', .2], ['stone_pick', .12], ['hammer', .08], ['spear', .12], ['iron_axe', .06], ['iron_pick', .02], ['iron_sword', .05]];
+const TIER1 = ['stone_axe', 'stone_pick', 'hammer'], IRON = ['iron_axe', 'iron_pick', 'iron_sword'];
 const NODE_HP = { tree: 100, appletree: 140, rock: 120, ore: 160, sulfur: 140, bush: 24, berry: 15 }, NODE_RT = { tree: 150, appletree: 220, rock: 180, ore: 300, sulfur: 300, bush: 90, berry: 120 };
-const YIELD = { tree: ['wood', 14], appletree: ['wood', 8], rock: ['stone', 12], ore: ['ore', 6], sulfur: ['sulfur', 5], bush: ['fiber', 5], berry: ['food', 1] };
+const YIELD = { tree: ['wood', 14], appletree: ['wood', 8], rock: ['stone', 12], ore: ['ore', 5], sulfur: ['sulfur', 5], bush: ['fiber', 5], berry: ['food', 1] };
 const rnd = (a, b) => a + Math.random() * (b - a), pick = (a) => a[(Math.random() * a.length) | 0];
 const angDiff = (a, b) => { let d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; };
 const yawTo = (dx, dz) => Math.atan2(-dx, -dz); // misma convención que el cliente: adelante = (-sin yaw, -cos yaw)
@@ -23,11 +26,19 @@ function nearestNode(room, p, types, R) {
   return best;
 }
 function init(room, p) {
-  const starter = Math.random(), gear = starter < .12 ? 'spear' : starter < .5 ? 'stone_axe' : 'fists';
-  return { gear, inv: { wood: gear === 'fists' ? 0 : rnd(0, 6) | 0, stone: gear === 'fists' ? 0 : rnd(0, 4) | 0, fiber: 0, ore: 0, sulfur: 0, food: rnd(0, 2) | 0, meat: 0 },
+  let gear = 'fists'; if (!(p.deaths > 0 && Math.random() < .75)) { let r = Math.random(); for (const [g, w] of STARTERS) { r -= w; if (r <= 0) { gear = g; break; } } }
+  return { gear, line: pick(TIER1), goal: pick(IRON), inv: { wood: gear === 'fists' ? 0 : rnd(0, 6) | 0, stone: gear === 'fists' ? 0 : rnd(0, 4) | 0, fiber: 0, ore: 0, sulfur: 0, food: rnd(0, 2) | 0, meat: 0 },
     bold: Math.random(), peaceful: Math.random() < .28, react: rnd(.45, 1.1), fov: rnd(1.9, 2.3), skill: rnd(.62, .88),
     mode: 'idle', until: room.t + rnd(1, 4), task: null, target: 0, seen: -99, lastX: p.x, lastZ: p.z, alert: new Map(), lastHp: p.hp, hurtT: -99,
     strafe: Math.random() < .5 ? 1 : -1, strafeT: 0, backT: 0, atkAt: 0, fleeT: 0, rest: 0, eatT: 0, stuckT: 0, px: p.x, pz: p.z, detour: 0, detourDir: 1, swingAt: 0, swings: 0, craftT: 0, wx: p.x, wz: p.z, lookT: 0, lookYaw: p.yaw };
+}
+// lo que deja un bot al morir: su arma y lo que ha recogido, más algo suelto
+function botBag(b) {
+  const out = []; if (b.gear !== 'fists') out.push({ id: b.gear, n: 1 });
+  const m = [['wood', 'wood'], ['stone', 'stone'], ['fiber', 'fiber'], ['ore', 'ore'], ['sulfur', 'sulfur'], ['meat', 'raw_meat'], ['food', 'berries']];
+  for (const [k, id] of m) if (b.inv[k] > 0) out.push({ id, n: Math.round(b.inv[k]) });
+  if (Math.random() < .4) out.push({ id: 'arrow', n: (3 + Math.random() * 10) | 0 }); if (Math.random() < .3) out.push({ id: 'bandage', n: 1 + (Math.random() * 2 | 0) }); if (Math.random() < .12) out.push({ id: 'ingot', n: 1 + (Math.random() * 3 | 0) });
+  return out;
 }
 function turn(p, want, rate) { const d = angDiff(p.yaw, want), s = Math.max(-rate * DT, Math.min(rate * DT, d)); p.yaw += s; return Math.abs(angDiff(p.yaw, want)); }
 // camina hacia un punto con giro suave, rodeando agua, pendientes y obstáculos
@@ -70,9 +81,10 @@ function threat(room, p, b, q) { // 0..1: lo peligroso que parece q frente a mí
 }
 
 export function brain(room, p) {
-  const b = p.ai || (p.ai = init(room, p)), t = room.t, T = room.T;
+  const first = !p.ai, b = p.ai || (p.ai = init(room, p)), t = room.t, T = room.T;
   p.input.jump = false;
-  if (p.dead > 0) { p.ai = null; return; }
+  if (p.dead > 0) { if (p.ai && !p.dropped) room.dropBag(p, botBag(p.ai)); p.ai = null; return; }
+  if (first || p.held !== b.gear) room.setHeld(p, b.gear);
   // --- recibir daño: apunta al atacante y reacciona
   if (p.hp < b.lastHp - .5) { b.hurtT = t; if (p.lastBy) { const q = room.players.get(p.lastBy); if (q && q.dead <= 0) { b.target = q.id; b.seen = t; b.lastX = q.x; b.lastZ = q.z; b.alert.set(q.id, 9); b.peaceful = false; } } }
   b.lastHp = p.hp;
@@ -90,7 +102,7 @@ export function brain(room, p) {
   }
   // --- combate (solo si lo ha percibido o lo recuerda y no es pacífico, o si le han golpeado)
   // al notar a alguien decide (una vez por encuentro) si lo ataca o lo evita; si le golpean, pelea
-  if (tq && (!b.dec || b.dec.id !== tq.id || t > b.dec.until)) b.dec = { id: tq.id, until: t + rnd(25, 50), fight: !b.peaceful && Math.random() < .1 + .4 * b.bold };
+  if (tq && (!b.dec || b.dec.id !== tq.id || t > b.dec.until)) b.dec = { id: tq.id, until: t + rnd(25, 50), fight: !b.peaceful && Math.random() < .16 + .45 * b.bold };
   const provoked = t - b.hurtT < 8, wantFight = tq && (provoked || (b.dec && b.dec.fight)) && threat(room, p, b, tq) < .85 + (b.bold - .5) * .3;
   if (tq && wantFight && b.mode !== 'rest') {
     if (b.mode !== 'fight') setMode(room, b, 'fight', 0);
@@ -130,9 +142,11 @@ export function brain(room, p) {
   if (p.hp < 55 && t - b.hurtT > 8 && b.mode !== 'rest') { setMode(room, b, 'rest', rnd(6, 12)); return; }
   // --- fabricar herramientas cuando tiene materiales
   if (b.mode !== 'craft' && t > b.craftT) { const i = b.inv; let nx = null;
-    if (b.gear === 'fists' && i.wood >= 10 && i.stone >= 6) nx = ['stone_axe', { wood: 10, stone: 6 }]; else if (b.gear === 'stone_axe' && i.wood >= 14 && i.fiber >= 5 && i.stone >= 4) nx = ['spear', { wood: 14, fiber: 5, stone: 4 }]; else if (b.gear === 'spear' && i.ore >= 14 && i.wood >= 10 && i.stone >= 10) nx = ['iron_sword', { ore: 14, wood: 10, stone: 10 }];
+    if (b.gear === 'fists' && i.wood >= 10 && i.stone >= 6) nx = [b.line, { wood: 10, stone: 6 }];
+    else if (TIER1.includes(b.gear) && i.wood >= 14 && i.fiber >= 5 && i.stone >= 4) nx = ['spear', { wood: 14, fiber: 5, stone: 4 }];
+    else if (b.gear === 'spear' && i.ore >= 40 && i.wood >= 10 && i.stone >= 10) nx = [b.goal, { ore: 40, wood: 10, stone: 10 }];
     if (nx) { b.craftTo = nx; setMode(room, b, 'craft', 2.6); } else b.craftT = t + 4; }
-  if (b.mode === 'craft') { stand(p); if (t > b.until && b.craftTo) { const [g, cost] = b.craftTo; for (const k in cost) b.inv[k] -= cost[k]; b.gear = g; b.craftTo = null; room.broadcast({ t: 'swing', id: p.id }); setMode(room, b, 'idle', .8); } return; }
+  if (b.mode === 'craft') { stand(p); if (t > b.until && b.craftTo) { const [g, cost] = b.craftTo; for (const k in cost) b.inv[k] -= cost[k]; b.gear = g; b.craftTo = null; room.setHeld(p, g); room.broadcast({ t: 'swing', id: p.id }); setMode(room, b, 'idle', .8); } return; }
   // --- tareas: recolectar, cazar, explorar
   if (b.mode === 'idle' && t < b.until) { stand(p); if (t > b.lookT) { b.lookT = t + rnd(1.2, 3); b.lookYaw = p.yaw + rnd(-1.6, 1.6); } turn(p, b.lookYaw, 1.4); return; }
   if (b.mode === 'idle' || b.mode === 'look') {
@@ -169,8 +183,8 @@ function chooseTask(room, p, b) {
   // qué necesita para progresar
   let types;
   if (b.gear === 'fists') types = i.wood < 10 ? ['tree', 'appletree'] : ['rock'];
-  else if (b.gear === 'stone_axe') types = i.wood < 14 ? ['tree'] : i.fiber < 5 ? ['bush'] : ['rock'];
-  else if (b.gear === 'spear') types = i.ore < 14 ? ['ore', 'sulfur'] : i.wood < 10 ? ['tree'] : ['rock'];
+  else if (TIER1.includes(b.gear)) types = i.wood < 14 ? ['tree'] : i.fiber < 5 ? ['bush'] : ['rock'];
+  else if (b.gear === 'spear') types = i.ore < 40 ? ['ore', 'sulfur'] : i.wood < 10 ? ['tree'] : ['rock'];
   else types = ['tree', 'rock', 'bush', 'berry'];
   if (Math.random() < .12) types = ['berry', 'appletree', 'bush'];
   const n = nearestNode(room, p, types, types.includes('ore') ? 140 : 90);

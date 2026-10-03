@@ -4635,7 +4635,7 @@ async function cgAutoPlay() {
 }
 
 // ---------------------------------------------------------------- modo en línea (servidor autoritativo)
-const NET = { noChat: false, animals: new Map(), mount: 0, deps: new Map(), bags: new Map(), slowUntil: 0, slowF: 1, pendingPay: {}, on: false, ws: null, id: 0, remotes: new Map(), roster: new Map(), tid: '', tribe: '', name: '', typing: false, invT: 0, invite: null, touchInvite: false, sendT: 0, wantRespawn: false, killFeedT: 0 };
+const NET = { held: '', noChat: false, animals: new Map(), mount: 0, deps: new Map(), bags: new Map(), slowUntil: 0, slowF: 1, pendingPay: {}, on: false, ws: null, id: 0, remotes: new Map(), roster: new Map(), tid: '', tribe: '', name: '', typing: false, invT: 0, invite: null, touchInvite: false, sendT: 0, wantRespawn: false, killFeedT: 0 };
 const remoteRoot = new THREE.Group(); scene.add(remoteRoot);
 const urlParam = (k) => { const m = location.search.match(new RegExp('[?&]' + k + '=([^&]*)')); return m ? decodeURIComponent(m[1]) : ''; };
 const SERVER_URL = urlParam('server') || (location.protocol === 'https:' ? 'wss://pvp-island.example.com' : 'ws://localhost:8080');
@@ -4646,10 +4646,18 @@ function nameTag(text, color) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d'); g.font = '700 30px sans-serif'; g.textAlign = 'center'; g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,.8)'; g.strokeText(text, 128, 42); g.fillStyle = color; g.fillText(text, 128, 42);
   const t = new THREE.CanvasTexture(c); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false })); sp.scale.set(1.9, .48, 1); sp.renderOrder = 10; return sp;
 }
+// arma que sostiene un jugador remoto (la del servidor); sin arma lleva los puños
+const HELD_OK = new Set(['stone_axe', 'stone_pick', 'iron_axe', 'iron_pick', 'hammer', 'spear', 'iron_sword']);
+function remoteHold(mdl, id) {
+  const m = mdl.mountR; if (!m) return; disposeModel(m); m.clear(); mdl.heldId = id;
+  if (!HELD_OK.has(id) || !ITEMS[id]) return; const it = ITEMS[id], kind = id === 'hammer' ? 'hammer' : it.icon, w = weaponModel(kind, it.tint === IRON_TINT ? 2 : 1);
+  w.traverse((o) => { if (o.isMesh) o.castShadow = true; }); m.add(w);
+}
 function makeRemote(id) {
   const info = NET.roster.get(id) || { name: 'Player', tribe: '?' };
   const mdl = vikingModel('raider', info.look ? lookOpts(cleanLook(info.look)) : { cl: tribeCloth(info.tid) });
   const b = { mdl, def: ETYPES.raider, type: 'raider', walk: 0, swing: 1, windup: 0, los: false, mode: 'remote', stun: 0, rcd: 5, fuse: -1 };
+  remoteHold(mdl, info.held || '');
   mdl.g.traverse((o) => { o.userData.remote = id; });
   const friend = info.tid === NET.tid, tag = nameTag(info.name, friend ? '#9be37a' : '#ff8a7a'); tag.position.y = 2.3 * (info.look ? Math.max(.9, Math.min(1.12, +info.look.height || 1)) : 1); mdl.g.add(tag);
   remoteRoot.add(mdl.g);
@@ -4696,14 +4704,15 @@ function netMsg(m) {
     player.pos.set(m.x, terrainH(m.x, m.z) + .1, m.z); player.vel.set(0, 0, 0); player.hp = 100; NET.on = true; document.body.classList.add('online-on');
     $('#netStatus').textContent = ''; clearTimeout(CG.autoT); startGame(); cgRoom(true); if (!store.get('pvp-priv')) privacyShow(); if (m.tribe) toast(`Tribu: ${m.tribe}`, 'info');
   } else if (m.t === 'snap') netSnap(m);
-  else if (m.t === 'join') { NET.roster.set(m.id, { id: m.id, name: m.name, tid: m.tid, tribe: m.tribe, bot: m.bot, look: m.look || (NET.roster.get(m.id) || {}).look }); chatAdd('', `${m.name} se ha unido`, false, true); }
+  else if (m.t === 'join') { NET.roster.set(m.id, { id: m.id, name: m.name, tid: m.tid, tribe: m.tribe, bot: m.bot, look: m.look || (NET.roster.get(m.id) || {}).look, held: m.held !== undefined ? m.held : (NET.roster.get(m.id) || {}).held }); chatAdd('', `${m.name} se ha unido`, false, true); }
   else if (m.t === 'tribe') {
-    NET.roster.set(m.id, { id: m.id, name: m.name, tid: m.tid, tribe: m.tribe, bot: m.bot, look: m.look || (NET.roster.get(m.id) || {}).look });
+    NET.roster.set(m.id, { id: m.id, name: m.name, tid: m.tid, tribe: m.tribe, bot: m.bot, look: m.look || (NET.roster.get(m.id) || {}).look, held: m.held !== undefined ? m.held : (NET.roster.get(m.id) || {}).held });
     if (m.id === NET.id) { NET.tid = m.tid; NET.tribe = m.tribe; $('#btnTLeave').hidden = !m.tribe; toast(m.tribe ? `Tribu: ${m.tribe}` : 'Has abandonado la tribu', 'info'); for (const r of NET.remotes.values()) refreshRemote(r); }
     else { const r = NET.remotes.get(m.id); if (r) refreshRemote(r); }
   }
   else if (m.t === 'invite') { NET.invite = { from: m.from, name: m.name, t: clock }; $('#invwho').textContent = `${m.name} te invita a su tribu`; $('#invite').hidden = false; sfx.craft(); }
   else if (m.t === 'notice') { toast(m.text, 'info'); chatAdd('', m.text, false, true); }
+  else if (m.t === 'held') { const q = NET.roster.get(m.id); if (q) q.held = m.w; const r = NET.remotes.get(m.id); if (r && r.mdl.heldId !== m.w) remoteHold(r.mdl, m.w); }
   else if (m.t === 'look') { const q = NET.roster.get(m.id); if (q) q.look = m.look; const r = NET.remotes.get(m.id); if (r) dropRemote(r); }
   else if (m.t === 'leave') { const q = NET.roster.get(m.id); if (q) chatAdd('', `${q.name} ha salido`, false, true); NET.roster.delete(m.id); const r = NET.remotes.get(m.id); if (r) dropRemote(r); }
   else if (m.t === 'swing') { const r = NET.remotes.get(m.id); if (r) r.b.swing = 0; }
@@ -4887,6 +4896,7 @@ function netTick(dt) {
   } else { NET.invT = 0; $('#invring').hidden = true; }
   updateRemotes(dt); updateNetAnimals(dt);
   if (state === 'playing' && inv.version !== NET.invV && (NET.invT = (NET.invT || 0) - dt) <= 0) { NET.invT = 2; NET.invV = inv.version; const items = {}; for (const sl of inv.slots) if (sl) items[sl.id] = (items[sl.id] || 0) + sl.n; netSend({ t: 'inv', items }); }
+  { const hid = state === 'playing' && inv.slots[sel] && HELD_OK.has(inv.slots[sel].id) ? inv.slots[sel].id : ''; if (NET.on && hid !== NET.held) { NET.held = hid; netSend({ t: 'held', w: hid }); } }
   if (state === 'playing' && (NET.sendT -= dt) <= 0) { NET.sendT = .05; netSend({ t: 'pos', x: +player.pos.x.toFixed(2), y: +player.pos.y.toFixed(2), z: +player.pos.z.toFixed(2), yaw: +player.yaw.toFixed(3), pitch: +player.pitch.toFixed(3) }); }
 }
 function remoteHit(r, weapon, extra) { netSend(Object.assign({ t: weapon === 'bow' || weapon === 'crossbow' ? 'shot' : 'attack', target: r.id, weapon }, extra || {})); }
