@@ -1,4 +1,5 @@
 import { cleanLook, randomLook } from './look.js';
+import { clean, isBad } from './filter.js';
 import { createTerrain } from '../../shared/terrain.js';
 import { MAPS, DT } from '../../shared/maps.js';
 import { Buildings, PIECE_DMG, TIER_MULT, TIER_RES, EXP_RES, pieceCenter } from './buildings.js';
@@ -21,7 +22,7 @@ export class Room {
     if (this.count >= this.max) return null;
     const id = this.nextId++, sp = this.spawnPoint(), tok = bot ? 'bot' + id : String(token || 'anon' + id).slice(0, 40);
     let tid = botTid || this.tribeOfToken.get(tok) || 's:' + tok;
-    const p = { id, token: tok, name: (name || 'Jugador').replace(/[<>]/g, '').slice(0, 16) || 'Jugador', tid, bot, ws, x: sp.x, z: sp.z, y: this.T.terrainH(sp.x, sp.z), vy: 0, yaw: 0, hp: HP, input: { mx: 0, mz: 0, sprint: false, jump: false }, cd: 0, kills: 0, deaths: 0, dead: 0, look: bot ? randomLook() : cleanLook(look), prot: this.t + PROT, chatT: 0 };
+    const p = { id, token: tok, name: (isBad(String(name || '')) ? 'Jugador' : String(name || 'Jugador').replace(/[<>]/g, '').slice(0, 16)) || 'Jugador', tid, bot, ws, x: sp.x, z: sp.z, y: this.T.terrainH(sp.x, sp.z), vy: 0, yaw: 0, hp: HP, input: { mx: 0, mz: 0, sprint: false, jump: false }, cd: 0, kills: 0, deaths: 0, dead: 0, look: bot ? randomLook() : cleanLook(look), prot: this.t + PROT, chatT: 0 };
     this.players.set(id, p); this.broadcast(Object.assign({ t: 'join' }, this.pub(p)));
     return p;
   }
@@ -53,7 +54,7 @@ export class Room {
     this.broadcastTribe(old, { t: 'notice', text: p.name + ' ha abandonado la tribu' });
   }
   chat(p, text) {
-    text = String(text || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120); if (!text || this.t < p.chatT) return; p.chatT = this.t + 1;
+    text = clean(String(text || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120)); if (!text || this.t < p.chatT) return; p.chatT = this.t + 1;
     if (text.startsWith('/t ')) { const tx = text.slice(3).trim(); if (tx && this.tribeInfo.has(p.tid)) this.broadcastTribe(p.tid, { t: 'chat', from: p.name, tribe: true, text: tx }); else this.notice(p, 'No tienes tribu'); return; }
     this.broadcast({ t: 'chat', from: p.name, tribe: false, text });
   }
@@ -91,6 +92,7 @@ export class Room {
     else if (m.t === 'gard') this.garden(p, +m.id, String(m.act));
     else if (m.t === 'coll') this.collect(p, +m.id, String(m.act));
     else if (m.t === 'inv') this.invReport(p, m.items);
+    else if (m.t === 'look') { if (this.t < (p.lookT || 0)) return; p.lookT = this.t + 3; const l = cleanLook(m.look); if (l) { p.look = l; this.broadcast({ t: 'look', id: p.id, look: l }); } }
     else if (m.t === 'ndep') this.nodeDepleted(p, m);
     else if (m.t === 'ahit') this.animalHit(p, +m.id, String(m.weapon || 'fists'), false);
     else if (m.t === 'abutcher') this.animalHit(p, +m.id, String(m.weapon || 'fists'), true);

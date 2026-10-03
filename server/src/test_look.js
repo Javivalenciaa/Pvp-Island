@@ -13,4 +13,9 @@ ok(me.look.hairStyle === 4 && me.look.beard === false && me.look.helm === 'horn'
 const b = await conn('Beto', 'beto', null); ok(b.msgs.find((m) => m.t === 'welcome').roster.find((q) => q.name === 'Ana').look.skin === '#112233', 'los demás reciben el aspecto de Ana');
 ok(a.msgs.some((m) => m.t === 'join' && m.name === 'Beto'), 'Ana ve entrar a Beto');
 const bots = w.roster.filter((q) => q.bot); ok(bots.length > 0 && bots.every((q) => q.look && q.look.skin), 'los bots también tienen aspecto propio');
+a.ws.send(JSON.stringify({ t: 'look', look: { skin: '#445566', head: 1.1 } })); await sleep(200);
+ok(b.msgs.some((m) => m.t === 'look' && m.look.skin === '#445566'), 'cambiar de aspecto en partida se propaga a los demás');
+a.ws.send(JSON.stringify({ t: 'chat', text: 'eres una mierda' })); await sleep(200);
+ok(b.msgs.some((m) => m.t === 'chat' && m.text.includes('******') && !m.text.includes('mierda')), 'el chat filtra insultos');
+const c = await conn('Puto', 'c', null); ok(c.msgs.find((m) => m.t === 'welcome').roster.find((q) => q.id === c.msgs.find((x) => x.t === 'welcome').id).name === 'Jugador', 'un apodo ofensivo se sustituye');
 srv.close(); process.exit(process.exitCode || 0);

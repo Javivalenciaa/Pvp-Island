@@ -28,6 +28,7 @@ Juego de supervivencia multijugador PvP para navegador (pensado para CrazyGames)
 | Creador de personaje (piel, ojos, pelo, peinado, barba, casco, ropa, tamaño de cabeza, brazos y complexión): los demás te ven así en multijugador | Hecho (`test_look.js`) |
 | Al morir, tus pertenencias y armadura quedan en una bolsa visible con baliza roja y marca de «última muerte» en el mapa (10 min) | Hecho |
 | Carga: el menú se pinta antes de generar el mundo; el botón Jugar se activa al terminar | Hecho (el coste real de compilar shaders depende de la GPU) |
+| **CrazyGames (Full Implementation)**: SDK completo, entra directo en partida, cuenta y datos en la nube, invitaciones, disableChat/muteAudio, anuncios con respaldo ante AdBlock, filtro de chat, paquete verificado (`docs/CRAZYGAMES.md`, `tools/package_crazygames.py`, `tools/test_cg.js`) | Hecho |
 | Inventario y crafting con autoridad total del servidor | Pendiente (hoy el cliente manda; solo hay detección de abusos gruesos) |
 | Prueba de rendimiento en GPU real con 20 jugadores | Pendiente (el servidor aguanta 20 jugadores con ~1,3 ms por tick) |
 

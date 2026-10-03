@@ -10,7 +10,7 @@ m = re.search(r'export const MAPS = (\{.*?\n\});', maps, re.S)
 block = f"""// @@terrain-begin (generado por tools/sync_terrain.py desde shared/terrain.js)
 {t}
 const MAPS = {m.group(1)};
-const MAP_ID = (location.search.match(/[?&]map=(\\w+)/) || [])[1] in MAPS ? location.search.match(/[?&]map=(\\w+)/)[1] : 'isla';
+const MAP_ID = (location.search.match(/[?&]map=(\\w+)/) || [])[1] in MAPS ? location.search.match(/[?&]map=(\\w+)/)[1] : (window.__mapId in MAPS ? window.__mapId : 'isla');
 const TERRAIN = createTerrain({{ world: MAPS[MAP_ID].world, seed: MAPS[MAP_ID].seed }});
 const {{ WORLD, HALF, SEG, N, CELL, MOUNT, MOUNT2, baseHeight, forestAt, LAKES, rawHeight, heights, terrainH, slopeAt, lakeAt, nearLake, biomeAt, BIOMES, CAVES, caveInfo, roofH, heights0, archInfo, archTop, ARCH_W, ARCH_H }} = TERRAIN;
 // @@terrain-end"""
