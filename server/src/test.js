@@ -5,7 +5,7 @@ const ok = (c, m) => { console.log((c ? 'OK   ' : 'FAIL ') + m); if (!c) process
 const client = (name, token, map) => new Promise((res) => { const ws = new WebSocket('ws://localhost:' + port); const st = { snaps: [], welcome: null, ws }; ws.on('open', () => ws.send(JSON.stringify({ t: 'join', name, token, map }))); ws.on('message', (d) => { const m = JSON.parse(d); if (m.t === 'welcome') { st.welcome = m; res(st); } else if (m.t === 'snap') st.snaps.push(m); else (st.other ||= []).push(m); }); });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 ok(srv.rooms.length === 2 && srv.rooms.every((r) => r.count === 8), 'dos mapas con 8 bots cada uno (sin humanos)');
-const bot0 = [...srv.rooms[0].players.values()].find((p) => p.bot), bx0 = bot0.x, bz0 = bot0.z; await sleep(2500); ok(Math.hypot(bot0.x - bx0, bot0.z - bz0) > 1, 'los bots se mueven solos'); srv.setBots(false);
+const bot0 = [...srv.rooms[0].players.values()].find((p) => p.bot), bx0 = bot0.x, bz0 = bot0.z; for (let k = 0; k < 40 && Math.hypot(bot0.x - bx0, bot0.z - bz0) <= 1; k++) await sleep(250); ok(Math.hypot(bot0.x - bx0, bot0.z - bz0) > 1, 'los bots se mueven solos'); srv.setBots(false);
 const a = await client('Ana', 'tok-ana', 'isla'), b = await client('Beto', 'tok-beto', 'isla');
 ok(a.welcome.seed === 0 && a.welcome.world === 640, 'bienvenida con semilla del mapa');
 await sleep(300);

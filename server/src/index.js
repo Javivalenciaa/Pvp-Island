@@ -7,7 +7,7 @@ import { loadRoom, saveRoom } from './persist.js';
 // minPlayers: número (igual para todos los mapas) o { isla: 6, cordillera: 7 }. `drift` hace que el objetivo de cada sala fluctúe ±1 de vez en cuando (sala más viva).
 export function createServer({ port = 8080, maxPlayers = 20, minPlayers = 8, dataDir = null, drift = false } = {}) {
   const rooms = Object.keys(MAPS).map((id) => new Room(id, maxPlayers));
-  rooms.forEach((r) => loadRoom(r, dataDir));
+  rooms.forEach((r) => { loadRoom(r, dataDir); r.world; }); // r.world: calcula los recursos del mapa ahora, no en mitad de una partida
   const saver = dataDir ? setInterval(() => rooms.forEach((r) => { try { saveRoom(r, dataDir); } catch (e) { console.error('guardado', e.message); } }), 30000) : null;
   let botN = 0, botsOn = true;
   const baseOf = (room) => (typeof minPlayers === 'number' ? minPlayers : (minPlayers[room.mapId] ?? 8)), target = new Map();

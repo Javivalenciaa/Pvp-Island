@@ -1,5 +1,6 @@
 import { cleanLook, randomLook } from './look.js';
 import { clean, isBad } from './filter.js';
+import { buildWorld } from '../../shared/world.js';
 import { createTerrain } from '../../shared/terrain.js';
 import { MAPS, DT } from '../../shared/maps.js';
 import { Buildings, PIECE_DMG, TIER_MULT, TIER_RES, EXP_RES, pieceCenter } from './buildings.js';
@@ -265,7 +266,7 @@ export class Room {
   tickWeather() { if (this.t < this.wx.until) return; const r = Math.random(); this.wx.state = r < .42 ? 'clear' : r < .68 ? 'cloudy' : r < .9 ? 'rain' : 'storm'; this.wx.until = this.t + 120 + Math.random() * 220; }
   find(id) { const q = this.players.get(id); return q && q.dead <= 0 ? q : null; }
   meleeHit(p, id, weapon) {
-    if (p.cd > 0 || p.dead > 0) return; this.broadcast({ t: 'swing', id: p.id }); const w = WEAPONS[weapon] || WEAPONS.fists, q = this.find(id); p.cd = .35; if (!q || q === p || q.tid === p.tid) return;
+    if (p.cd > 0 || p.dead > 0) return; p.atkT = this.t; this.broadcast({ t: 'swing', id: p.id }); const w = WEAPONS[weapon] || WEAPONS.fists, q = this.find(id); p.cd = .35; if (!q || q === p || q.tid === p.tid) return;
     if (Math.hypot(q.x - p.x, q.z - p.z) > w[1] + 1.2 || Math.abs(q.y - p.y) > 3) return; this.hurt(q, w[0], p);
   }
   shotHit(p, id, weapon, charge) {
@@ -278,7 +279,8 @@ export class Room {
     for (const q of this.players.values()) { if (q === p || q.dead > 0 || q.tid === p.tid) continue; const dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz); if (d < bd && (dx * fx + dz * fz) / (d || 1) > .3) { bd = d; best = q; } }
     if (best) this.hurt(best, DMG, p);
   }
-  hurt(q, dmg, by, cause) { if (!(dmg > 0)) return; if ((by || cause === 'trap' || cause === 'fire' || cause === 'explosion' || cause === 'animal') && by !== q && cause !== 'selfdmg' && q.prot > this.t) return; if (by && by.prot > this.t) by.prot = 0; q.hp -= dmg; q.regenT = this.t + 10; this.broadcast({ t: 'hit', id: q.id, hp: Math.max(0, Math.round(q.hp)), by: by ? by.id : 0 }); if (q.hp <= 0 && !(q.dead > 0)) { q.dead = 4; q.deaths++; if (by) by.kills++; this.broadcast({ t: 'kill', victim: q.id, killer: by ? by.id : 0, cause: cause || '' }); } }
+  get world() { return this._w || (this._w = buildWorld(this.T)); }
+  hurt(q, dmg, by, cause) { if (!(dmg > 0)) return; if (by && by !== q) { q.lastBy = by.id; q.lastByT = this.t; } if ((by || cause === 'trap' || cause === 'fire' || cause === 'explosion' || cause === 'animal') && by !== q && cause !== 'selfdmg' && q.prot > this.t) return; if (by && by.prot > this.t) by.prot = 0; q.hp -= dmg; q.regenT = this.t + 10; this.broadcast({ t: 'hit', id: q.id, hp: Math.max(0, Math.round(q.hp)), by: by ? by.id : 0 }); if (q.hp <= 0 && !(q.dead > 0)) { q.dead = 4; q.deaths++; if (by) by.kills++; this.broadcast({ t: 'kill', victim: q.id, killer: by ? by.id : 0, cause: cause || '' }); } }
   tick() {
     this.t += DT;
     for (const p of this.players.values()) {
