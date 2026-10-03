@@ -1,3 +1,4 @@
+import { cleanLook, randomLook } from './look.js';
 import { createTerrain } from '../../shared/terrain.js';
 import { MAPS, DT } from '../../shared/maps.js';
 import { Buildings, PIECE_DMG, TIER_MULT, TIER_RES, EXP_RES, pieceCenter } from './buildings.js';
@@ -12,15 +13,15 @@ export class Room {
   get count() { return this.players.size; }
   spawnPoint() { for (let i = 0; i < 300; i++) { const a = Math.random() * 6.283, r = this.half * (.2 + Math.random() * .62), x = Math.cos(a) * r, z = Math.sin(a) * r, h = this.T.terrainH(x, z); if (h > 1.6 && h < 12 && this.T.slopeAt(x, z) < .28 && !this.T.nearLake(x, z, 1.5)) return { x, z }; } return { x: 0, z: 0 }; }
   // Tribus: solo se forman por invitación (máx. 3). Quien no tiene tribu tiene una tribu "solitaria" propia (tid = 's:' + token).
-  pub(p) { const t = this.tribeInfo.get(p.tid); return { id: p.id, name: p.name, tid: p.tid, tribe: t ? t.name : '', bot: p.bot }; }
+  pub(p) { const t = this.tribeInfo.get(p.tid); return { id: p.id, name: p.name, tid: p.tid, tribe: t ? t.name : '', bot: p.bot, look: p.look }; }
   tribeSize(tid) { let n = 0; for (const q of this.players.values()) if (q.tid === tid && !q.bot) n++; return n; }
   members(tid) { return [...this.players.values()].filter((q) => q.tid === tid); }
   notice(p, text) { if (p && p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'notice', text })); }
-  join(name, token, ws, bot = false, botTid = null) {
+  join(name, token, ws, bot = false, botTid = null, look = null) {
     if (this.count >= this.max) return null;
     const id = this.nextId++, sp = this.spawnPoint(), tok = bot ? 'bot' + id : String(token || 'anon' + id).slice(0, 40);
     let tid = botTid || this.tribeOfToken.get(tok) || 's:' + tok;
-    const p = { id, token: tok, name: (name || 'Jugador').replace(/[<>]/g, '').slice(0, 16) || 'Jugador', tid, bot, ws, x: sp.x, z: sp.z, y: this.T.terrainH(sp.x, sp.z), vy: 0, yaw: 0, hp: HP, input: { mx: 0, mz: 0, sprint: false, jump: false }, cd: 0, kills: 0, deaths: 0, dead: 0, prot: this.t + PROT, chatT: 0 };
+    const p = { id, token: tok, name: (name || 'Jugador').replace(/[<>]/g, '').slice(0, 16) || 'Jugador', tid, bot, ws, x: sp.x, z: sp.z, y: this.T.terrainH(sp.x, sp.z), vy: 0, yaw: 0, hp: HP, input: { mx: 0, mz: 0, sprint: false, jump: false }, cd: 0, kills: 0, deaths: 0, dead: 0, look: bot ? randomLook() : cleanLook(look), prot: this.t + PROT, chatT: 0 };
     this.players.set(id, p); this.broadcast(Object.assign({ t: 'join' }, this.pub(p)));
     return p;
   }
@@ -147,7 +148,7 @@ export class Room {
   }
   ownDep(p, id) { const d = this.D.map.get(id); return d && d.owner === p.tid ? d : null; }
   removeDep(p, id) { const d = this.ownDep(p, id); if (!d || !this.depNear(p, d, 8)) return; this.D.map.delete(id); this.broadcast({ t: 'dd', id, by: p.id, refund: d.t }); if (d.slots) this.spill(d); }
-  spill(d) { const bag = this.D.addBag(d.x, d.y + .3, d.z, d.slots); if (bag) { bag.expire = this.t + 300; this.broadcast({ t: 'lb', b: { id: bag.id, x: bag.x, y: bag.y, z: bag.z } }); } }
+  spill(d) { const bag = this.D.addBag(d.x, d.y + .3, d.z, d.slots); if (bag) { bag.expire = this.t + 600; this.broadcast({ t: 'lb', b: { id: bag.id, x: bag.x, y: bag.y, z: bag.z } }); } }
   destroyDep(d, by) {
     this.D.map.delete(d.id); this.broadcast({ t: 'dd', id: d.id, by: 0, refund: null });
     if (d.slots) this.spill(d);
@@ -192,7 +193,7 @@ export class Room {
   // ---- botín: al morir se suelta lo que llevabas; los cofres destruidos sueltan su contenido
   dropBag(p, slots) {
     if (!Array.isArray(slots) || p.dead <= 0 || p.dropped) return; p.dropped = true; const clean = slots.slice(0, 40).map((s) => (s && typeof s.id === 'string' && s.n > 0 ? { id: s.id.slice(0, 24), n: Math.min(999, s.n | 0), dur: s.dur } : null));
-    const bag = this.D.addBag(p.x, p.y + .3, p.z, clean); if (bag) { bag.expire = this.t + 300; this.broadcast({ t: 'lb', b: { id: bag.id, x: bag.x, y: bag.y, z: bag.z } }); }
+    const bag = this.D.addBag(p.x, p.y + .3, p.z, clean); if (bag) { bag.expire = this.t + 600; this.broadcast({ t: 'lb', b: { id: bag.id, x: bag.x, y: bag.y, z: bag.z } }); }
   }
   pickBag(p, id) { const b = this.D.bags.get(id); if (!b || p.dead > 0 || Math.hypot(b.x - p.x, b.z - p.z) > 4) return; this.D.bags.delete(id); this.broadcast({ t: 'lx', id }); this.send(p, { t: 'give', items: b.slots.map((s) => [s.id, s.n]) }); }
   // ---- trampas y torretas (se evalúan en cada tick)

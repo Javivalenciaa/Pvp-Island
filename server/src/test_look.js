@@ -1,0 +1,16 @@
+import WebSocket from 'ws';
+import { createServer } from './index.js';
+const ok = (c, m) => { console.log((c ? 'OK   ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const srv = createServer({ port: 0, minPlayers: 3 }); await new Promise((r) => srv.wss.on('listening', r)); const port = srv.wss.address().port;
+const conn = async (name, token, look) => { const ws = new WebSocket('ws://localhost:' + port); const msgs = []; await new Promise((r) => ws.on('open', r)); ws.on('message', (d) => msgs.push(JSON.parse(d))); ws.send(JSON.stringify({ t: 'join', name, token, map: 'isla', look })); await sleep(300); return { ws, msgs }; };
+const a = await conn('Ana', 'ana', { skin: '#112233', hair: 'rojo<script>', head: 9, arms: .1, hairStyle: 4, beard: false, helm: 'horn', cloth: '#aa0000' });
+const w = a.msgs.find((m) => m.t === 'welcome'); const me = w.roster.find((q) => q.name === 'Ana');
+ok(me.look && me.look.skin === '#112233' && me.look.cloth === '#aa0000', 'el servidor guarda el aspecto válido');
+ok(me.look.hair === '#5a3a1f', 'un color inválido se sustituye por el de por defecto');
+ok(me.look.head === 1.3 && me.look.arms === .85, 'las medidas se limitan a su rango');
+ok(me.look.hairStyle === 4 && me.look.beard === false && me.look.helm === 'horn', 'peinado, barba y casco se conservan');
+const b = await conn('Beto', 'beto', null); ok(b.msgs.find((m) => m.t === 'welcome').roster.find((q) => q.name === 'Ana').look.skin === '#112233', 'los demás reciben el aspecto de Ana');
+ok(a.msgs.some((m) => m.t === 'join' && m.name === 'Beto'), 'Ana ve entrar a Beto');
+const bots = w.roster.filter((q) => q.bot); ok(bots.length > 0 && bots.every((q) => q.look && q.look.skin), 'los bots también tienen aspecto propio');
+srv.close(); process.exit(process.exitCode || 0);

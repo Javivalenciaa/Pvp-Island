@@ -120,12 +120,12 @@ export function createTerrain({ world = 640, seed = 0, maxLakes = 4 } = {}) {
     }
     return null;
   };
-  function rawHeight(x, z) {
-    const h = rawHeight0(x, z), ci = caveInfo(x, z);
+  function rawHeight(x, z, h0) {
+    const h = h0 === undefined ? rawHeight0(x, z) : h0, ci = caveInfo(x, z);
     return ci ? h - Math.max(0, h - ci.c.y0) * ci.f : h;
   }
   const heights = new Float32Array(N * N), heights0 = new Float32Array(N * N);
-  for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) { const x = -HALF + ix * CELL, z = -HALF + iz * CELL, h0 = rawHeight0(x, z); heights0[iz * N + ix] = h0; heights[iz * N + ix] = CAVES.length ? rawHeight(x, z) : h0; }
+  for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) { const x = -HALF + ix * CELL, z = -HALF + iz * CELL, h0 = rawHeight0(x, z); heights0[iz * N + ix] = h0; heights[iz * N + ix] = CAVES.length ? rawHeight(x, z, h0) : h0; }
   function terrainH(x, z) {
     const fx = (x + HALF) / CELL, fz = (z + HALF) / CELL;
     if (fx < 0 || fz < 0 || fx >= SEG || fz >= SEG) return -8;
