@@ -27,11 +27,11 @@ export class Buildings {
   place(d, owner, count) {
     const kind = d.kind; if (!PIECE_HP[kind]) return { ok: false, why: 'Pieza no válida' };
     const i = d.i | 0, j = d.j | 0, L = d.L | 0, dir = d.dir === 'v' ? 'v' : 'h';
-    if (Math.abs(i) > 400 || Math.abs(j) > 400 || L < 0 || L > 6 || !Number.isFinite(+d.top) || !Number.isFinite(+d.bottom)) return { ok: false, why: 'Posición no válida' };
+    if (Math.abs(i) > 400 || Math.abs(j) > 400 || L < 0 || L > 6 || !Number.isFinite(+d.top) || (kind === 'foundation' && !Number.isFinite(+d.bottom))) return { ok: false, why: 'Posición no válida' };
     const key = kind === 'foundation' ? fKey(i, j) : kind === 'ceiling' ? cKey(i, j, L) : wKey(dir, i, j, L);
     if (this.map.has(key)) return { ok: false, why: 'Ya hay una pieza aquí' };
     if (count >= 450) return { ok: false, why: 'Tu tribu ha alcanzado el límite de piezas' };
-    const p = { kind, key, i, j, L: kind === 'foundation' ? 0 : L, dir: kind === 'wall' || kind === 'door' ? dir : undefined, tier: 0, top: +d.top, bottom: +d.bottom, open: false, owner };
+    const p = { kind, key, i, j, L: kind === 'foundation' ? 0 : L, dir: kind === 'wall' || kind === 'door' ? dir : undefined, tier: 0, top: +d.top, bottom: Number.isFinite(+d.bottom) ? +d.bottom : +d.top, open: false, owner };
     if ((kind === 'wall' || kind === 'door') && !this.wallSupported(p)) return { ok: false, why: 'Las paredes van sobre un cimiento' };
     if (kind === 'ceiling' && !this.ceilingSupported(p)) return { ok: false, why: 'El techo va sobre un cimiento con paredes' };
     p.hp = this.maxHp(p); this.map.set(key, p); return { ok: true, p };

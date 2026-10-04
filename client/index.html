@@ -1913,7 +1913,7 @@ function addPiece(data) {
   const ob = buildObject(p, tierMats[p.tier]);
   p.obj = ob.g; p.pivot = ob.pivot; p.boxes = ob.sh.boxes.map((b) => worldBox(ob.o, b)); p.doorBox = ob.sh.door ? worldBox(ob.o, ob.sh.door) : null;
   ob.g.traverse((m) => { m.userData.piece = p; });
-  if (p.pivot) p.pivot.rotation.y = p.open ? -1.45 : 0;
+  p.doorAng = p.open ? -1.45 : 0; if (p.pivot) p.pivot.rotation.y = p.doorAng;
   pieceRoot.add(ob.g); pieces.push(p); pieceMap.set(p.key, p);
   rebuildColliders();
   return p;
@@ -4235,7 +4235,7 @@ function tryPlace() {
   }
   if (NET.on && placement.ok) {
     if (!inv.pay(placement.cost)) return true;
-    const p = placement; netSend({ t: 'build', piece: { kind: p.kind, key: p.key, i: p.i, j: p.j, L: p.L || 0, dir: p.dir, top: p.top, bottom: p.bottom } }); NET.pendingPay[p.key] = Object.assign({}, p.cost); ghostKey = ''; return true;
+    const p = placement; netSend({ t: 'build', piece: { kind: p.kind, key: p.key, i: p.i, j: p.j, L: p.L || 0, dir: p.dir, top: p.top, bottom: p.bottom != null ? p.bottom : p.top } }); NET.pendingPay[p.key] = Object.assign({}, p.cost); ghostKey = ''; return true;
   }
   if (!placement.ok) { toast(placement.why, 'bad'); sfx.bad(); return true; }
   if (placement.dep) {
@@ -5095,10 +5095,12 @@ function tick(dt, now) {
   updateLights(fl); updateDeployables(dt); updateFire(dt); updateBanners(dt);
   $('#armorInfo').textContent = player.armorId ? ITEMS[player.armorId].name + ' · −' + Math.round(ITEMS[player.armorId].armor * 100) + '% de daño' : '';
 }
+function updateDoors(dt) { const k = Math.min(1, dt * 7); for (let n = 0; n < pieces.length; n++) { const p = pieces[n]; if (!p.pivot) continue; const tg = p.open ? -1.45 : 0, a = p.doorAng == null ? tg : p.doorAng; if (a !== tg) { p.doorAng = Math.abs(tg - a) < .01 ? tg : a + (tg - a) * k; p.pivot.rotation.y = p.doorAng; } } }
 function frame(now) {
   requestAnimationFrame(frame); cgSync(); syncTouch();
   const dt = Math.min(.05, (now - last) / 1000); last = now;
   if (state !== 'paused') waterTime.value += dt;
+  updateDoors(dt);
   sea.position.set(Math.round(camera.position.x / SEA_STEP) * SEA_STEP, 0, Math.round(camera.position.z / SEA_STEP) * SEA_STEP);
   if (state === 'playing') {
     tick(dt, now);
