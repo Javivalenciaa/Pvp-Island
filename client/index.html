@@ -4638,7 +4638,7 @@ async function cgAutoPlay() {
 const NET = { held: '', noChat: false, animals: new Map(), mount: 0, deps: new Map(), bags: new Map(), slowUntil: 0, slowF: 1, pendingPay: {}, on: false, ws: null, id: 0, remotes: new Map(), roster: new Map(), tid: '', tribe: '', name: '', typing: false, invT: 0, invite: null, touchInvite: false, sendT: 0, wantRespawn: false, killFeedT: 0 };
 const remoteRoot = new THREE.Group(); scene.add(remoteRoot);
 const urlParam = (k) => { const m = location.search.match(new RegExp('[?&]' + k + '=([^&]*)')); return m ? decodeURIComponent(m[1]) : ''; };
-const SERVER_URL = urlParam('server') || (location.protocol === 'https:' ? 'wss://pvp-island.example.com' : 'ws://localhost:8080');
+const SERVER_URL = urlParam('server') || (location.protocol === 'https:' ? (/github\.io$/.test(location.hostname) ? 'wss://35-223-110-190.sslip.io' : 'wss://pvp-island.example.com') : 'ws://localhost:8080');
 function netSend(m) { if (NET.ws && NET.ws.readyState === 1) NET.ws.send(JSON.stringify(m)); }
 const TRIBE_CLOTH = ['red', 'blue', 'green', 'brown', 'grey', 'ember'];
 const tribeCloth = (t) => { let h = 0; for (const c of String(t)) h = (h * 31 + c.charCodeAt(0)) | 0; return TRIBE_CLOTH[Math.abs(h) % TRIBE_CLOTH.length]; };
