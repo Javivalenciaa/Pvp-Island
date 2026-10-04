@@ -267,6 +267,8 @@ body.online-on #btnReset,body.online-on #btnNew{display:none}
 .lockhint{position:fixed;left:50%;bottom:22%;transform:translateX(-50%);padding:12px 22px;border-radius:8px;background:rgba(0,0,0,.62);border:1px solid var(--line);font-weight:700;letter-spacing:.03em;pointer-events:none;z-index:6}
 #pauseUser{display:flex;align-items:center;gap:8px;font-weight:700}#pauseUser img{border-radius:50%}
 #privacy{position:fixed;left:12px;right:12px;bottom:12px;max-width:560px;margin:0 auto;padding:12px 14px;font-size:13px;line-height:1.4;z-index:30;display:flex;gap:12px;align-items:center}#privacy button{flex:0 0 auto}
+#pause .card{max-height:94vh;overflow-y:auto}
+#pause .ctas{flex-wrap:wrap}
 #boot{display:flex;align-items:center;gap:10px;font-weight:600;font-size:14px;color:#d6d0bf}
 #boot i{width:18px;height:18px;border-radius:50%;border:3px solid rgba(255,255,255,.25);border-top-color:var(--ember);}
 @keyframes bootspin{to{transform:rotate(360deg)}}
@@ -439,7 +441,7 @@ body:not(.ready) .glass{backdrop-filter:none;-webkit-backdrop-filter:none}
     <h2 class="brand" style="font-size:56px">Pausa</h2>
     <div id="pauseUser" hidden></div>
     <p class="lede" id="pauseTxt">Tu progreso se guarda automáticamente.</p>
-    <div class="ctas"><button class="btn" id="btnResume" type="button">Continuar</button><button class="btn ghost" id="btnReset" type="button">Nueva partida</button><button class="btn ghost" id="btnTLeave" type="button" hidden>Abandonar tribu</button><button class="btn ghost" id="btnLook2" type="button">Personalizar personaje</button><button class="btn ghost" id="btnPriv" type="button">Privacidad</button></div>
+    <div class="ctas"><button class="btn" id="btnResume" type="button">Continuar</button><button class="btn ghost" id="btnMenuBack" type="button">Salir al menú</button><button class="btn ghost" id="btnReset" type="button">Nueva partida</button><button class="btn ghost" id="btnTLeave" type="button" hidden>Abandonar tribu</button><button class="btn ghost" id="btnLook2" type="button">Personalizar personaje</button><button class="btn ghost" id="btnPriv" type="button">Privacidad</button></div>
     <p class="records" id="records2"></p>
     <div class="qrow"><span>Idioma</span><div class="qb"><button type="button" class="chipbtn" data-lang="en">English</button><button type="button" class="chipbtn" data-lang="es">Español</button></div></div>
     <div class="qrow"><span>Calidad gráfica</span><div class="qb"><button type="button" class="chipbtn" data-q="baja">Baja</button><button type="button" class="chipbtn" data-q="media">Media</button><button type="button" class="chipbtn" data-q="alta">Alta</button><button type="button" class="chipbtn" data-q="ultra">Ultra</button></div></div>
@@ -565,7 +567,7 @@ const ES_EN = Object.assign({}, NAMES, {
   '¡Te están quemando la base!': 'They are burning your base!', '¡Has pisado tu propio cepo!': 'You stepped on your own bear trap!', 'Has aguantado': 'You held on', 'Has resistido': 'You survived', 'Errantes abatidos': 'Marauders killed', 'Mejor noche': 'Best night',
   'Tu personaje': 'Your character', 'Personalizar personaje': 'Customize character', 'Guardar': 'Save', 'Aleatorio': 'Random', 'Restablecer': 'Reset', 'Tono de piel': 'Skin tone', 'Pelo': 'Hair', 'Ojos': 'Eyes', 'Camisa': 'Shirt', 'Pantalón': 'Pants', 'Peinado': 'Hairstyle', 'Trenzas': 'Braids', 'Corto': 'Short', 'Rapado': 'Shaved', 'Cresta': 'Mohawk', 'Largo': 'Long', 'Flequillo': 'Fringe', 'Barba': 'Beard', 'Sí': 'Yes', 'Casco': 'Helmet', 'Ninguno': 'None', 'Cónico': 'Conical', 'Cuernos': 'Horns', 'Banda': 'Headband', 'Capucha': 'Hood', 'Gafas': 'Goggles', 'Cabeza': 'Head', 'Altura': 'Height', 'Complexión': 'Build', 'Largo brazos': 'Arm length', 'Grosor brazos': 'Arm thickness',
   'Despiertas en una isla salvaje sin nada. Recoge recursos, caza, doma caballos, construye tu base y forma una tribu de hasta 3 jugadores. Explora desiertos, junglas, pantanos y cuevas, y defiende lo que construyes: aquí nadie está a salvo, ni siquiera cuando te desconectas.': 'You wake up on a wild island with nothing. Gather resources, hunt, tame horses, build your base and form a tribe of up to 3 players. Explore deserts, jungles, swamps and caves, and defend what you build: nobody is safe here, not even when you log off.', 'Desmontar': 'Dismount', 'Tu progreso se guarda automáticamente.': 'Your progress is saved automatically.',
-  'Haz clic para jugar': 'Click to play', 'Gira el dispositivo para jugar': 'Rotate your device to play', 'Entendido': 'Got it', 'Privacidad': 'Privacy', 'Cargando el mundo…': 'Loading the world…', 'Entrando en la isla…': 'Entering the island…', 'Para jugar en línea, el servidor del juego recibe tu apodo, tu aspecto y los mensajes que escribas. No se recoge nada más ni se comparte con terceros.': 'To play online, the game server receives your nickname, your appearance and the messages you type. Nothing else is collected or shared with third parties.',
+  'Haz clic para jugar': 'Click to play', 'Gira el dispositivo para jugar': 'Rotate your device to play', 'Entendido': 'Got it', 'Privacidad': 'Privacy', 'Cargando el mundo…': 'Loading the world…', 'Salir al menú': 'Back to menu', 'Entrando en la isla…': 'Entering the island…', 'Para jugar en línea, el servidor del juego recibe tu apodo, tu aspecto y los mensajes que escribas. No se recoge nada más ni se comparte con terceros.': 'To play online, the game server receives your nickname, your appearance and the messages you type. Nothing else is collected or shared with third parties.',
   'Piezas y objetos perdidos': 'Pieces and items lost', 'Saqueado': 'Looted', 'Intacto': 'Intact', 'Engranaje por no perder nada': 'Gear for losing nothing', 'Faro viejo': 'Old lighthouse', 'Errantes': 'Marauders',
   'La próxima noche habrá luna de sangre. Repara con el martillo y refuerza los muros.': 'Next night there will be a blood moon. Repair with the hammer and reinforce your walls.', 'La próxima noche vendrán más. Repara con el martillo y refuerza los muros.': 'More will come next night. Repair with the hammer and reinforce your walls.',
   'Aún está creciendo': 'Still growing', 'Pólvora ': 'Gunpowder ',
@@ -3359,7 +3361,8 @@ function endSiege() {
 function updateSiege(dt) {
   if (ONLINE) return;
   const night = isNight();
-  if (night && !siege.active && stats.siegeDone !== dayCount && clock > 20) startSiege(dayCount);
+  if (night) { siege.nightT = (siege.nightT || 0) + dt; if (siege.nightT > 5 && siege.warnedDay !== dayCount) { siege.warnedDay = dayCount; showBanner('Cae la noche', 'Los Errantes atacarán pronto: refúgiate y prepara defensas.', false); } } else siege.nightT = 0;
+  if (night && !siege.active && stats.siegeDone !== dayCount && clock > 20 && siege.nightT > (dayCount === 1 ? 90 : 30)) startSiege(dayCount);
   if (!night && siege.active) endSiege();
   if (!siege.active || !siege.queue.length || (siege.spawnT -= dt) > 0) return;
   siege.spawnT = 2.5 + Math.random() * 2.5;
@@ -3988,6 +3991,12 @@ function startGame() {
 function pauseGame() { if (state !== 'playing') return; state = 'paused'; mouseL = false; $('#pause').hidden = false; $('#resetConfirm').hidden = true; $('#records2').textContent = recordsText(); save(); }
 $('#btnPlay').addEventListener('click', () => { if (ONLINE && !NET.on) { audio(); netConnect(); } else startGame(); });
 $('#btnResume').addEventListener('click', startGame);
+// salir de la partida: sin conexión vuelve al menú al instante; en línea cierra la conexión y recarga directo al menú (estado limpio)
+$('#btnMenuBack').addEventListener('click', () => {
+  save(); try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* sin bloqueo */ }
+  if (NET.on || NET.ws) { netClose(); try { const u = new URL(location.href); u.searchParams.set('menu', '1'); location.replace(u.toString()); } catch (e) { location.reload(); } return; }
+  $('#pause').hidden = true; $('#hud').hidden = true; $('#menu').hidden = false; state = 'menu';
+});
 let resetArmed = false;
 function resetGame() { if (!resetArmed) { resetArmed = true; $('#resetConfirm').hidden = false; return; } try { store.del(SAVE_KEY); } catch (e) {} location.reload(); }
 $('#btnReset').addEventListener('click', resetGame);
