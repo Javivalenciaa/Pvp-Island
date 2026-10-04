@@ -1,3 +1,5 @@
 node_modules/
 *.log
 dist/
+promo/*.mp4
+promo/*.wav
