@@ -46,7 +46,7 @@ body.ready #splash .fill{animation:none;transform:scaleX(1);transition:transform
 <div class="stuck" id="splStuck"></div>
 <script>
 (function () {
-  var es = false; try { es = localStorage.getItem('isla-lang') === 'es'; } catch (e) { /* sin almacenamiento */ }
+  var es = false;   // the loading screen is always in English (default language)
   var T = es ? {
     sub: 'Supervivencia PvP', stage: ['Levantando la isla…', 'Plantando bosques y desiertos…', 'Encendiendo las hogueras…', 'Afilando las hachas…', 'Despertando a los lobos…', 'Casi listo…'],
     tip: ['Mantén clic derecho sobre un jugador para invitarlo a tu tribu (máx. 3).', 'Al morir, tus cosas quedan en una mochila: recupérala antes de que desaparezca.', 'Tu base se puede atacar aunque estés desconectado: construye con cabeza.', 'Mejora tus paredes de madera a piedra y metal para aguantar asedios.', 'Las cuevas guardan minerales y azufre, pero también peligros.', 'Los anuncios solo salen si tú decides verlos para ganar una recompensa.'], stuck: '¿Tarda demasiado? Recarga la página (F5).'
