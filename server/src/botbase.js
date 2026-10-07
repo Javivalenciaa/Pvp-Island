@@ -137,9 +137,10 @@ function placeStep(room, bt, st, tier = 0) {
 }
 function upgradePiece(room, q, tier) { q.tier = tier; q.hp = room.B.maxHp(q); room.broadcast({ t: 'pu', key: q.key, tier, hp: Math.round(q.hp) }); }
 function addDep(room, bt, t, x, z, y, r = 0) { const d = room.D.add(t, x, y, z, r, bt.tid); if (d) room.broadcast({ t: 'db', d: room.D.pub(d) }); return d; }
-function furnish(room, bt) {
+const t_ok = (room, bt) => room.t - (bt.chestGoneAt ?? -1e9) > 600 || !bt.built;
+function furnish(room, bt, noChest) {
   const L = layout(bt.base), top = bt.base.top, dp = L.door;
-  if (!chestOf(room, bt)) { const c = addDep(room, bt, 'chest', L.chest.x, L.chest.z, top); if (c) { bt.chestId = c.id; bt.dirty = true; } }
+  if (!noChest && !chestOf(room, bt) && t_ok(room, bt)) { const c = addDep(room, bt, 'chest', L.chest.x, L.chest.z, top); if (c) { bt.chestId = c.id; bt.dirty = true; } }
   if (!(bt.bedId && room.D.map.has(bt.bedId))) { const b = addDep(room, bt, 'bed', L.bed.x, L.bed.z, top, Math.random() * 6); if (b) bt.bedId = b.id; }
   if (!bt.bench || !room.D.map.has(bt.bench)) { const b = addDep(room, bt, 'workbench', L.bench.x + 0.9, L.bench.z - .6, top); if (b) bt.bench = b.id; }
   if (!bt.camp || !room.D.map.has(bt.camp)) { const o = 3.4, px = dp.x + dp.n[0] * o + (dp.n[1] ? 2.4 : 0), pz = dp.z + dp.n[1] * o + (dp.n[0] ? 2.4 : 0), b = addDep(room, bt, 'campfire', px, pz, room.T.terrainH(px, pz)); if (b) bt.camp = b.id; }
@@ -354,10 +355,11 @@ export function tick(room) {
     if (info) { info.base = bt.base; info.pool = bt.pool; }
     if (bt.dirty) syncChest(room, bt);
     if (bt.base && bt.built && bt.plan && !nextUpgrade(room, bt) && (bt.upgradeGoal || 1) < 2) bt.upgradeGoal = 2;
-    if (bt.base && bt.built && !chestOf(room, bt) && bt.chestId) { bt.pool = { bomb: bt.pool.bomb || 0 }; bt.pool.bomb = 0; bt.chestId = 0; if (info) info.pool = bt.pool; }
+    if (bt.base && bt.built && !chestOf(room, bt) && bt.chestId) { bt.pool = {}; bt.chestId = 0; bt.chestGoneAt = t; if (info) info.pool = bt.pool; }
     if (bt.base && !bt.plan) bt.plan = genPlan(bt.base);
     if (bt.base && bt.plan && !bt.built && planDone(room, bt)) { bt.built = true; furnish(room, bt); room.feed('base', info.name, null, doorPos(bt.base)); }
-    if (bt.base && bt.built && !chestOf(room, bt) && (bt.pool.wood || 0) + 0 >= 0 && mem.length && (t - (bt.furnT || 0) > 30)) { bt.furnT = t; furnish(room, bt); } // arcón nuevo tras un saqueo
+    // arcón nuevo tras un saqueo: no al instante (el botín queda en el suelo para quien lo rompió); el clan lo rehace a los 10 min y con algo de material
+    if (bt.base && bt.built && !chestOf(room, bt) && mem.length && t - (bt.chestGoneAt ?? -1e9) > 600 && (bt.pool.wood || 0) + (bt.pool.stone || 0) >= 40 && t - (bt.furnT || 0) > 30) { bt.furnT = t; furnish(room, bt); }
     if (bt.base && bt.plan && planDone(room, bt) === false && bt.built) bt.built = true; // al faltar piezas se reparan aunque la base ya estuviera completa
     // puertas: se abren para quien es de la tribu
     if (bt.base && bt.built) { const dd = bt.base.door, key = wKey(dd.d, dd.i, dd.j, 0), q = room.B.map.get(key), pos = doorPos(bt.base); if (q && q.kind === 'door') { const near = mem.some((m) => Math.hypot(m.x - pos.x, m.z - pos.z) < 3.6), far = !mem.some((m) => Math.hypot(m.x - pos.x, m.z - pos.z) < 5.5); if (!q.open && near) { q.open = true; room.broadcast({ t: 'po', key, open: true }); } else if (q.open && far) { q.open = false; room.broadcast({ t: 'po', key, open: false }); } } }
@@ -375,7 +377,7 @@ export function tick(room) {
 }
 // alerta de ataque a una base (llamada desde Room cuando alguien daña una pieza o un objeto ajeno)
 // lista de bases para los clientes (mapa, brújula, objetivos): solo cambia de vez en cuando
-export function baseList(room) { return [...bases(room, true).values()].map((o) => ({ tid: o.tid, name: o.name, x: Math.round(o.x), z: Math.round(o.z), n: o.n, bot: !!o.bot, chest: o.chests.length > 0 })); }
+export function baseList(room) { return [...bases(room, true).values()].map((o) => ({ tid: o.tid, name: o.name, x: Math.round(o.x), z: Math.round(o.z), n: o.n, chest: o.chests.length > 0 })); }
 export function sendBases(room, p) { room.send(p, { t: 'bases', list: baseList(room) }); }
 export function baseAttacked(room, tid, by) {
   if (!by || by.tid === tid) return; const s = room._bb; if (!s) return; const bt = s.bt.get(tid); if (!bt) return;

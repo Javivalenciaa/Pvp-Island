@@ -46,3 +46,12 @@
 - **Aviso al dueño:** `alert` (primer golpe, throttled 25 s), `ev` global (feed), `report` al volver si estaba desconectado (solo para clanes de jugadores).
 - **PvP físico más suave:** `skill` 0,42–0,68, reacción 0,7–1,5 s, menos ganas de pelear y cadencia de golpes más lenta: son buenos economía/construcción, no en el cuerpo a cuerpo.
 - **Pruebas:** `npm run bases` (simulación sin red de N minutos), `src/test_raid.js` (defensa, botín, informe), `tools/test_online_ui.js` (navegador real contra servidor local).
+
+
+## Cuerpo dormido (server/src/room.js: sleep / wake / killSleeper)
+
+- El cliente informa su inventario completo (`invfull`: 24 casillas con durabilidad, armadura, hambre y sed) cada 4 s y al cerrar/ocultar la pestaña. El servidor lo valida (ids ≤24 caracteres, cantidades ≤999) y lo guarda en el jugador.
+- Al cerrar la conexión de un humano vivo, `leave()` lo convierte en cuerpo dormido (`sleeping`): sigue en `players` con su `tid` (sus construcciones siguen siendo suyas), se emite `sleep` y aparece en las instantáneas con la bandera `e[8]`. No cuenta para `count/humans` (no ocupa sitio ni cuenta como jugador en línea). Los bots y los animales ignoran los cuerpos dormidos; los demás jugadores pueden golpearlo, dispararle o explotarlo.
+- Si muere, `killSleeper` suelta una bolsa con todo (casillas + armadura), lo quita del mapa y guarda un aviso para su dueño. Si el dueño vuelve antes, `join` con el mismo `token` despierta el mismo cuerpo (mismo id) y la bienvenida incluye `restore` (inventario, armadura, hambre, sed, vida) y la posición.
+- Un segundo `join` con el mismo token mientras hay otra conexión releva a la anterior. Los tramposos expulsados no dejan cuerpo.
+- Persistencia: `sleepers` y `deadSleepers` van en el JSON de la sala; los cuerpos dormidos caducan a las 24 h (se sueltan en una bolsa).

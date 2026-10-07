@@ -11,7 +11,7 @@ pa.prot = 0; pb.prot = 0; const ix = Math.round(pa.x / 3), jz = Math.round(pa.z 
 send(a, { t: 'build', piece: { kind: 'foundation', key: `F${ix},${jz}`, i: ix, j: jz, L: 0, top, bottom: top - 1 } }); await sleep(150);
 ok(room.B.map.size === 1, 'el dueño construye');
 a.close(); await sleep(300);
-ok(!room.players.has(pa.id), 'el dueño se ha desconectado');
+ok(room.players.has(pa.id) && pa.sleeping && room.count === 1, 'el dueño se ha desconectado: su cuerpo queda durmiendo y no cuenta como jugador en línea');
 pb.x = ix * 3 + 1.5; pb.z = jz * 3 + 1.5 + 1; pb.y = top; const f = room.B.get(`F${ix},${jz}`), hp0 = f.hp;
 send(b, { t: 'phit', key: f.key, weapon: 'iron_axe' }); await sleep(150);
 ok(f.hp < hp0, 'sin protección al desconectarse: la base recibe daño con su dueño fuera (' + hp0 + ' -> ' + f.hp + ')');

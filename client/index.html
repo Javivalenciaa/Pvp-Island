@@ -195,6 +195,12 @@ body.touch #rank{top:calc(12px + env(safe-area-inset-top,0px))}body.touch #feed{
 .live{margin:0;font-size:13px;color:#ffd7a8;min-height:18px}
 @media (max-width:640px){.howto{grid-template-columns:1fr}.howto div{padding:5px 8px}}
 @media (max-height:520px){.howto{display:none}}
+#pauseRoster{margin-top:4px;padding-top:10px;border-top:1px solid rgba(236,229,212,.12)}
+#pauseRoster h3{margin:0 0 6px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700}
+#pauseRoster .pl{display:flex;flex-wrap:wrap;gap:5px 6px;max-height:112px;overflow-y:auto}
+#pauseRoster .pl span{background:rgba(236,229,212,.07);border:1px solid rgba(236,229,212,.1);border-radius:4px;padding:2px 8px;font-size:13px;color:#d6d0bf;white-space:nowrap}
+#pauseRoster .pl span.me{border-color:var(--ember);color:#ffd7a8}#pauseRoster .pl span.zz{opacity:.6}
+#pauseRoster .pl small{color:#ffb27a;margin-left:5px;font-size:11px}
 #toasts{position:absolute;left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(120px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:4px;align-items:flex-start}
 .toast{padding:5px 10px;font-size:14px;font-weight:600;border-radius:4px;background:rgba(10,14,12,.75);border-left:3px solid var(--moss);animation:tin .2s ease-out}
 .toast.bad{border-left-color:var(--blood)}
@@ -468,6 +474,7 @@ body:not(.ready) .glass{backdrop-filter:none;-webkit-backdrop-filter:none}
     <p class="records" id="records2"></p>
     <div class="qrow"><span>Idioma</span><div class="qb"><button type="button" class="chipbtn" data-lang="en">English</button><button type="button" class="chipbtn" data-lang="es">Español</button></div></div>
     <div class="qrow"><span>Calidad gráfica</span><div class="qb"><button type="button" class="chipbtn" data-q="baja">Baja</button><button type="button" class="chipbtn" data-q="media">Media</button><button type="button" class="chipbtn" data-q="alta">Alta</button><button type="button" class="chipbtn" data-q="ultra">Ultra</button></div></div>
+    <div id="pauseRoster" hidden><h3 id="prH"></h3><div class="pl" id="prL"></div></div>
     <p class="note" id="resetConfirm" hidden>Pulsa otra vez «Nueva partida» para borrar la isla y empezar de cero.</p>
   </div>
 </div>
@@ -644,7 +651,7 @@ Object.assign(ES_EN, {
   'Base de clan': 'Clan base', 'CONSTRUYE': 'BUILD', 'RAIDEA': 'RAID', 'SOBREVIVE': 'SURVIVE', 'Cimientos, paredes, una puerta y un arcón con tu botín.': 'Foundations, walls, a door and a chest for your loot.', 'Rompe las bases de otros clanes y roba sus arcones.': "Break into other clans' bases and steal their chests.", 'Forma una tribu de 3 y defiende lo vuestro.': "Form a tribe of 3 and defend what's yours.",
   'Fabrica un Arcón en el banco de trabajo y colócalo dentro de tu casa: guarda ahí tu botín. Otros clanes irán a por él.': 'Craft a Chest at the workbench and place it inside your house: keep your loot there. Other clans will come for it.',
   'Derrota a un jugador o a un bot en combate.': 'Defeat a player or a bot in combat.' });
-RULES.unshift([/^Domar \((.+)\)$/, (m) => `Tame (${tr(m[1])})`], [/^Domando: (\d+)%$/, (m) => `Taming: ${m[1]}%`], [/^(.+) ha domado un animal$/, (m) => `${m[1]} tamed an animal`], [/^(.+) \(domado\)$/, (m) => `${tr(m[1])} (tamed)`], [/^manzana o bayas$/, () => 'apple or berries'],
+RULES.unshift([/^Tu cuerpo dormido fue abatido(?: por (.+))?\. Has perdido tus pertenencias\.$/, (m) => `Your sleeping body was killed${m[1] ? ' by ' + m[1] : ''}. You lost your belongings.`], [/^Domar \((.+)\)$/, (m) => `Tame (${tr(m[1])})`], [/^Domando: (\d+)%$/, (m) => `Taming: ${m[1]}%`], [/^(.+) ha domado un animal$/, (m) => `${m[1]} tamed an animal`], [/^(.+) \(domado\)$/, (m) => `${tr(m[1])} (tamed)`], [/^manzana o bayas$/, () => 'apple or berries'],
   [/^(.+) te invita a su tribu$/, (m) => `${m[1]} invites you to their tribe`], [/^Invitar a tribu: (.+)$/, (m) => `Invite to tribe: ${m[1]}`], [/^Invitación enviada a (.+)$/, (m) => `Invitation sent to ${m[1]}`], [/^(.+) ha rechazado la invitación$/, (m) => `${m[1]} declined the invitation`],
   [/^(.+) se ha unido a la tribu$/, (m) => `${m[1]} joined the tribe`], [/^(.+) ha abandonado la tribu$/, (m) => `${m[1]} left the tribe`], [/^(.+) se ha unido$/, (m) => `${m[1]} joined`], [/^(.+) ha salido$/, (m) => `${m[1]} left`], [/^Tribu de (.+)$/, (m) => `${m[1]}'s tribe`],
   [/^Tribu: (.+)$/, (m) => `Tribe: ${m[1]}`], [/^(.+) ha abatido a (.+)$/, (m) => `${m[1]} killed ${m[2]}`], [/^Te ha abatido (.+)\. Tus pertenencias han quedado en una bolsa donde caíste \(marcada en el mapa\)\.$/, (m) => `${m[1]} took you down. Your belongings are in a bag where you fell (marked on the map).`], [/^Has muerto\. Reapareces en otro punto de la isla\.$/, () => 'You died. You respawn somewhere else on the island.']);
@@ -3994,7 +4001,7 @@ function updateBasePing() {
   const el = $('#baseping'); if (!NET.on || state !== 'playing') { if (!el.hidden) el.hidden = true; return; }
   const b = nearestFoeBase(); if (!b) { if (!el.hidden) el.hidden = true; return; }
   const head = -player.yaw * 180 / Math.PI, brg = Math.atan2(b.x - player.pos.x, -(b.z - player.pos.z)) * 180 / Math.PI, rel = Math.round(brg - head);
-  const near = b.d < 45 ? LT('¡Rómpele la puerta!', 'Break down the door!') : b.bot ? LT('clan de bots', 'bot clan') : LT('base de jugador', 'player base');
+  const near = b.d < 45 ? LT('¡Rómpele la puerta!', 'Break down the door!') : LT('base enemiga', 'enemy base');
   el.innerHTML = `<i style="transform:rotate(${rel}deg)">▲</i><span>${escH(b.name)} · <em>${Math.round(b.d)} m</em> · ${near}</span>`; el.hidden = false;
 }
 // rango y experiencia: se calcula a partir de lo que haces y se guarda entre partidas
@@ -4016,7 +4023,7 @@ function updateRank() {
   $('#rkN').textContent = `${LT('Nv.', 'Lv.')} ${lv} · ${LANG === 'es' ? r[0] : r[1]}`; $('#rkB').style.width = Math.min(100, (tot - a) / (b - a) * 100) + '%'; el.hidden = false;
   if (clock - XP.save > 10) { XP.save = clock; try { store.set('pvp-xp', String(Math.round(tot))); } catch (e) { /* sin almacenamiento */ } }
 }
-function updateHook() { if (!NET.on) return; updateBasePing(); updateRank(); }
+function updateHook() { if (!NET.on) return; updateBasePing(); updateRank(); if (clock - (NET.invT || -9) > 4) { NET.invT = clock; sendInv(); } }
 
 // ---------------------------------------------------------------- estado, entrada
 let state = 'menu', panelOpen = false, locked = false, lockWorked = false, fallbackLook = false;
@@ -4101,7 +4108,14 @@ function startGame() {
   $('#menu').hidden = true; $('#pause').hidden = true; $('#hud').hidden = false; state = 'playing'; audio(); ambientStart(); dailyChallenges(); renderPanel(true);
   if (!fallbackLook && !CG.skipLock) requestLock(); CG.skipLock = false;
 }
-function pauseGame() { if (state !== 'playing') return; state = 'paused'; mouseL = false; $('#pause').hidden = false; $('#resetConfirm').hidden = true; $('#records2').textContent = recordsText(); save(); }
+function renderPauseRoster() {
+  const box = $('#pauseRoster'); if (!NET.on) { box.hidden = true; return; }
+  const list = [...NET.roster.values()].sort((a, b) => (a.id === NET.id ? -1 : b.id === NET.id ? 1 : a.name.localeCompare(b.name)));
+  $('#prH').textContent = LT(`Jugadores en el mapa (${list.length})`, `Players on the map (${list.length})`); const L = $('#prL'); L.innerHTML = '';
+  for (const q of list) { const sp = document.createElement('span'); sp.className = (q.id === NET.id ? 'me' : '') + (q.sleep ? ' zz' : ''); sp.textContent = q.name + (q.id === NET.id ? LT(' (tú)', ' (you)') : ''); if (q.tribe) { const t = document.createElement('small'); t.textContent = q.tribe; sp.appendChild(t); } if (q.sleep) { const z = document.createElement('small'); z.textContent = 'Zzz'; sp.appendChild(z); } L.appendChild(sp); }
+  box.hidden = false;
+}
+function pauseGame() { if (state !== 'playing') return; state = 'paused'; mouseL = false; $('#pause').hidden = false; renderPauseRoster(); $('#resetConfirm').hidden = true; $('#records2').textContent = recordsText(); save(); }
 $('#btnPlay').addEventListener('click', () => { if (ONLINE && !NET.on) { audio(); netConnect(); } else startGame(); });
 $('#btnResume').addEventListener('click', startGame);
 // salir de la partida: sin conexión vuelve al menú al instante; en línea cierra la conexión y recarga directo al menú (estado limpio)
@@ -4228,7 +4242,7 @@ function primaryAction() {
   if (NET.on && a.kind === 'dep' && tool.type !== 'hammer' && a.dep.owner !== NET.tid) { netSend({ t: 'dhit', id: a.dep.sid, weapon: s ? s.id : 'fists' }); sfx.wood(); burst(a.p, 'wood', 4); if (s && maxDur(s.id) && inv.wear(sel, 1)) toast(ITEMS[s.id].name + ' se ha roto', 'bad'); return; }
   if (NET.on && a.kind === 'piece' && tool.type !== 'hammer' && a.piece.owner !== NET.tid) { netSend({ t: 'phit', key: a.piece.key, weapon: s ? s.id : 'fists' }); const st = a.piece.tier >= 2; (st ? sfx.stone : sfx.wood)(); burst(a.p, st ? 'stone' : 'wood', 4); if (s && maxDur(s.id) && inv.wear(sel, 1)) toast(ITEMS[s.id].name + ' se ha roto', 'bad'); return; }
   if (tool.type === 'hammer' && (a.kind === 'piece' || a.kind === 'dep')) { repairTarget(a); if (s && inv.wear(sel, 1)) toast('El martillo se ha roto', 'bad'); return; }
-  if (a.kind === 'dep' && a.dep.t === 'barrel') { damageDep(a.dep, tool.dmg); return; }
+  if (a.kind === 'dep' && a.dep.t === 'barrel') { if (!NET.on) damageDep(a.dep, tool.dmg); return; }
   if (a.kind === 'node') {
     const r = harvest(a.n, tool, tier); if (NET.on) netSend({ t: "swing" });
     if (r.st === 'tier') { toast(`Necesitas ${a.n.def.better} para la ${a.n.def.name.toLowerCase()}`, 'bad'); sfx.bad(); return; }
@@ -4664,7 +4678,7 @@ function drawMap() {
   if (NET.lastDeath) { const [x, y] = P(NET.lastDeath.x, NET.lastDeath.z); g.fillStyle = '#e63a2e'; g.beginPath(); g.arc(x, y - 2, 7, 0, 6.283); g.fill(); g.fillStyle = '#fff'; g.fillRect(x - 4, y + 1, 8, 5); g.fillStyle = '#e63a2e'; g.fillRect(x - 3, y + 2, 2, 3); g.fillRect(x + 1, y + 2, 2, 3); g.fillStyle = '#000'; g.fillRect(x - 4, y - 5, 3, 3); g.fillRect(x + 1, y - 5, 3, 3); label('Tu última muerte', x, y - 12); }
   for (const c of CAVES) if (c.found) { const [x, y] = P(c.x, c.z); g.fillStyle = '#222'; g.beginPath(); g.moveTo(x, y - 6); g.lineTo(x + 6, y + 5); g.lineTo(x - 6, y + 5); g.closePath(); g.fill(); g.strokeStyle = '#e8873e'; g.stroke(); label('Cueva', x, y - 10); }
   g.fillStyle = '#ece5d4'; for (const pc of pieces) if (pc.kind === 'foundation') { const [x, y] = P(pc.i * GRID, pc.j * GRID); g.fillRect(x, y, Math.max(2, GRID * k), Math.max(2, GRID * k)); }
-  if (NET.on) for (const bb of NET.bases || []) { const [x, y] = P(bb.x, bb.z), mine = bb.tid === NET.tid; g.fillStyle = mine ? '#8fd16a' : bb.bot ? '#ff9a4a' : '#ff5a4a'; g.beginPath(); g.arc(x, y, 6, 0, 6.283); g.fill(); g.strokeStyle = '#1a0f05'; g.lineWidth = 2; g.stroke(); label(mine ? LT('Tu base', 'Your base') : bb.name, x, y - 12, mine ? '#b8e89a' : '#ffd0a8'); }
+  if (NET.on) for (const bb of NET.bases || []) { const [x, y] = P(bb.x, bb.z), mine = bb.tid === NET.tid; g.fillStyle = mine ? '#8fd16a' : '#ff8a4a'; g.beginPath(); g.arc(x, y, 6, 0, 6.283); g.fill(); g.strokeStyle = '#1a0f05'; g.lineWidth = 2; g.stroke(); label(mine ? LT('Tu base', 'Your base') : bb.name, x, y - 12, mine ? '#b8e89a' : '#ffd0a8'); }
   const [px, py] = P(player.pos.x, player.pos.z); g.save(); g.translate(px, py); g.rotate(-player.yaw); g.fillStyle = '#ffd27a'; g.strokeStyle = '#1a0f05'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, -11); g.lineTo(7, 8); g.lineTo(0, 4); g.lineTo(-7, 8); g.closePath(); g.stroke(); g.fill(); g.restore();
   g.fillStyle = '#ece5d4'; g.font = '800 16px Barlow, sans-serif'; g.fillText('N', S / 2, 18);
 }
@@ -4831,10 +4845,13 @@ function makeRemote(id) {
   const b = { mdl, def: ETYPES.raider, type: 'raider', walk: 0, swing: 1, windup: 0, los: false, mode: 'remote', stun: 0, rcd: 5, fuse: -1 };
   remoteHold(mdl, info.held || '');
   mdl.g.traverse((o) => { o.userData.remote = id; });
-  const friend = info.tid === NET.tid, tag = nameTag(info.name, friend ? '#9be37a' : '#ff8a7a'); tag.position.y = 2.3 * (info.look ? Math.max(.9, Math.min(1.12, +info.look.height || 1)) : 1); mdl.g.add(tag);
+  const friend = info.tid === NET.tid, tag = nameTag(info.name + (info.sleep ? ' · Zzz' : ''), friend ? '#9be37a' : '#ff8a7a'); tag.position.y = 2.3 * (info.look ? Math.max(.9, Math.min(1.12, +info.look.height || 1)) : 1); mdl.g.add(tag);
   remoteRoot.add(mdl.g);
-  const r = { id, mdl, g: mdl.g, b, tag, pos: new THREE.Vector3(), tgt: new THREE.Vector3(), yaw: 0, tyaw: 0, hp: 100, dead: false, fresh: true, info, friend };
+  const r = { id, mdl, g: mdl.g, b, tag, pos: new THREE.Vector3(), tgt: new THREE.Vector3(), yaw: 0, tyaw: 0, hp: 100, dead: false, sleep: !!info.sleep, fresh: true, info, friend };
   NET.remotes.set(id, r); return r;
+}
+function retagRemote(r) {
+  const info = NET.roster.get(r.id) || r.info; r.g.remove(r.tag); r.tag.material.map.dispose(); r.tag = nameTag(info.name + (r.sleep ? ' · Zzz' : ''), r.friend ? '#9be37a' : '#ff8a7a'); r.tag.position.y = 2.3; r.g.add(r.tag);
 }
 function refreshRemote(r) {
   const info = NET.roster.get(r.id); if (!info) return; r.info = info; r.friend = info.tid === NET.tid;
@@ -4847,7 +4864,7 @@ function netSnap(m) {
     const id = e[0];
     if (id === NET.id) { if (state === 'playing' && e[5] > 0) player.hp = e[5]; continue; }
     seen.add(id); let r = NET.remotes.get(id) || makeRemote(id);
-    r.tgt.set(e[1], e[2], e[3]); r.tyaw = e[4]; r.hp = e[5]; r.dead = !!e[6]; r.mounted = !!e[7];
+    r.tgt.set(e[1], e[2], e[3]); r.tyaw = e[4]; r.hp = e[5]; r.dead = !!e[6]; r.mounted = !!e[7]; if (r.sleep !== !!e[8]) { r.sleep = !!e[8]; const q = NET.roster.get(id); if (q) q.sleep = e[8] ? 1 : 0; retagRemote(r); }
     if (r.fresh) { r.pos.copy(r.tgt); r.yaw = r.tyaw; r.fresh = false; }
   }
   for (const r of [...NET.remotes.values()]) if (!seen.has(r.id)) dropRemote(r);
@@ -4867,18 +4884,19 @@ function updateRemotes(dt) {
     const moved = Math.hypot(r.pos.x - px, r.pos.z - pz); r.b.walk += moved; r.b.swing = Math.min(1, r.b.swing + dt * 2.8);
     r.g.position.copy(r.pos); r.g.rotation.order = 'YXZ'; r.g.rotation.y = r.yaw;
     animViking(r.b, dt, moved);
-    r.g.rotation.x = r.dead ? -1.5 : 0; r.g.position.y = r.pos.y - (r.dead ? .1 : 0) + (r.mounted ? .95 : 0);
+    const lie = r.dead || r.sleep; r.g.rotation.x = lie ? -1.5 : 0; r.g.position.y = r.pos.y - (lie ? .1 : 0) + (r.mounted ? .95 : 0);
   }
 }
 function netMsg(m) {
   if (m.t === 'welcome') {
     dayPhase = m.phase; dayCount = m.day; if (m.wx) wxState = m.wx; NET.id = m.id; NET.tid = m.tid; NET.tribe = m.tribe; $('#btnTLeave').hidden = !m.tribe; NET.roster.clear(); for (const q of m.roster) NET.roster.set(q.id, q);
-    player.pos.set(m.x, terrainH(m.x, m.z) + .1, m.z); player.vel.set(0, 0, 0); player.hp = 100; NET.on = true; document.body.classList.add('online-on');
+    player.pos.set(m.x, Math.max(terrainH(m.x, m.z), Number.isFinite(m.y) ? m.y : -1e9) + .1, m.z); player.vel.set(0, 0, 0); player.hp = 100; NET.on = true;
+    if (m.restore) { const R = m.restore; inv.slots.fill(null); (R.slots || []).forEach((sl, i) => { if (i < inv.slots.length && sl && ITEMS[sl.id]) inv.slots[i] = { id: sl.id, n: sl.n, dur: sl.dur }; }); inv.touch(); player.armorId = R.armor && ITEMS[R.armor] ? R.armor : null; if (R.hp > 0) player.hp = R.hp; if (Number.isFinite(R.hunger) && R.hunger > 0) player.hunger = R.hunger; if (Number.isFinite(R.thirst) && R.thirst > 0) player.thirst = R.thirst; setTimeout(() => toast(LT('Vuelves a tu cuerpo: conservas todo lo que llevabas', 'You return to your body: you keep everything you were carrying'), 'info'), 1500); } document.body.classList.add('online-on');
     NET.bases = []; NET.joinT = clock; $('#netStatus').textContent = ''; clearTimeout(CG.autoT); startGame(); cgRoom(true); showBanner('Pvp-Island', LT('Construye tu base · Raidea a los clanes · Sobrevive', 'Build your base · Raid the clans · Survive'), false); if (!store.get('pvp-priv')) privacyShow(); if (m.tribe) toast(`Tribu: ${m.tribe}`, 'info');
   } else if (m.t === 'snap') netSnap(m);
-  else if (m.t === 'join') { NET.roster.set(m.id, { id: m.id, name: m.name, tid: m.tid, tribe: m.tribe, bot: m.bot, look: m.look || (NET.roster.get(m.id) || {}).look, held: m.held !== undefined ? m.held : (NET.roster.get(m.id) || {}).held }); chatAdd('', `${m.name} se ha unido`, false, true); }
+  else if (m.t === 'join') { NET.roster.set(m.id, { id: m.id, name: m.name, tid: m.tid, tribe: m.tribe, sleep: m.sleep, look: m.look || (NET.roster.get(m.id) || {}).look, held: m.held !== undefined ? m.held : (NET.roster.get(m.id) || {}).held }); chatAdd('', `${m.name} se ha unido`, false, true); }
   else if (m.t === 'tribe') {
-    NET.roster.set(m.id, { id: m.id, name: m.name, tid: m.tid, tribe: m.tribe, bot: m.bot, look: m.look || (NET.roster.get(m.id) || {}).look, held: m.held !== undefined ? m.held : (NET.roster.get(m.id) || {}).held });
+    NET.roster.set(m.id, { id: m.id, name: m.name, tid: m.tid, tribe: m.tribe, sleep: m.sleep, look: m.look || (NET.roster.get(m.id) || {}).look, held: m.held !== undefined ? m.held : (NET.roster.get(m.id) || {}).held });
     if (m.id === NET.id) { NET.tid = m.tid; NET.tribe = m.tribe; $('#btnTLeave').hidden = !m.tribe; toast(m.tribe ? `Tribu: ${m.tribe}` : 'Has abandonado la tribu', 'info'); for (const r of NET.remotes.values()) refreshRemote(r); }
     else { const r = NET.remotes.get(m.id); if (r) refreshRemote(r); }
   }
@@ -4886,7 +4904,9 @@ function netMsg(m) {
   else if (m.t === 'notice') { toast(m.text, 'info'); chatAdd('', m.text, false, true); }
   else if (m.t === 'held') { const q = NET.roster.get(m.id); if (q) q.held = m.w; const r = NET.remotes.get(m.id); if (r && r.mdl.heldId !== m.w) remoteHold(r.mdl, m.w); }
   else if (m.t === 'look') { const q = NET.roster.get(m.id); if (q) q.look = m.look; const r = NET.remotes.get(m.id); if (r) dropRemote(r); }
-  else if (m.t === 'leave') { const q = NET.roster.get(m.id); if (q) chatAdd('', `${q.name} ha salido`, false, true); NET.roster.delete(m.id); const r = NET.remotes.get(m.id); if (r) dropRemote(r); }
+  else if (m.t === 'sleep') { const q = NET.roster.get(m.id); if (q) { q.sleep = 1; chatAdd('', `${q.name} ha salido`, false, true); } const r = NET.remotes.get(m.id); if (r) { r.sleep = true; retagRemote(r); } }
+  else if (m.t === 'wake') { const q = NET.roster.get(m.id); if (q) { q.sleep = 0; if (m.name) q.name = m.name; if (m.look) q.look = m.look; if (m.id !== NET.id) chatAdd('', `${q.name} se ha unido`, false, true); } const r = NET.remotes.get(m.id); if (r) dropRemote(r); }
+  else if (m.t === 'leave') { const q = NET.roster.get(m.id); if (q && !m.killed) chatAdd('', `${q.name} ha salido`, false, true); NET.roster.delete(m.id); const r = NET.remotes.get(m.id); if (r) dropRemote(r); }
   else if (m.t === 'swing') { const r = NET.remotes.get(m.id); if (r) r.b.swing = 0; }
   else if (m.t === 'hit') { if (m.id === NET.id) { player.hp = m.hp; sfx.hurt(); camShake = Math.max(camShake, .25); ui.hurt.style.boxShadow = 'inset 0 0 160px rgba(200,30,20,.55)'; setTimeout(() => { ui.hurt.style.boxShadow = 'inset 0 0 160px rgba(200,30,20,0)'; }, 160); } else { const r = NET.remotes.get(m.id); if (r) { r.hp = m.hp; burst(r.pos.clone().setY(r.pos.y + 1.2), 'blood', 5); } } }
   else if (m.t === 'kill') {
@@ -4982,6 +5002,7 @@ function updateNetAnimals(dt) {
 function netBag(b) {
   if (NET.bags.has(b.id)) return; const g = new THREE.Group(), k = new Kit();
   k.add(gS(10, 8), MT.leather, 0, .22, 0, 0, 0, 0, .3, .26, .3); k.add(gS(7, 5), MT.leatherD, 0, .46, 0, 0, 0, 0, .12, .09, .12); k.add(gRing(.1, .02, 8), MT.rope, 0, .4, 0); k.bake(g);
+  if (b.c) { const beam = new THREE.Mesh(new THREE.CylinderGeometry(.18, .18, 14, 8, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.7, .5), transparent: true, opacity: .32, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); beam.position.y = 7; g.add(beam); }
   g.position.set(b.x, Math.max(b.y - .3, terrainH(b.x, b.z)), b.z); g.traverse((o) => { o.userData.loot = b.id; }); lootRoot.add(g); NET.bags.set(b.id, { g, id: b.id });
 }
 function netDep(d) {
@@ -5025,7 +5046,13 @@ function netDie(by, cause) {
     netSend({ t: 'drop', slots }); inv.slots.fill(null); inv.touch(); player.armorId = null; }
   player.hp = 0; state = 'dead'; mouseL = false; if (panelOpen) togglePanel(); if (locked) document.exitPointerLock(); $('#death').hidden = false;
 }
-function netClose() { cgRoom(false); try { if (NET.ws) { NET.ws.onclose = null; NET.ws.close(); } } catch (e) { /* ya cerrado */ } NET.ws = null; NET.on = false; document.body.classList.remove('online-on'); }
+function sendInv() {
+  if (!NET.on || state === 'menu' || state === 'dead') return;
+  netSend({ t: 'invfull', slots: inv.slots.map((sl) => (sl ? { id: sl.id, n: sl.n, dur: sl.dur } : null)), armor: player.armorId || null, hunger: Math.round(player.hunger), thirst: Math.round(player.thirst) });
+}
+addEventListener('pagehide', () => { try { sendInv(); } catch (e) { /* cerrando */ } });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { try { sendInv(); } catch (e) { /* oculto */ } } });
+function netClose() { try { sendInv(); } catch (e) { /* sin conexión */ } cgRoom(false); try { if (NET.ws) { NET.ws.onclose = null; NET.ws.close(); } } catch (e) { /* ya cerrado */ } NET.ws = null; NET.on = false; document.body.classList.remove('online-on'); }
 function netConnect() {
   const name = ($('#inName').value || 'Player').trim().slice(0, 16);
   let token = ''; try { store.set('pvp-name', name); token = store.get('pvp-token') || ''; if (!token) { token = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join(''); store.set('pvp-token', token); } } catch (e) { token = 'anon' + Math.random().toString(36).slice(2); }
@@ -5039,7 +5066,7 @@ function netConnect() {
 }
 function renderRooms() {
   const box = $('#roomList'); box.innerHTML = '';
-  for (const r of NET.rooms) { const b = document.createElement('button'); b.type = 'button'; b.className = 'chipbtn' + (r.map === MAP_ID ? ' on' : ''); b.textContent = `${r.name} · ${r.players}/${r.max}`; if (r.map === MAP_ID) { const ls = $('#liveStat'); if (ls) ls.textContent = LT(`● ${r.humans} jugadores · ${r.bots} bots · ${r.bases || 0} bases en este servidor`, `● ${r.humans} players · ${r.bots} bots · ${r.bases || 0} bases on this server`); } b.addEventListener('click', () => { if (r.map !== MAP_ID) { const u = new URL(location.href); u.searchParams.set('map', r.map); location.href = u.toString(); } }); box.appendChild(b); }
+  for (const r of NET.rooms) { const b = document.createElement('button'); b.type = 'button'; b.className = 'chipbtn' + (r.map === MAP_ID ? ' on' : ''); b.textContent = `${r.name} · ${r.players}/${r.max}`; if (r.map === MAP_ID) { const ls = $('#liveStat'); if (ls) ls.textContent = LT(`● ${r.players} jugadores en línea · ${r.bases || 0} bases en este servidor`, `● ${r.players} players online · ${r.bases || 0} bases on this server`); } b.addEventListener('click', () => { if (r.map !== MAP_ID) { const u = new URL(location.href); u.searchParams.set('map', r.map); location.href = u.toString(); } }); box.appendChild(b); }
 }
 function netListRooms() {
   try { const ws = new WebSocket(SERVER_URL); ws.onopen = () => ws.send(JSON.stringify({ t: 'list' })); ws.onmessage = (e) => { try { const m = JSON.parse(e.data); if (m.t === 'rooms') { NET.rooms = m.rooms; renderRooms(); ws.close(); } } catch (err) { /* ignorar */ } }; ws.onerror = () => { $('#netStatus').textContent = 'No se pudo conectar con el servidor'; }; } catch (e) { /* sin red */ }
@@ -5329,7 +5356,7 @@ setLang(LANG);
 requestAnimationFrame(frame);
 requestAnimationFrame(() => requestAnimationFrame(() => { document.body.classList.add('ready'); performance.mark('ready'); const pb = $('#btnPlay'); if (pb && typeof THREE !== 'undefined') pb.disabled = false; menuCharStart(); (async () => { if (inCG()) { await cgBoot(); cgLoaded(); } await cgAutoPlay(); })(); }));
 // gancho de pruebas: avanza la simulación sin depender de los FPS
-window.__isla = { deployables, remoteRoot, pressR(v) { mouseR = v; }, remotes: () => NET.remotes.values(), NET, netMsg, netSend, remoteHit, hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
+window.__isla = { pauseGame, renderPauseRoster, sendInv, deployables, remoteRoot, pressR(v) { mouseR = v; }, remotes: () => NET.remotes.values(), NET, netMsg, netSend, remoteHit, hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
   caveRoofs, BIOMES, biomeAt, CAVES, caveDark, caveInfo, roofH, player, inv, nodes, pieces, animals, spawnAnimal, LAKES, waterSurfaceAt, stats, giveItem, spawnBot, terrainH, spawn: SPAWN, scene, refreshEnv, renderer, POIS, destroyPiece, post, weather, setWeather(w) { wxState = w; wxTimer = 999; }, ctlData, N, CELL, HALF, camera, pieceRoot, get state() { return state; }, get aim() { return aim; }, get placement() { return placement; }, get waterAim() { return waterAim; },
   sim(sec, hold) { const n = Math.round(sec / .05); for (let k = 0; k < n; k++) { if (hold) mouseL = true; if (hold === 'click' && k === 0) clickQueued = true; waterTime.value += .05; scene.updateMatrixWorld(); tick(.05, performance.now()); } if (hold) mouseL = false; },
   setPhase(p) { dayPhase = p; } };

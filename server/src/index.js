@@ -1,6 +1,6 @@
 import { WebSocketServer } from 'ws';
 import { Room } from './room.js';
-import { brain, botName } from './bots.js';
+import { brain, BOT_NAMES } from './bots.js';
 import { botTribe, seedBases, sendBases } from './botbase.js';
 import { MAPS } from '../../shared/maps.js';
 import { loadRoom, saveRoom } from './persist.js';
@@ -15,7 +15,9 @@ export function createServer({ port = 8080, maxPlayers = 20, minPlayers = 8, dat
   const goal = (room) => Math.max(0, Math.min(room.max - 1, target.has(room.mapId) ? target.get(room.mapId) : baseOf(room)));
   // las tribus de bots tienen ids fijos (tb0, tb1...) de hasta 3 miembros: así sus bases se conservan aunque cambien los bots
   const pickTribe = (room) => { const cnt = new Map(); for (const q of room.players.values()) if (q.bot) cnt.set(q.tid, (cnt.get(q.tid) || 0) + 1); for (let k = 0; k < 8; k++) if ((cnt.get('tb' + k) || 0) < 3) return k; return 7; };
-  const addBot = (room) => { const n = botN++, k = pickTribe(room); botTribe(room, 'tb' + k, k); const p = room.join(botName(n) + (n >= 12 ? n : ''), null, null, true, 'tb' + k); if (p && botsOn) p.brain = brain; return p; };
+  // los bots usan nombres de una lista fija (sin números ni etiquetas) y nunca repiten uno ya presente en la sala
+  const pickName = (room, n) => { const used = new Set([...room.players.values()].map((q) => q.name.toLowerCase())), free = BOT_NAMES.filter((x) => !used.has(x.toLowerCase())); return free.length ? free[(Math.random() * free.length) | 0] : BOT_NAMES[n % BOT_NAMES.length] + (n % 90 + 10); };
+  const addBot = (room) => { const n = botN++, k = pickTribe(room); botTribe(room, 'tb' + k, k); const p = room.join(pickName(room, n), null, null, true, 'tb' + k); if (p && botsOn) p.brain = brain; return p; };
   const balance = (room) => { // bots hasta minPlayers; los bots dejan sitio a los humanos
     const bots = [...room.players.values()].filter((p) => p.bot);
     const g = goal(room);
@@ -38,16 +40,17 @@ export function createServer({ port = 8080, maxPlayers = 20, minPlayers = 8, dat
         if (room.count >= room.max) { const b = [...room.players.values()].find((p) => p.bot); if (b) room.leave(b); }
         me = room.join(m.name, m.token, ws, false, null, m.look);
         if (!me) { ws.send(JSON.stringify({ t: 'full' })); return; }
-        ws.send(JSON.stringify({ t: 'welcome', id: me.id, map: room.mapId, seed: room.map.seed, world: room.map.world, tid: me.tid, tribe: room.pub(me).tribe, phase: room.phase(), wx: room.wx.state, day: Math.floor((room.t + 42) / 600) + 1, x: me.x, z: me.z, roster: [...room.players.values()].map((q) => room.pub(q)) }));
+        ws.send(JSON.stringify({ t: 'welcome', id: me.id, map: room.mapId, seed: room.map.seed, world: room.map.world, tid: me.tid, tribe: room.pub(me).tribe, phase: room.phase(), wx: room.wx.state, day: Math.floor((room.t + 42) / 600) + 1, x: me.x, y: me.y, z: me.z, restore: me.restored ? { slots: me.slots || [], armor: me.armor || null, hunger: me.hunger, thirst: me.thirst, hp: Math.round(me.hp) } : undefined, roster: [...room.players.values()].map((q) => room.pub(q)) }));
         if (room.B.map.size) ws.send(JSON.stringify({ t: 'pieces', list: [...room.B.map.values()].map((q) => room.B.pub(q)) }));
         if (room.D.map.size) ws.send(JSON.stringify({ t: 'deps', list: [...room.D.map.values()].map((d) => room.D.pub(d)) }));
         if (room.nodes.size) ws.send(JSON.stringify({ t: 'nodes', list: [...room.nodes.keys()] }));
         if (room.D.bags.size) ws.send(JSON.stringify({ t: 'bags', list: [...room.D.bags.values()].map((b) => ({ id: b.id, x: b.x, y: b.y, z: b.z })) }));
-        room.sendReport(me); sendBases(room, me); balance(room); return;
+        const ds = room.deadSleepers.get(me.token); if (ds) { room.deadSleepers.delete(me.token); room.notice(me, 'Tu cuerpo dormido fue abatido' + (ds.by ? ' por ' + ds.by : '') + '. Has perdido tus pertenencias.'); }
+        me.restored = false; room.sendReport(me); sendBases(room, me); balance(room); return;
       }
       room.onMessage(me, m);
     });
-    ws.on('close', () => { if (me && room) { room.leave(me); balance(room); } });
+    ws.on('close', () => { if (me && room && me.ws === ws) { room.leave(me); balance(room); } });
   });
   return { wss, rooms, setBots(v) { botsOn = v; for (const r of rooms) for (const p of r.players.values()) if (p.bot) p.brain = v ? brain : null; }, close() { if (driftT) clearInterval(driftT); if (saver) { clearInterval(saver); rooms.forEach((r) => saveRoom(r, dataDir)); } rooms.forEach((r) => r.close()); wss.close(); } };
 }

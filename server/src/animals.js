@@ -31,7 +31,7 @@ export class Fauna {
     if (give.length) this.room.send(p, { t: 'give', items: give }); if (done) this.map.delete(a.id);
   }
   update(dt) {
-    const r = this.room, T = r.T, t = r.t, players = [...r.players.values()].filter((q) => q.dead <= 0 && q.prot <= t);
+    const r = this.room, T = r.T, t = r.t, players = [...r.players.values()].filter((q) => q.dead <= 0 && !q.sleeping && q.prot <= t);
     const counts = {}; for (const a of this.map.values()) if (!a.dead) counts[a.type] = (counts[a.type] || 0) + 1;
     for (const [type, d] of Object.entries(ANI)) if ((counts[type] || 0) < d.n && Math.random() < dt * .1) this.spawn(type);
     for (const a of [...this.map.values()]) {

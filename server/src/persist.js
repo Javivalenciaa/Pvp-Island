@@ -4,13 +4,15 @@ import path from 'node:path';
 export function snapshotRoom(r) {
   return {
     v: 1, savedAt: Date.now(), nextTribe: r.nextTribe, nextDep: r.D.next,
-    tribes: [...r.tribeInfo], tokens: [...r.tribeOfToken], names: [...r.names], reports: [...r.reports].map(([k, m]) => [k, [...m.values()]]),
+    tribes: [...r.tribeInfo], tokens: [...r.tribeOfToken], names: [...r.names], deadSleepers: [...r.deadSleepers],
+    sleepers: r.sleepers.map((q) => ({ token: q.token, name: q.name, tid: q.tid, x: q.x, y: q.y, z: q.z, yaw: q.yaw, hp: q.hp, look: q.look, held: q.held || '', slots: q.slots || [], armor: q.armor || null, hunger: q.hunger, thirst: q.thirst, bed: q.bed || 0, kills: q.kills || 0, deaths: q.deaths || 0, sleepAt: q.sleepAt })), reports: [...r.reports].map(([k, m]) => [k, [...m.values()]]),
     pieces: [...r.B.map.values()], deps: [...r.D.map.values()].map((d) => ({ ...d, cd: 0 })),
   };
 }
 export function restoreRoom(r, s) {
   if (!s || s.v !== 1) return false;
   r.nextTribe = s.nextTribe || 1; r.tribeInfo = new Map(s.tribes || []); r.tribeOfToken = new Map(s.tokens || []);
+  r.deadSleepers = new Map(s.deadSleepers || []); for (const q of s.sleepers || []) r.addSleeper(q);
   r.names = new Map(s.names || []); r.reports = new Map((s.reports || []).map(([k, l]) => [k, new Map(l.map((e) => [e.who, e]))]));
   for (const p of s.pieces || []) r.B.map.set(p.key, p);
   for (const d of s.deps || []) { r.D.map.set(d.id, d); }

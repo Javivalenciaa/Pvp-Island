@@ -2,7 +2,8 @@
 // campo de visión, oído a corta distancia, tiempo de reacción y memoria. Recolectan recursos reales del mapa,
 // fabrican herramientas, cazan, se curan y luchan con criterio (rodean, retroceden, huyen cuando conviene).
 import * as BB from './botbase.js';
-const NAMES = ['Ragnar', 'Freya', 'Bjorn', 'Astrid', 'Ulf', 'Sigrid', 'Leif', 'Ingrid', 'Thor', 'Helga', 'Erik', 'Gudrun', 'Olaf', 'Runa', 'Sven', 'Tyra', 'Harald', 'Liv', 'Knut', 'Yrsa'];
+export const BOT_NAMES = ["Ragnar", "Freya", "Bjorn", "Astrid", "Ulf", "Sigrid", "Leif", "Ingrid", "Thor", "Helga", "Erik", "Gudrun", "Olaf", "Runa", "Sven", "Tyra", "Harald", "Liv", "Knut", "Yrsa", "Rolf", "Sif", "Gunnar", "Thora", "Orm", "Hilda", "Torsten", "Maren", "Viggo", "Elsa", "Arne", "Signe", "Halvar", "Dagny", "Ivar", "Solveig", "Magnus", "Brynja", "Njal", "Embla", "Vidar", "Ragna", "Steinar", "Katla", "Asger", "Eira", "Torvald", "Ylva", "Haakon", "Gerd", "Finn", "Alva", "Kolbein", "Thyra", "Starkad", "Bodil", "Egil", "Hrafn", "Linnea", "Rurik", "Sunniva"];
+const NAMES = BOT_NAMES;
 const DT = 1 / 20, TAU = Math.PI * 2;
 const GEAR = { fists: { dmg: 4, reach: 2.2, chop: 6, mine: 5 }, stone_axe: { dmg: 13, reach: 2.6, chop: 28, mine: 12 }, stone_pick: { dmg: 13, reach: 2.6, chop: 10, mine: 30 }, hammer: { dmg: 10, reach: 2.5, chop: 8, mine: 10 },
   spear: { dmg: 26, reach: 3.5, chop: 14, mine: 12 }, iron_axe: { dmg: 22, reach: 2.8, chop: 46, mine: 20 }, iron_pick: { dmg: 22, reach: 2.8, chop: 16, mine: 46 }, iron_sword: { dmg: 48, reach: 3.0, chop: 18, mine: 16 } };
@@ -65,7 +66,7 @@ function perceive(room, p, b) {
   const t = room.t, fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), night = room.isNight, vis = night ? 16 : 32;
   let best = null, bs = 1e9;
   for (const q of room.players.values()) {
-    if (q === p || q.dead > 0 || q.tid === p.tid || q.prot > t) continue;
+    if (q === p || q.dead > 0 || q.sleeping || q.tid === p.tid || q.prot > t) continue;
     const dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz); if (d > 40) { b.alert.delete(q.id); continue; }
     const infront = (dx * fx + dz * fz) / (d || 1) > Math.cos(b.fov / 2);
     const sees = d < vis && infront && Math.abs(q.y - p.y) < 12;

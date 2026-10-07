@@ -23,7 +23,9 @@ const ch = T.chests[0], n0 = ch.slots.filter(Boolean).length; ok(n0 > 0, 'el arc
 h.x = ch.x + 1; h.z = ch.z; h.y = ch.y; h.cd = 0; room.damageDep(ch, 99999, h);
 const bag = [...room.D.bags.values()].find((b) => Math.hypot(b.x - ch.x, b.z - ch.z) < 1);
 ok(!!bag && bag.slots.length > 0, 'al destruir el arcón queda el botín en el suelo');
-log.length = 0; h.x = bag.x; h.z = bag.z; room.pickBag(h, bag.id); ok(log.some((m) => m.t === 'give' && m.items.some(([id]) => id === 'wood')), 'el jugador recoge el botín');
+for (let i = 0; i < 20 * 90; i++) room.tick();
+ok(![...room.D.map.values()].some((d) => d.t === 'chest' && d.owner === T.tid) && room.D.bags.has(bag.id), 'el arcón roto NO reaparece al instante y el botín sigue en el suelo tras 90 s');
+log.length = 0; h.hp = 100; h.dead = 0; h.x = bag.x; h.z = bag.z; room.pickBag(h, bag.id); ok(log.some((m) => m.t === 'give' && m.items.some(([id]) => id === 'wood')), 'el jugador recoge el botín');
 ok(log.length >= 0 && [...room.reports.keys()].every((k) => !k.startsWith('tb')), 'los clanes de bots no acumulan informes');
 // informe: el dueño no está conectado y le destrozan la base
 const ownerLog = []; const o = room.join('Dueña', 'tok-owner', sock(ownerLog)); o.prot = 0;
