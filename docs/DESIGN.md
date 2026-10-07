@@ -34,3 +34,15 @@
 3. Domar animales y monturas.
 4. Interiores de cuevas y minas.
 5. Persistencia (SQLite), reglas de equilibrio y despliegue.
+
+
+## Bases de bots, clanes y raids (server/src/botbase.js)
+
+- **Clanes:** los bots se agrupan en tribus fijas `tb0…tb7` de hasta 3 (nombre «Clan <Nombre>»). Los ids son estables, así que una base sigue siendo del clan aunque cambien los bots, y se guarda en disco con el resto de la sala (`tribeInfo.base/pool`).
+- **Arranque en frío:** `createServer({ bases: true })` siembra una base completa por clan (con arcón, cama, banco, hoguera, estacas y botín) separadas ≥120 m, para que desde el primer minuto haya algo que ver y raidear. Después los bots las mantienen.
+- **Construcción:** plano determinista (2×2 o 3×2 cimientos, perímetro de paredes, puerta, techo). Usa `Buildings.place` y las mismas reglas que un jugador; paga con la reserva del clan y lo que lleva cada bot. Mejora paredes y puerta a madera y luego a piedra; repara lo dañado y reconstruye lo que falta. El arcón es un espejo de la reserva del clan: lo que se roba es lo que de verdad había.
+- **Movimiento:** los bots suben a los cimientos, abren su puerta al acercarse y no atraviesan paredes (solo ellos; los humanos colisionan en el cliente).
+- **Raids:** cuando un clan tiene ≥1 bomba (4 azufre + 2 fibra + 4 madera) o 2 bots con lanza/hierro y pasa el enfriamiento (6 min), elige una base conocida (se conocen al pasar a <90 m o por tener a los suyos cerca); las bases de **jugadores solo se atacan si hay alguien del equipo conectado** (puede verlo y defenderse). Fases: reunirse a ~30 m → lanzar bombas a la puerta/pared más débil (con arco visible) → golpear con el arma → destruir el arcón → recoger el botín y llevarlo a casa. Quien defiende (bots del clan a <90 m) reacciona al primer golpe.
+- **Aviso al dueño:** `alert` (primer golpe, throttled 25 s), `ev` global (feed), `report` al volver si estaba desconectado (solo para clanes de jugadores).
+- **PvP físico más suave:** `skill` 0,42–0,68, reacción 0,7–1,5 s, menos ganas de pelear y cadencia de golpes más lenta: son buenos economía/construcción, no en el cuerpo a cuerpo.
+- **Pruebas:** `npm run bases` (simulación sin red de N minutos), `src/test_raid.js` (defensa, botín, informe), `tools/test_online_ui.js` (navegador real contra servidor local).

@@ -1,0 +1,38 @@
+// Bases de bots frente a jugadores: se pueden raidear, se defienden, avisan al dueño, y quien vuelve recibe el informe de lo ocurrido.
+import { createServer } from './index.js';
+import { bases, baseList } from './botbase.js';
+const ok = (c, m) => { console.log((c ? 'OK   ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
+const srv = createServer({ port: 0, minPlayers: { isla: 6, cordillera: 0 }, bases: true }); await new Promise((r) => srv.wss.on('listening', r));
+const room = srv.rooms[0]; for (const p of room.players.values()) p.prot = 0;
+const sock = (log) => ({ readyState: 1, send(s) { log.push(JSON.parse(s)); } });
+for (let i = 0; i < 40; i++) room.tick();
+const bs = [...bases(room, true).values()].filter((o) => o.bot);
+ok(bs.length >= 2, 'hay bases de bots desde el arranque: ' + bs.map((o) => o.name).join(', '));
+ok(bs.every((o) => o.chests.length === 1 && o.n >= 14), 'cada una con cimientos, paredes, puerta, techo y un arcón');
+ok(baseList(room).length === bs.length && baseList(room)[0].name.startsWith('Clan '), 'la lista de bases tiene nombres de clan');
+const T = bs[0], q = [...room.B.map.values()].find((p) => p.owner === T.tid && p.kind === 'wall');
+const log = []; const h = room.join('Raider', 'tok-raid', sock(log)); h.prot = 0; srv.setBots(false);
+const pc = (await import('./buildings.js')).pieceCenter(q); h.x = pc.x + 2; h.z = pc.z; h.y = pc.y;
+h.cd = 0; room.onMessage(h, { t: 'phit', key: q.key, weapon: 'iron_axe' });
+ok(room.B.get(q.key).hp < room.B.maxHp(q), 'un jugador puede dañar una pared de un clan de bots');
+const defenders = [...room.players.values()].filter((p) => p.tid === T.tid && p.ai);
+ok(defenders.length > 0 && defenders.every((p) => p.ai.target === h.id || Math.hypot(p.x - h.x, p.z - h.z) >= 90), 'los bots del clan se ponen a defender');
+ok(log.some((m) => m.t === 'ev' && m.k === 'raid' && m.a === 'Raider'), 'el feed anuncia "Raider está raideando a <clan>"');
+// arcón: destruirlo suelta el botín
+const ch = T.chests[0], n0 = ch.slots.filter(Boolean).length; ok(n0 > 0, 'el arcón del clan tiene botín (' + ch.slots.filter(Boolean).map((s) => s.id + '×' + s.n).join(' ') + ')');
+h.x = ch.x + 1; h.z = ch.z; h.y = ch.y; h.cd = 0; room.damageDep(ch, 99999, h);
+const bag = [...room.D.bags.values()].find((b) => Math.hypot(b.x - ch.x, b.z - ch.z) < 1);
+ok(!!bag && bag.slots.length > 0, 'al destruir el arcón queda el botín en el suelo');
+log.length = 0; h.x = bag.x; h.z = bag.z; room.pickBag(h, bag.id); ok(log.some((m) => m.t === 'give' && m.items.some(([id]) => id === 'wood')), 'el jugador recoge el botín');
+ok(log.length >= 0 && [...room.reports.keys()].every((k) => !k.startsWith('tb')), 'los clanes de bots no acumulan informes');
+// informe: el dueño no está conectado y le destrozan la base
+const ownerLog = []; const o = room.join('Dueña', 'tok-owner', sock(ownerLog)); o.prot = 0;
+room.B.place({ kind: 'foundation', i: 40, j: 40, L: 0, top: 3, bottom: 2 }, o.tid, 0); room.B.place({ kind: 'wall', i: 40, j: 40, dir: 'h', L: 0, top: 3 }, o.tid, 1);
+room.leave(o);
+const bot = [...room.players.values()].find((p) => p.bot); const wall = room.B.get('Wh40,40,0');
+room.damagePiece(wall, 9999, bot);
+ok(room.reports.get(o.tid) && room.reports.get(o.tid).size === 1, 'se guarda un informe para el dueño ausente');
+const back = []; const o2 = room.join('Dueña', 'tok-owner', sock(back)); room.sendReport(o2);
+const rep = back.find((m) => m.t === 'report'); ok(rep && rep.list[0].who.startsWith('Clan ') && rep.list[0].pieces >= 1, 'al volver recibe el informe: ' + (rep ? JSON.stringify(rep.list[0]) : ''));
+ok(!room.reports.has(o.tid), 'y el informe se vacía');
+srv.close(); process.exit(process.exitCode || 0);

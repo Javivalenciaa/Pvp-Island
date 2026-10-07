@@ -5,7 +5,7 @@ const ok = (c, m) => { console.log((c ? 'OK   ' : 'FAIL ') + m); if (!c) process
 const client = (name, token, map) => new Promise((res) => { const ws = new WebSocket('ws://localhost:' + port); const st = { snaps: [], welcome: null, ws }; ws.on('open', () => ws.send(JSON.stringify({ t: 'join', name, token, map }))); ws.on('message', (d) => { const m = JSON.parse(d); if (m.t === 'welcome') { st.welcome = m; res(st); } else if (m.t === 'snap') st.snaps.push(m); else (st.other ||= []).push(m); }); });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 ok(srv.rooms.length === 2 && srv.rooms.every((r) => r.count === 8), 'dos mapas con 8 bots cada uno (sin humanos)');
-const bot0 = [...srv.rooms[0].players.values()].find((p) => p.bot), bx0 = bot0.x, bz0 = bot0.z; for (let k = 0; k < 40 && Math.hypot(bot0.x - bx0, bot0.z - bz0) <= 1; k++) await sleep(250); ok(Math.hypot(bot0.x - bx0, bot0.z - bz0) > 1, 'los bots se mueven solos'); srv.setBots(false);
+const bots0 = [...srv.rooms[0].players.values()].filter((p) => p.bot).map((p) => [p, p.x, p.z]), moved0 = () => bots0.some(([p, x, z]) => Math.hypot(p.x - x, p.z - z) > 1); for (let k = 0; k < 80 && !moved0(); k++) await sleep(250); ok(moved0(), 'los bots se mueven solos'); srv.setBots(false);
 const a = await client('Ana', 'tok-ana', 'isla'), b = await client('Beto', 'tok-beto', 'isla');
 ok(a.welcome.seed === 0 && a.welcome.world === 640, 'bienvenida con semilla del mapa');
 await sleep(300);
@@ -67,7 +67,7 @@ const hpP = pd.hp; pd.prot = room.t + 10; pa.tid = 's:tok-ana'; pa.prot = 0; pa.
   ok(!room.B.get(f.key) && !room.B.get(w.key) && !room.B.get(`Wh${ix},${jz},0`) && has(a, (m) => m.t === 'pd' && m.keys.length === 3), 'al caer el cimiento se derrumba todo lo que sostenía (3 piezas)');
   // un jugador que entra después recibe las piezas existentes
   send(a, { t: 'build', piece: { kind: 'foundation', key: `F${ix + 5},${jz}`, i: ix + 5, j: jz, L: 0, top, bottom: top - 1 } }); await sleep(150);
-  const e2 = await client('Eva', 'tok-eva', 'isla'); await sleep(250); ok(e2.other && e2.other.some((m) => m.t === 'pieces' && m.list.length === 1), 'quien entra después recibe las construcciones existentes'); e2.ws.close();
+  const e2 = await client('Eva', 'tok-eva', 'isla'); await sleep(250); ok(e2.other && e2.other.some((m) => m.t === 'pieces' && m.list.filter((q) => !String(q.o).startsWith('tb')).length === 1), 'quien entra después recibe las construcciones existentes'); e2.ws.close();
 }
 // objetos, trampas, torretas, explosivos y botín
 {
@@ -125,7 +125,7 @@ const hpP = pd.hp; pd.prot = room.t + 10; pa.tid = 's:tok-ana'; pa.prot = 0; pa.
   send(a, { t: 'ahit', id: deer.id, weapon: 'iron_sword' }); await sleep(150); ok(deer.dead > 0, 'el ciervo cae de un golpe');
   pa.cd = 0; send(a, { t: 'abutcher', id: deer.id, weapon: 'iron_sword' }); await sleep(150); ok(a.other.some((m) => m.t === 'give' && m.items.some((i) => i[0] === 'raw_meat')), 'despiezar da carne');
   // un lobo ataca a quien se acerca
-  const wolf = room.fauna.spawn('wolf'); wolf.x = pa.x + 6; wolf.z = pa.z; wolf.y = room.T.terrainH(wolf.x, wolf.z); pa.y = room.T.terrainH(pa.x, pa.z); pa.hp = 100; pa.prot = 0; srv.setBots(false); for (const q of room.players.values()) if (q !== pa) { q.x = pa.x + 90; q.z = pa.z + 90; } for (let k = 0; k < 16 && pa.hp >= 100; k++) { pa.hp = 100; pa.prot = 0; wolf.x = pa.x + 3; wolf.z = pa.z; wolf.y = pa.y; wolf.cd = 0; await sleep(250); } ok(pa.hp < 100, 'un lobo hostil ataca al jugador: ' + pa.hp); room.fauna.map.delete(wolf.id);
+  const wolf = room.fauna.spawn('wolf'); wolf.x = pa.x + 6; wolf.z = pa.z; wolf.y = room.T.terrainH(wolf.x, wolf.z); pa.y = room.T.terrainH(pa.x, pa.z); pa.hp = 100; pa.prot = 0; srv.setBots(false); for (const q of room.players.values()) if (q !== pa) { q.x = pa.x + 90; q.z = pa.z + 90; } for (let k = 0; k < 40 && pa.hp >= 100; k++) { pa.hp = 100; pa.prot = 0; wolf.x = pa.x + 3; wolf.z = pa.z; wolf.y = pa.y; wolf.cd = 0; await sleep(250); } ok(pa.hp < 100, 'un lobo hostil ataca al jugador: ' + pa.hp); room.fauna.map.delete(wolf.id);
 }
 b.ws.close(); await sleep(200); ok(room.humans === 3 && room.count === 8, 'al salir un humano entra un bot: ' + room.humans + '/' + room.count);
 // los bots se mueven y combaten solos

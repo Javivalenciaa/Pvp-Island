@@ -177,6 +177,24 @@ body.touch #bottom{transform:scale(.68);transform-origin:bottom center}
 #tbuild #tDem{bottom:calc(100px + env(safe-area-inset-bottom,0px))}
 #cross.draw{transition:transform .25s}
 .qrow .chipbtn{margin-left:4px}
+#feed{position:absolute;right:calc(16px + env(safe-area-inset-right,0px));top:calc(112px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:3px;align-items:flex-end;max-width:min(340px,48vw);pointer-events:none}
+#feed .ev{background:rgba(13,18,16,.7);border-right:3px solid var(--ember);padding:4px 9px;border-radius:3px;font-size:13px;line-height:1.3;color:var(--bone);text-align:right;animation:feedin .25s ease-out;transition:opacity .6s}
+#feed .ev.raid{border-color:#ff5a3a}#feed .ev.loot{border-color:#ffd27a}#feed .ev.base{border-color:#8fbf6a}
+#feed .ev b{font-weight:700;color:#ffd7a8}
+@keyframes feedin{from{transform:translateX(14px);opacity:0}to{transform:none;opacity:1}}
+#baseping{position:absolute;left:50%;top:calc(54px + env(safe-area-inset-top,0px));transform:translateX(-50%);padding:5px 12px;font-size:13px;font-weight:600;white-space:nowrap;display:flex;gap:8px;align-items:center}
+#baseping i{display:inline-block;font-style:normal;color:#ff9a5a;font-size:15px;line-height:1}
+#baseping em{font-style:normal;color:#ffd7a8}
+#rank{position:absolute;right:calc(16px + env(safe-area-inset-right,0px));top:calc(74px + env(safe-area-inset-top,0px));padding:5px 10px;min-width:150px;text-align:right}
+#rank .n{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#ffd7a8}
+#rank .b{display:block;height:4px;margin-top:4px;background:rgba(236,229,212,.15);border-radius:2px;overflow:hidden}#rank .b i{display:block;height:100%;width:0;background:var(--ember);transition:width .4s}
+body.touch #rank{top:calc(12px + env(safe-area-inset-top,0px))}body.touch #feed{top:calc(56px + env(safe-area-inset-top,0px))}body.touch #baseping{top:calc(50px + env(safe-area-inset-top,0px));font-size:11px;padding:3px 8px}
+.howto{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:2px 0}
+.howto div{background:rgba(236,229,212,.06);border:1px solid rgba(236,229,212,.12);border-radius:6px;padding:8px 10px;font-size:13px;line-height:1.35;color:#d6d0bf}
+.howto b{display:block;font-family:var(--display);letter-spacing:.08em;font-size:15px;color:var(--ember);margin-bottom:2px}
+.live{margin:0;font-size:13px;color:#ffd7a8;min-height:18px}
+@media (max-width:640px){.howto{grid-template-columns:1fr}.howto div{padding:5px 8px}}
+@media (max-height:520px){.howto{display:none}}
 #toasts{position:absolute;left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(120px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:4px;align-items:flex-start}
 .toast{padding:5px 10px;font-size:14px;font-weight:600;border-radius:4px;background:rgba(10,14,12,.75);border-left:3px solid var(--moss);animation:tin .2s ease-out}
 .toast.bad{border-left-color:var(--blood)}
@@ -203,7 +221,7 @@ body.touch #bottom{transform:scale(.68);transform-origin:bottom center}
 .maplegend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);align-items:center}
 .maplegend .close{margin-left:auto;color:var(--bone)}
 .lg{display:inline-block;width:10px;height:10px;margin-right:6px;border-radius:2px;vertical-align:-1px}
-.lg.you{background:#ffd27a}.lg.poi{background:var(--ember)}.lg.base{background:#ece5d4}.lg.ore{background:#c9692b}
+.lg.you{background:#ffd27a}.lg.poi{background:var(--ember)}.lg.base{background:#ece5d4}.lg.ore{background:#c9692b}.lg.clan{background:#ff9a4a;border-radius:50%}
 #hurt{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 160px rgba(200,30,20,.0);transition:box-shadow .35s}
 
 /* Panel inventario/crafteo */
@@ -367,6 +385,9 @@ body:not(.ready) .glass{backdrop-filter:none;-webkit-backdrop-filter:none}
   <div id="invring" hidden><i id="invbar"></i><span id="invtxt"></span></div>
   <div id="invite" class="glass" hidden><span id="invwho"></span><button type="button" id="invYes">Aceptar [Y]</button><button type="button" id="invNo">Rechazar [N]</button></div>
   <div id="toasts"></div>
+  <div id="feed"></div>
+  <div id="baseping" class="glass" hidden></div>
+  <div id="rank" class="glass" hidden><div class="n" id="rkN"></div><span class="b"><i id="rkB"></i></span></div>
   <div id="banner" hidden><div class="t" id="bannerT"></div><div class="s" id="bannerS"></div></div>
   <div id="bossbar" hidden><div class="n">Señor de la Guerra</div><div class="b"><i id="bossHp"></i></div></div>
   <div id="report" class="glass" hidden></div>
@@ -374,7 +395,7 @@ body:not(.ready) .glass{backdrop-filter:none;-webkit-backdrop-filter:none}
   <div id="bottom"><div id="itemname"></div><div id="armorInfo"></div><div class="need air" id="airwrap" hidden><span>Aire</span><i id="airbar" style="width:100%"></i></div><div id="health"><i id="hpbar" style="width:100%"></i></div><div id="needs"><div class="need food" id="foodwrap"><span>Hambre</span><i id="foodbar" style="width:100%"></i></div><div class="need drink" id="drinkwrap"><span>Sed</span><i id="drinkbar" style="width:100%"></i></div><div class="need stam" id="stamwrap"><span>Energía</span><i id="stambar" style="width:100%"></i></div></div><div id="hotbar"></div></div>
 </div>
 
-<div id="map" hidden><div class="mapwrap glass"><canvas id="mapc" width="760" height="760"></canvas><div class="maplegend"><span><i class="lg you"></i>Tú</span><span><i class="lg poi"></i>Lugar descubierto</span><span><i class="lg base"></i>Tu base</span><span><i class="lg ore"></i>Hierro</span><span class="close">M para cerrar</span></div></div></div>
+<div id="map" hidden><div class="mapwrap glass"><canvas id="mapc" width="760" height="760"></canvas><div class="maplegend"><span><i class="lg you"></i>Tú</span><span><i class="lg poi"></i>Lugar descubierto</span><span><i class="lg base"></i>Tu base</span><span><i class="lg ore"></i>Hierro</span><span><i class="lg clan"></i>Base de clan</span><span class="close">M para cerrar</span></div></div></div>
 <div id="panel" hidden>
   <div class="wrap">
     <div class="col">
@@ -399,7 +420,9 @@ body:not(.ready) .glass{backdrop-filter:none;-webkit-backdrop-filter:none}
   <div id="menuChar"><canvas id="menuPrev" width="520" height="720"></canvas><button class="btn ghost" id="btnLook" type="button">Personalizar personaje</button></div>
   <div class="card glass">
     <h1 class="brand">Pvp-<span>Island</span></h1>
-    <p class="lede">Despiertas en una isla salvaje sin nada. Recoge recursos, caza, doma caballos, construye tu base y forma una tribu de hasta 3 jugadores. Explora desiertos, junglas, pantanos y cuevas, y defiende lo que construyes: aquí nadie está a salvo, ni siquiera cuando te desconectas.</p>
+    <p class="lede">Una isla, muchos clanes y una sola ley: lo que construyes puede ser raideado. Recoge recursos, levanta tu base, guarda tu botín en un arcón y asalta las bases de otros jugadores y clanes. Forma una tribu de hasta 3 y defiende lo vuestro: aquí nadie está a salvo, ni siquiera cuando te desconectas.</p>
+    <div class="howto"><div><b>CONSTRUYE</b>Cimientos, paredes, una puerta y un arcón con tu botín.</div><div><b>RAIDEA</b>Rompe las bases de otros clanes y roba sus arcones.</div><div><b>SOBREVIVE</b>Forma una tribu de 3 y defiende lo vuestro.</div></div>
+    <p class="live" id="liveStat"></p>
     <div class="ctas" id="menuBtns">
       <button class="btn" id="btnPlay" type="button" disabled>Jugar</button>
       <div id="boot"><i></i><span>Cargando el mundo…</span></div>
@@ -616,6 +639,11 @@ Object.assign(ES_EN, { 'Nombre': 'Name', 'Tribu (opcional)': 'Tribe (optional)',
   'Aceptar [Y]': 'Accept [Y]', 'Rechazar [N]': 'Decline [N]', 'Abandonar tribu': 'Leave tribe', 'Clic der. (mantener)': 'Right click (hold)', 'Invitar a tribu': 'Invite to tribe', 'Chat': 'Chat', 'Enter': 'Enter',
   'Está demasiado lejos': 'They are too far away', 'Ese jugador ya tiene tribu': 'That player already has a tribe', 'Tu tribu está completa (máximo 3)': 'Your tribe is full (maximum 3)', 'Esa tribu está completa (máximo 3)': 'That tribe is full (maximum 3)', 'Ya tienes tribu': 'You already have a tribe',
   'Tu tribu se ha disuelto': 'Your tribe has been dissolved', 'No tienes tribu': "You don't have a tribe", 'Has abandonado la tribu': 'You left the tribe', 'Escribe y pulsa Enter (/t para tu tribu)': 'Type and press Enter (/t for your tribe)' });
+Object.assign(ES_EN, {
+  'Una isla, muchos clanes y una sola ley: lo que construyes puede ser raideado. Recoge recursos, levanta tu base, guarda tu botín en un arcón y asalta las bases de otros jugadores y clanes. Forma una tribu de hasta 3 y defiende lo vuestro: aquí nadie está a salvo, ni siquiera cuando te desconectas.': "One island, many clans and a single law: whatever you build can be raided. Gather resources, build your base, stash your loot in a chest and raid the bases of other players and clans. Form a tribe of up to 3 and defend what's yours: nobody is safe here, not even when you log off.",
+  'Base de clan': 'Clan base', 'CONSTRUYE': 'BUILD', 'RAIDEA': 'RAID', 'SOBREVIVE': 'SURVIVE', 'Cimientos, paredes, una puerta y un arcón con tu botín.': 'Foundations, walls, a door and a chest for your loot.', 'Rompe las bases de otros clanes y roba sus arcones.': "Break into other clans' bases and steal their chests.", 'Forma una tribu de 3 y defiende lo vuestro.': "Form a tribe of 3 and defend what's yours.",
+  'Fabrica un Arcón en el banco de trabajo y colócalo dentro de tu casa: guarda ahí tu botín. Otros clanes irán a por él.': 'Craft a Chest at the workbench and place it inside your house: keep your loot there. Other clans will come for it.',
+  'Derrota a un jugador o a un bot en combate.': 'Defeat a player or a bot in combat.' });
 RULES.unshift([/^Domar \((.+)\)$/, (m) => `Tame (${tr(m[1])})`], [/^Domando: (\d+)%$/, (m) => `Taming: ${m[1]}%`], [/^(.+) ha domado un animal$/, (m) => `${m[1]} tamed an animal`], [/^(.+) \(domado\)$/, (m) => `${tr(m[1])} (tamed)`], [/^manzana o bayas$/, () => 'apple or berries'],
   [/^(.+) te invita a su tribu$/, (m) => `${m[1]} invites you to their tribe`], [/^Invitar a tribu: (.+)$/, (m) => `Invite to tribe: ${m[1]}`], [/^Invitación enviada a (.+)$/, (m) => `Invitation sent to ${m[1]}`], [/^(.+) ha rechazado la invitación$/, (m) => `${m[1]} declined the invitation`],
   [/^(.+) se ha unido a la tribu$/, (m) => `${m[1]} joined the tribe`], [/^(.+) ha abandonado la tribu$/, (m) => `${m[1]} left the tribe`], [/^(.+) se ha unido$/, (m) => `${m[1]} joined`], [/^(.+) ha salido$/, (m) => `${m[1]} left`], [/^Tribu de (.+)$/, (m) => `${m[1]}'s tribe`],
@@ -628,7 +656,7 @@ function tr(s) {
   if (r === undefined) {
     r = ES_EN[key];
     if (r === undefined) for (const [re, f] of RULES) { const m = key.match(re); if (m) { const o = f(m); if (o != null) { r = o; break; } } }
-    if (r === undefined && /[.!?·] /.test(key)) { const parts = key.split(/(?<=[.!?])\s+|\s·\s/), sep = key.includes(' · ') && !/[.!?] /.test(key) ? ' · ' : ' '; const o = parts.map((p) => tr(p)); if (o.some((p, i) => p !== parts[i])) r = o.join(sep); }
+    if (r === undefined && /[.!?·] /.test(key)) { const parts = key.split(/(?<=[.!?])\s+|\s·\s/), sep = key.includes(' · ') && !/[.!?] /.test(key) ? ' · ' : ' '; if (parts.length > 1) { const o = parts.map((p) => tr(p)); if (o.some((p, i) => p !== parts[i])) r = o.join(sep); } }
     if (r === undefined) r = key;
     if (trCache.size > 3000) trCache.clear(); trCache.set(key, r);
   }
@@ -3896,14 +3924,99 @@ function bearing(tx, tz) {
   const names = ['norte', 'noreste', 'este', 'sureste', 'sur', 'suroeste', 'oeste', 'noroeste'];
   return `${Math.round(d)} m al ${names[Math.round(ang / 45) % 8]}`;
 }
+// ---------------------------------------------------------------- en línea: bases visibles, feed, rango y objetivos del bucle PvP
+const LT = (es, en) => (LANG === 'es' ? es : en);
+const escH = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const foeBases = () => ((NET.bases || []).filter((b) => b.tid !== NET.tid && (b.n > 0 || b.chest)));
+function nearestFoeBase() { let best = null, bd = 1e9; for (const b of foeBases()) { const d = Math.hypot(b.x - player.pos.x, b.z - player.pos.z); if (d < bd) { bd = d; best = b; } } return best ? Object.assign({}, best, { d: bd }) : null; }
+function bearingLT(tx, tz) { const dx = tx - player.pos.x, dz = tz - player.pos.z, d = Math.round(Math.hypot(dx, dz)), i = Math.round(((Math.atan2(dx, -dz) * 180 / Math.PI + 360) % 360) / 45) % 8; return LANG === 'es' ? `${d} m al ${['norte', 'noreste', 'este', 'sureste', 'sur', 'suroeste', 'oeste', 'noroeste'][i]}` : `${d} m ${COMPASS_EN[i]}`; }
+const ONLINE_OBJ = [
+  { t: 'Golpea un árbol con las manos hasta reunir 20 de madera.', ok: () => (stats.got.wood || 0) >= 20 },
+  { t: () => { const b = nearestFoeBase(); return b ? LT(`Hay una base cerca: ${b.name}. Acércate a verla: aquí se construye… y se raidea.`, `There is a base nearby: ${b.name}. Go take a look: on this island people build… and raid.`) : LT('Explora la isla: otros clanes tienen bases. Busca construcciones.', 'Explore the island: other clans have bases. Look for buildings.'); },
+    ok: () => { const b = nearestFoeBase(); return (!!b && b.d < 38) || clock - (NET.joinT || 0) > 150; }, dir: nearestFoeBase, dirF: (od) => LT('La base está a ', 'The base is ') + bearingLT(od.x, od.z) },
+  { t: 'Golpea una roca gris hasta reunir 10 de piedra.', ok: () => (stats.got.stone || 0) >= 10 },
+  { t: 'Abre la mochila con Tab y fabrica un hacha de piedra.', ok: () => stats.crafted.stone_axe },
+  { t: 'Fabrica también un pico de piedra. Pon el hacha en la barra (1–6) para talar más rápido.', ok: () => stats.crafted.stone_pick },
+  { t: 'Tienes sed. Busca un lago de agua dulce, apunta al agua y pulsa E para beber. El mar es salado.', ok: () => (stats.drank || 0) >= 1, dir: () => nearestLake() },
+  { t: 'Come algo: recoge bayas o manzanas, selecciónalas en la barra y haz clic.', ok: () => (stats.ate || 0) >= 1 },
+  { t: 'Fabrica un banco de trabajo, selecciónalo en la barra y colócalo con clic.', ok: () => stats.placed.workbench },
+  { t: () => { const b = nearestFoeBase(); return b ? LT(`Primer raid: rompe la puerta o una pared de ${b.name} con tu hacha, destruye su arcón y quédate el botín.`, `First raid: break ${b.name}'s door or a wall with your axe, destroy its chest and keep the loot.`) : LT('Primer raid: encuentra una base, rompe su puerta y roba su arcón.', 'First raid: find a base, break its door and steal its chest.'); },
+    ok: () => (stats.raidChests || 0) >= 1 && (stats.looted || 0) >= 1, dir: nearestFoeBase, dirF: (od) => LT('Su base está a ', 'Their base is ') + bearingLT(od.x, od.z) },
+  { t: 'Pulsa B para construir y coloca un cimiento en el suelo.', ok: () => stats.placed.foundation },
+  { t: 'Levanta 3 paredes y una puerta sobre los cimientos (teclas 2 y 3 en modo construcción).', ok: () => (stats.placed.wall || 0) >= 3 && (stats.placed.door || 0) >= 1 },
+  { t: 'Fabrica un Arcón en el banco de trabajo y colócalo dentro de tu casa: guarda ahí tu botín. Otros clanes irán a por él.', ok: () => stats.placed.chest },
+  { t: 'Mejora una pieza: en modo construcción, apunta a ella y pulsa E.', ok: () => stats.upgraded >= 1 },
+  { t: 'Defiende la entrada: coloca estacas, un cepo o una empalizada delante de la puerta.', ok: () => stats.placed.spikes || stats.placed.beartrap || stats.placed.palisade },
+  { t: 'Ve a la montaña y saca 10 de mineral de hierro con el pico de piedra.', ok: () => (stats.got.ore || 0) >= 10, dir: MOUNT },
+  { t: 'Fabrica un horno junto al banco y funde 5 lingotes de hierro.', ok: () => (stats.crafted.ingot || 0) >= 5 },
+  { t: 'Forja un hacha de hierro en el banco de trabajo.', ok: () => stats.crafted.iron_axe },
+  { t: 'Derrota a un jugador o a un bot en combate.', ok: () => (stats.kills || 0) >= 1 },
+];
+const objList = () => (NET.on ? ONLINE_OBJ : OBJECTIVES);
 function updateObjective() {
-  while (objIndex < OBJECTIVES.length && OBJECTIVES[objIndex].ok()) { objIndex++; if (objIndex < OBJECTIVES.length) { toast('Objetivo completado', 'info'); cgHappy(); sfx.craft(); } }
-  if (objIndex >= OBJECTIVES.length) { ui.objLab.textContent = 'Señor de la isla'; ui.objTxt.textContent = 'Has completado la historia. Cada noche llegan más Errantes: ¿hasta qué noche aguantarás?'; ui.objSub.textContent = recordsText(); return; }
-  const o = OBJECTIVES[objIndex];
-  ui.objLab.textContent = `Objetivo ${objIndex + 1} de ${OBJECTIVES.length}`; ui.objTxt.textContent = o.t;
+  const LIST = objList();
+  while (objIndex < LIST.length && LIST[objIndex].ok()) { objIndex++; if (objIndex < LIST.length) { toast('Objetivo completado', 'info'); cgHappy(); sfx.craft(); } }
+  if (objIndex >= LIST.length) {
+    if (NET.on) { ui.objLab.textContent = LT('Señor de la isla', 'Lord of the island'); ui.objTxt.textContent = LT('Has completado la historia. Raidea más bases, sube de rango y aguanta con tu tribu.', 'Story complete. Raid more bases, climb the ranks and hold out with your tribe.'); ui.objSub.textContent = ''; return; }
+    ui.objLab.textContent = 'Señor de la isla'; ui.objTxt.textContent = 'Has completado la historia. Cada noche llegan más Errantes: ¿hasta qué noche aguantarás?'; ui.objSub.textContent = recordsText(); return;
+  }
+  const o = LIST[objIndex];
+  ui.objLab.textContent = `Objetivo ${objIndex + 1} de ${LIST.length}`; ui.objTxt.textContent = typeof o.t === 'function' ? o.t() : o.t;
   const od = typeof o.dir === 'function' ? o.dir() : o.dir;
-  ui.objSub.textContent = od ? (o.dirLab || (o.dir === MOUNT ? 'La montaña está a ' : 'El lago más cercano está a ')) + bearing(od.x, od.z) : (siege.active ? 'Asedio en curso: defiende el Arcón.' : '');
+  ui.objSub.textContent = od ? (o.dirF ? o.dirF(od) : (o.dirLab || (o.dir === MOUNT ? 'La montaña está a ' : 'El lago más cercano está a ')) + bearing(od.x, od.z)) : (siege.active ? 'Asedio en curso: defiende el Arcón.' : '');
 }
+// feed del mundo: lo que pasa en el servidor (raids, saqueos, bases nuevas)
+const feedEl = $('#feed');
+function feedAdd(html, cls) {
+  const el = document.createElement('div'); el.className = 'ev ' + (cls || ''); el.innerHTML = html; feedEl.appendChild(el);
+  while (feedEl.children.length > 5) feedEl.firstChild.remove();
+  setTimeout(() => { el.style.opacity = 0; setTimeout(() => el.remove(), 700); }, 9000);
+}
+function onWorldEvent(m) {
+  const a = `<b>${escH(m.a)}</b>`, b = m.b ? `<b>${escH(m.b)}</b>` : '';
+  if (m.k === 'raid') feedAdd(LT(`${a} está raideando a ${b}`, `${a} is raiding ${b}`), 'raid');
+  else if (m.k === 'chest') feedAdd(LT(`${a} ha destruido el arcón de ${b}`, `${a} destroyed ${b}'s chest`), 'loot');
+  else if (m.k === 'loot') feedAdd(LT(`${a} se lleva el botín de ${b}`, `${a} grabs the loot from ${b}`), 'loot');
+  else if (m.k === 'haul') feedAdd(LT(`${a} vuelve a casa con el botín de ${b}`, `${a} brings ${b}'s loot home`), 'loot');
+  else if (m.k === 'base') feedAdd(LT(`${a} ha terminado su base`, `${a} finished building their base`), 'base');
+}
+function onBaseAlert(m) {
+  toast(m.k === 'incoming' ? LT(`¡${m.by} prepara un asalto contra tu base!`, `${m.by} is preparing a raid on your base!`) : LT(`¡${m.by} está atacando tu base!`, `${m.by} is attacking your base!`), 'bad');
+  sfx.bell(); siege.baseHitT = clock;
+}
+function onRaidReport(m) {
+  const el = $('#report'), rows = m.list.map((e) => { const p = []; if (e.pieces) p.push(LT(`${e.pieces} piezas destruidas`, `${e.pieces} pieces destroyed`)); if (e.chest) p.push(LT('arcón robado', 'chest looted')); if (e.deps) p.push(LT(`${e.deps} objetos`, `${e.deps} objects`)); return `<div class="row"><span>${escH(e.who)}</span><b class="bad">${p.join(' · ') || '—'}</b></div>`; }).join('');
+  el.innerHTML = `<div class="lab">${LT('Mientras estabas fuera', 'While you were away')}</div><h3>${LT('Han raideado tu base', 'Your base was raided')}</h3>${rows}<div class="x">${LT('Repárala con el martillo y refuerza los muros. Para la revancha, busca su base en el mapa (M).', 'Repair it with the hammer and reinforce the walls. For revenge, find their base on the map (M).')}</div>`;
+  el.hidden = false; reportT = 16; sfx.bell();
+}
+// brújula a la base enemiga más cercana
+function updateBasePing() {
+  const el = $('#baseping'); if (!NET.on || state !== 'playing') { if (!el.hidden) el.hidden = true; return; }
+  const b = nearestFoeBase(); if (!b) { if (!el.hidden) el.hidden = true; return; }
+  const head = -player.yaw * 180 / Math.PI, brg = Math.atan2(b.x - player.pos.x, -(b.z - player.pos.z)) * 180 / Math.PI, rel = Math.round(brg - head);
+  const near = b.d < 45 ? LT('¡Rómpele la puerta!', 'Break down the door!') : b.bot ? LT('clan de bots', 'bot clan') : LT('base de jugador', 'player base');
+  el.innerHTML = `<i style="transform:rotate(${rel}deg)">▲</i><span>${escH(b.name)} · <em>${Math.round(b.d)} m</em> · ${near}</span>`; el.hidden = false;
+}
+// rango y experiencia: se calcula a partir de lo que haces y se guarda entre partidas
+const RANKS = [['Náufrago', 'Castaway'], ['Recolector', 'Gatherer'], ['Constructor', 'Builder'], ['Cazador', 'Hunter'], ['Saqueador', 'Raider'], ['Guerrero', 'Warrior'], ['Señor de clan', 'Clan lord'], ['Rey de la isla', 'King of the island']];
+const xpAt = (lv) => 25 * (lv - 1) * lv;
+const XP = { base: -1, sess: 0, lv: 0, save: 0 };
+function sessionXp() {
+  const sum = (o) => Object.values(o || {}).reduce((a, v) => a + (+v || 0), 0);
+  return Math.floor(sum(stats.got) * .4 + sum(stats.crafted) * 4 + sum(stats.placed) * 3 + (stats.upgraded || 0) * 5 + (stats.kills || 0) * 25 + (stats.raidPieces || 0) * 6 + (stats.raidChests || 0) * 40 + (stats.looted || 0) * 40 + (stats.crates || 0) * 20 + objIndex * 25 + clock / 60 * 3);
+}
+function updateRank() {
+  const el = $('#rank'); if (!NET.on || state === 'menu') { el.hidden = true; return; }
+  if (XP.base < 0) { XP.base = 0; try { XP.base = +store.get('pvp-xp') || 0; } catch (e) { /* sin almacenamiento */ } }
+  const sx = sessionXp(), gain = sx - XP.sess; XP.sess = sx; const tot = XP.base + sx;
+  let lv = 1; while (tot >= xpAt(lv + 1)) lv++;
+  if (XP.lv && lv > XP.lv) { const r = RANKS[Math.min(lv - 1, RANKS.length - 1)]; showBanner(LT(`Nivel ${lv}`, `Level ${lv}`), LANG === 'es' ? r[0] : r[1], false); sfx.craft(); cgHappy(); }
+  else if (gain >= 3) toast('XP', gain, 'xp');
+  XP.lv = lv; const r = RANKS[Math.min(lv - 1, RANKS.length - 1)], a = xpAt(lv), b = xpAt(lv + 1);
+  $('#rkN').textContent = `${LT('Nv.', 'Lv.')} ${lv} · ${LANG === 'es' ? r[0] : r[1]}`; $('#rkB').style.width = Math.min(100, (tot - a) / (b - a) * 100) + '%'; el.hidden = false;
+  if (clock - XP.save > 10) { XP.save = clock; try { store.set('pvp-xp', String(Math.round(tot))); } catch (e) { /* sin almacenamiento */ } }
+}
+function updateHook() { if (!NET.on) return; updateBasePing(); updateRank(); }
 
 // ---------------------------------------------------------------- estado, entrada
 let state = 'menu', panelOpen = false, locked = false, lockWorked = false, fallbackLook = false;
@@ -4155,7 +4268,7 @@ function interact() {
   }
   if (a.kind === 'dep') useDeployable(a.dep);
   if (a.kind === 'crate') openCrate(a.crate);
-  if (a.kind === 'loot') netSend({ t: 'lpick', id: a.id });
+  if (a.kind === 'loot') { NET.lastPick = clock; netSend({ t: 'lpick', id: a.id }); }
   if (a.kind === 'animal' && NET.on && a.an.sid != null && !a.an.dead) {
     const an = a.an;
     if (an.owned) { if (an.type === 'horse') netSend({ t: NET.mount ? 'dismount' : 'mount', id: an.sid }); else toast('Este animal ya está domado', 'info'); return; }
@@ -4551,6 +4664,7 @@ function drawMap() {
   if (NET.lastDeath) { const [x, y] = P(NET.lastDeath.x, NET.lastDeath.z); g.fillStyle = '#e63a2e'; g.beginPath(); g.arc(x, y - 2, 7, 0, 6.283); g.fill(); g.fillStyle = '#fff'; g.fillRect(x - 4, y + 1, 8, 5); g.fillStyle = '#e63a2e'; g.fillRect(x - 3, y + 2, 2, 3); g.fillRect(x + 1, y + 2, 2, 3); g.fillStyle = '#000'; g.fillRect(x - 4, y - 5, 3, 3); g.fillRect(x + 1, y - 5, 3, 3); label('Tu última muerte', x, y - 12); }
   for (const c of CAVES) if (c.found) { const [x, y] = P(c.x, c.z); g.fillStyle = '#222'; g.beginPath(); g.moveTo(x, y - 6); g.lineTo(x + 6, y + 5); g.lineTo(x - 6, y + 5); g.closePath(); g.fill(); g.strokeStyle = '#e8873e'; g.stroke(); label('Cueva', x, y - 10); }
   g.fillStyle = '#ece5d4'; for (const pc of pieces) if (pc.kind === 'foundation') { const [x, y] = P(pc.i * GRID, pc.j * GRID); g.fillRect(x, y, Math.max(2, GRID * k), Math.max(2, GRID * k)); }
+  if (NET.on) for (const bb of NET.bases || []) { const [x, y] = P(bb.x, bb.z), mine = bb.tid === NET.tid; g.fillStyle = mine ? '#8fd16a' : bb.bot ? '#ff9a4a' : '#ff5a4a'; g.beginPath(); g.arc(x, y, 6, 0, 6.283); g.fill(); g.strokeStyle = '#1a0f05'; g.lineWidth = 2; g.stroke(); label(mine ? LT('Tu base', 'Your base') : bb.name, x, y - 12, mine ? '#b8e89a' : '#ffd0a8'); }
   const [px, py] = P(player.pos.x, player.pos.z); g.save(); g.translate(px, py); g.rotate(-player.yaw); g.fillStyle = '#ffd27a'; g.strokeStyle = '#1a0f05'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, -11); g.lineTo(7, 8); g.lineTo(0, 4); g.lineTo(-7, 8); g.closePath(); g.stroke(); g.fill(); g.restore();
   g.fillStyle = '#ece5d4'; g.font = '800 16px Barlow, sans-serif'; g.fillText('N', S / 2, 18);
 }
@@ -4565,7 +4679,8 @@ function drawCompass() {
   for (let d = 0; d < 360; d += 15) { const x = toX(d); if (x === null) continue; const main = d % 45 === 0; g.fillStyle = main ? '#ece5d4' : 'rgba(236,229,212,.4)'; if (main) { g.font = (d % 90 === 0 ? '800 14px' : '600 11px') + ' Barlow, sans-serif'; g.fillText((LANG === 'en' ? COMPASS_EN : COMPASS)[d / 45], x, 13); } else g.fillRect(x - .5, 6, 1, 6); }
   const mark = (tx, tz, col, shape) => { const deg = (Math.atan2(tx - player.pos.x, -(tz - player.pos.z)) * 180 / Math.PI + 360) % 360, x = toX(deg); if (x === null) return; g.fillStyle = col; if (shape === 'tri') { g.beginPath(); g.moveTo(x, 22); g.lineTo(x + 5, 31); g.lineTo(x - 5, 31); g.closePath(); g.fill(); } else g.fillRect(x - 3.5, 24, 7, 7); };
   for (const q of POIS) if (q.found) mark(q.x, q.z, '#e8873e');
-  const o = OBJECTIVES[objIndex]; if (o && o.dir) { const od = typeof o.dir === 'function' ? o.dir() : o.dir; if (od) mark(od.x, od.z, '#ffd27a', 'tri'); }
+  const o = objList()[objIndex]; if (o && o.dir) { const od = typeof o.dir === 'function' ? o.dir() : o.dir; if (od) mark(od.x, od.z, '#ffd27a', 'tri'); }
+  if (NET.on) for (const fb of foeBases()) mark(fb.x, fb.z, '#ff7a4a', 'tri');
   const base = pieces.find((pc) => pc.kind === 'foundation'); if (base) mark(base.i * GRID, base.j * GRID, clock - siege.baseHitT < 3 && Math.sin(clock * 12) > 0 ? '#ff4a3a' : '#ece5d4');
   g.fillStyle = '#e8873e'; g.fillRect(W / 2 - 1, 0, 2, 5);
 }
@@ -4759,7 +4874,7 @@ function netMsg(m) {
   if (m.t === 'welcome') {
     dayPhase = m.phase; dayCount = m.day; if (m.wx) wxState = m.wx; NET.id = m.id; NET.tid = m.tid; NET.tribe = m.tribe; $('#btnTLeave').hidden = !m.tribe; NET.roster.clear(); for (const q of m.roster) NET.roster.set(q.id, q);
     player.pos.set(m.x, terrainH(m.x, m.z) + .1, m.z); player.vel.set(0, 0, 0); player.hp = 100; NET.on = true; document.body.classList.add('online-on');
-    $('#netStatus').textContent = ''; clearTimeout(CG.autoT); startGame(); cgRoom(true); if (!store.get('pvp-priv')) privacyShow(); if (m.tribe) toast(`Tribu: ${m.tribe}`, 'info');
+    NET.bases = []; NET.joinT = clock; $('#netStatus').textContent = ''; clearTimeout(CG.autoT); startGame(); cgRoom(true); showBanner('Pvp-Island', LT('Construye tu base · Raidea a los clanes · Sobrevive', 'Build your base · Raid the clans · Survive'), false); if (!store.get('pvp-priv')) privacyShow(); if (m.tribe) toast(`Tribu: ${m.tribe}`, 'info');
   } else if (m.t === 'snap') netSnap(m);
   else if (m.t === 'join') { NET.roster.set(m.id, { id: m.id, name: m.name, tid: m.tid, tribe: m.tribe, bot: m.bot, look: m.look || (NET.roster.get(m.id) || {}).look, held: m.held !== undefined ? m.held : (NET.roster.get(m.id) || {}).held }); chatAdd('', `${m.name} se ha unido`, false, true); }
   else if (m.t === 'tribe') {
@@ -4792,6 +4907,7 @@ function netMsg(m) {
   else if (m.t === 'po') { const p = pieceMap.get(m.key); if (p) { p.open = m.open; rebuildColliders(); sfx.wood(); } }
   else if (m.t === 'ph') { const p = pieceMap.get(m.key); if (p) { const dmg = p.hp > m.hp; p.hp = m.hp; if (dmg) { p.hitT = clock; if (Math.hypot(p.obj.position.x - player.pos.x, p.obj.position.z - player.pos.z) < 40) { (p.tier >= 2 ? sfx.stone : sfx.wood)(); burst(p.obj.position.clone().setY(p.obj.position.y + 1.4), p.tier >= 2 ? 'stone' : 'wood', 3); } if (p.owner === NET.tid) siege.baseHitT = clock; } } }
   else if (m.t === 'pd') {
+    if (m.by === NET.id) { let f = 0; for (const k of m.keys) { const p = pieceMap.get(k); if (p && p.owner !== NET.tid) f++; } if (f) stats.raidPieces = (stats.raidPieces || 0) + f; }
     for (const k of m.keys) { const p = pieceMap.get(k); if (p) removePiece(p, true); } rebuildColliders();
     if (m.by === NET.id) for (const it of m.items || []) { const c = pieceCost(it.kind, it.tier); for (const k in c) { const back = Math.floor(c[k] / 2); if (back) giveItem(k, back); } }
     sfx.build();
@@ -4808,7 +4924,7 @@ function netMsg(m) {
   else if (m.t === 'deps') { for (const d of m.list) netDep(d); }
   else if (m.t === 'db') { netDep(m.d); sfx.build(); }
   else if (m.t === 'ddeny') { giveItem(m.key, 1); toast(m.why, 'bad'); sfx.bad(); }
-  else if (m.t === 'dd') { const d = NET.deps.get(m.id); if (d) { burst(new THREE.Vector3(d.x, d.y + .5, d.z), 'wood', 8, 1.2); removeDeployable(d); NET.deps.delete(m.id); if (chestOpen === d) togglePanel(); } if (m.by === NET.id && m.refund) giveItem(m.refund, 1); }
+  else if (m.t === 'dd') { const d = NET.deps.get(m.id); if (d && m.by === NET.id && d.t === 'chest' && d.owner !== NET.tid) stats.raidChests = (stats.raidChests || 0) + 1; if (d) { burst(new THREE.Vector3(d.x, d.y + .5, d.z), 'wood', 8, 1.2); removeDeployable(d); NET.deps.delete(m.id); if (chestOpen === d) togglePanel(); } if (m.by === NET.id && m.refund) giveItem(m.refund, 1); }
   else if (m.t === 'dh') { const d = NET.deps.get(m.id); if (d) { const dmg = d.hp > m.hp; d.hp = m.hp; if (dmg && Math.hypot(d.x - player.pos.x, d.z - player.pos.z) < 40) { sfx.wood(); burst(new THREE.Vector3(d.x, d.y + .6, d.z), 'wood', 3); } } }
   else if (m.t === 'cwater') { if (m.mode === 'fill') { const sl = inv.slots[sel]; if (sl && sl.id === 'waterskin') { inv.slots[sel] = { id: 'waterskin_full', n: 1, dur: m.k }; inv.touch(); sfx.drink(); toast('Odre lleno', 'info'); } } else { player.thirst = Math.min(100, player.thirst + 20); sfx.drink(); stats.drank = (stats.drank || 0) + 1; toast('Agua', 20, 'w:drink'); } }
   else if (m.t === 'da') { const d = NET.deps.get(m.id); if (d) { if (m.water != null) { d.water = m.water; if (d.t === 'collector') setCollector(d); } if (m.ammo != null) d.ammo = m.ammo; if (m.armed != null) { d.armed = m.armed; if (d.jaws) setTrap(d); sfx.clank(); } if (m.planted != null) { d.planted = m.planted; d.grow = m.grow || 0; if (d.plants) setGarden(d); } } }
@@ -4818,12 +4934,16 @@ function netMsg(m) {
   else if (m.t === 'fx') netFx(m);
   else if (m.t === 'slow') { NET.slowUntil = clock + m.dur; NET.slowF = m.s; }
   else if (m.t === 'stun') { player.stun = m.dur; sfx.clank(); }
-  else if (m.t === 'give') { for (const [id, n] of m.items) if (ITEMS[id]) giveItem(id, n); sfx.craft(); }
+  else if (m.t === 'give') { for (const [id, n] of m.items) if (ITEMS[id]) giveItem(id, n); sfx.craft(); if (clock - (NET.lastPick || -9) < 3 && m.items.length >= 2) stats.looted = (stats.looted || 0) + 1; }
   else if (m.t === 'bags') { for (const b of m.list) netBag(b);
     try { const d = JSON.parse(store.get('pvp-death') || 'null'); if (d && d.map === MAP_ID && m.list.some((b) => Math.hypot(b.x - d.x, b.z - d.z) < 4)) NET.lastDeath = { x: d.x, y: terrainH(d.x, d.z), z: d.z }; else store.del('pvp-death'); } catch (e) { /* nada */ } }
   else if (m.t === 'lb') { netBag(m.b); }
   else if (m.t === 'lx') { const b = NET.bags.get(m.id); if (b && NET.lastDeath && Math.hypot(b.g.position.x - NET.lastDeath.x, b.g.position.z - NET.lastDeath.z) < 4) { NET.lastDeath = null; try { store.del('pvp-death'); } catch (e) { /* nada */ } } if (b) { lootRoot.remove(b.g); disposeModel(b.g); NET.bags.delete(m.id); } }
   else if (m.t === 'alarm') { sfx.bell(); toast('¡La campana suena: están atacando tu base!', 'bad'); siege.baseHitT = clock; }
+  else if (m.t === 'ev') onWorldEvent(m);
+  else if (m.t === 'alert') onBaseAlert(m);
+  else if (m.t === 'report') onRaidReport(m);
+  else if (m.t === 'bases') { NET.bases = m.list || []; }
   else if (m.t === 'powner') { for (const p of pieces) if (p.owner === m.from) p.owner = m.to; }
 }
 const lootRoot = new THREE.Group(); scene.add(lootRoot);
@@ -4875,6 +4995,7 @@ function netFx(m) {
   const dir = to.clone().sub(from), dist = dir.length() || 1; dir.divideScalar(dist);
   if (m.k === 'bolt') { spawnProj('bolt', from, dir.clone().multiplyScalar(70).add(new THREE.Vector3(0, .3, 0)), { dmg: 0, owner: 'fx' }); sfx.bow(); }
   else if (m.k === 'flame') { for (let k = 0; k < 4; k++) { const f = .2 + Math.random() * .8; burst(from.clone().addScaledVector(dir, 9.5 * f).add(new THREE.Vector3((Math.random() - .5), 0, (Math.random() - .5))), 'fire', 1, 1.6); } if (Math.random() < .3) sfx.flame(); }
+  else if (m.k === 'toss') { const T = m.T || .9; spawnProj('shell', from, new THREE.Vector3((to.x - from.x) / T, (to.y + .3 - from.y) / T + 9.8 * T / 2, (to.z - from.z) / T), { dmg: 0, R: 0, owner: 'fx' }); sfx.thud(); }
   else if (m.k === 'shell') { const T = 2.4; spawnProj('shell', from, new THREE.Vector3((to.x - from.x) / T, (to.y + .3 - from.y) / T + 9.8 * T / 2, (to.z - from.z) / T), { dmg: 0, R: 0, owner: 'fx' }); sfx.thud(); }
 }
 function netUse(d) {
@@ -4918,7 +5039,7 @@ function netConnect() {
 }
 function renderRooms() {
   const box = $('#roomList'); box.innerHTML = '';
-  for (const r of NET.rooms) { const b = document.createElement('button'); b.type = 'button'; b.className = 'chipbtn' + (r.map === MAP_ID ? ' on' : ''); b.textContent = `${r.name} · ${r.players}/${r.max}`; b.addEventListener('click', () => { if (r.map !== MAP_ID) { const u = new URL(location.href); u.searchParams.set('map', r.map); location.href = u.toString(); } }); box.appendChild(b); }
+  for (const r of NET.rooms) { const b = document.createElement('button'); b.type = 'button'; b.className = 'chipbtn' + (r.map === MAP_ID ? ' on' : ''); b.textContent = `${r.name} · ${r.players}/${r.max}`; if (r.map === MAP_ID) { const ls = $('#liveStat'); if (ls) ls.textContent = LT(`● ${r.humans} jugadores · ${r.bots} bots · ${r.bases || 0} bases en este servidor`, `● ${r.humans} players · ${r.bots} bots · ${r.bases || 0} bases on this server`); } b.addEventListener('click', () => { if (r.map !== MAP_ID) { const u = new URL(location.href); u.searchParams.set('map', r.map); location.href = u.toString(); } }); box.appendChild(b); }
 }
 function netListRooms() {
   try { const ws = new WebSocket(SERVER_URL); ws.onopen = () => ws.send(JSON.stringify({ t: 'list' })); ws.onmessage = (e) => { try { const m = JSON.parse(e.data); if (m.t === 'rooms') { NET.rooms = m.rooms; renderRooms(); ws.close(); } } catch (err) { /* ignorar */ } }; ws.onerror = () => { $('#netStatus').textContent = 'No se pudo conectar con el servidor'; }; } catch (e) { /* sin red */ }
@@ -5114,7 +5235,7 @@ function updateNodes(dt) {
     if (!NET.on) for (const n of nodes) if (n.depleted && !n.fall && clock >= n.respawnAt && Math.hypot(n.x - player.pos.x, n.z - player.pos.z) > 25) { n.depleted = false; n.hp = n.def.hp; n.acc.fill(0); writeNode(n); }
     for (const q of POIS) if (!q.found && Math.hypot(q.x - player.pos.x, q.z - player.pos.z) < 55) { q.found = true; toast('Has descubierto: ' + q.name, 'info'); sfx.craft(); }
     for (const c of CAVES) if (!c.found && Math.hypot(c.x - player.pos.x, c.z - player.pos.z) < 40) { c.found = true; toast('Has descubierto una cueva', 'info'); sfx.craft(); }
-    updateObjective(); renderPanel();
+    updateObjective(); updateHook(); renderPanel();
   }
 }
 function updateParts(dt) {

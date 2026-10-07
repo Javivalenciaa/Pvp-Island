@@ -4,13 +4,14 @@ import path from 'node:path';
 export function snapshotRoom(r) {
   return {
     v: 1, savedAt: Date.now(), nextTribe: r.nextTribe, nextDep: r.D.next,
-    tribes: [...r.tribeInfo], tokens: [...r.tribeOfToken],
+    tribes: [...r.tribeInfo], tokens: [...r.tribeOfToken], names: [...r.names], reports: [...r.reports].map(([k, m]) => [k, [...m.values()]]),
     pieces: [...r.B.map.values()], deps: [...r.D.map.values()].map((d) => ({ ...d, cd: 0 })),
   };
 }
 export function restoreRoom(r, s) {
   if (!s || s.v !== 1) return false;
   r.nextTribe = s.nextTribe || 1; r.tribeInfo = new Map(s.tribes || []); r.tribeOfToken = new Map(s.tokens || []);
+  r.names = new Map(s.names || []); r.reports = new Map((s.reports || []).map(([k, l]) => [k, new Map(l.map((e) => [e.who, e]))]));
   for (const p of s.pieces || []) r.B.map.set(p.key, p);
   for (const d of s.deps || []) { r.D.map.set(d.id, d); }
   r.D.next = Math.max(s.nextDep || 1, ...[...r.D.map.keys()].map((k) => k + 1), 1);

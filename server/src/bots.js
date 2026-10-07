@@ -1,6 +1,7 @@
 // Bots: usan el mismo canal que un jugador (input, yaw, ataques) y solo "ven" lo que vería un jugador:
 // campo de visión, oído a corta distancia, tiempo de reacción y memoria. Recolectan recursos reales del mapa,
 // fabrican herramientas, cazan, se curan y luchan con criterio (rodean, retroceden, huyen cuando conviene).
+import * as BB from './botbase.js';
 const NAMES = ['Ragnar', 'Freya', 'Bjorn', 'Astrid', 'Ulf', 'Sigrid', 'Leif', 'Ingrid', 'Thor', 'Helga', 'Erik', 'Gudrun', 'Olaf', 'Runa', 'Sven', 'Tyra', 'Harald', 'Liv', 'Knut', 'Yrsa'];
 const DT = 1 / 20, TAU = Math.PI * 2;
 const GEAR = { fists: { dmg: 4, reach: 2.2, chop: 6, mine: 5 }, stone_axe: { dmg: 13, reach: 2.6, chop: 28, mine: 12 }, stone_pick: { dmg: 13, reach: 2.6, chop: 10, mine: 30 }, hammer: { dmg: 10, reach: 2.5, chop: 8, mine: 10 },
@@ -9,9 +10,9 @@ const STARTERS = [['fists', .35], ['stone_axe', .2], ['stone_pick', .12], ['hamm
 const TIER1 = ['stone_axe', 'stone_pick', 'hammer'], IRON = ['iron_axe', 'iron_pick', 'iron_sword'];
 const NODE_HP = { tree: 100, appletree: 140, rock: 120, ore: 160, sulfur: 140, bush: 24, berry: 15 }, NODE_RT = { tree: 150, appletree: 220, rock: 180, ore: 300, sulfur: 300, bush: 90, berry: 120 };
 const YIELD = { tree: ['wood', 14], appletree: ['wood', 8], rock: ['stone', 12], ore: ['ore', 5], sulfur: ['sulfur', 5], bush: ['fiber', 5], berry: ['food', 1] };
-const rnd = (a, b) => a + Math.random() * (b - a), pick = (a) => a[(Math.random() * a.length) | 0];
+export const rnd = (a, b) => a + Math.random() * (b - a), pick = (a) => a[(Math.random() * a.length) | 0];
 const angDiff = (a, b) => { let d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; };
-const yawTo = (dx, dz) => Math.atan2(-dx, -dz); // misma convención que el cliente: adelante = (-sin yaw, -cos yaw)
+export const yawTo = (dx, dz) => Math.atan2(-dx, -dz); // misma convención que el cliente: adelante = (-sin yaw, -cos yaw)
 
 function worldOf(room) {
   if (room._botWorld) return room._botWorld;
@@ -28,7 +29,7 @@ function nearestNode(room, p, types, R) {
 function init(room, p) {
   let gear = 'fists'; if (!(p.deaths > 0 && Math.random() < .75)) { let r = Math.random(); for (const [g, w] of STARTERS) { r -= w; if (r <= 0) { gear = g; break; } } }
   return { gear, line: pick(TIER1), goal: pick(IRON), inv: { wood: gear === 'fists' ? 0 : rnd(0, 6) | 0, stone: gear === 'fists' ? 0 : rnd(0, 4) | 0, fiber: 0, ore: 0, sulfur: 0, food: rnd(0, 2) | 0, meat: 0 },
-    bold: Math.random(), peaceful: Math.random() < .28, react: rnd(.45, 1.1), fov: rnd(1.9, 2.3), skill: rnd(.62, .88),
+    bold: Math.random(), peaceful: Math.random() < .28, react: rnd(.7, 1.5), fov: rnd(1.9, 2.3), skill: rnd(.42, .68), bombs: 0, loot: null, buildT: 0,
     mode: 'idle', until: room.t + rnd(1, 4), task: null, target: 0, seen: -99, lastX: p.x, lastZ: p.z, alert: new Map(), lastHp: p.hp, hurtT: -99,
     strafe: Math.random() < .5 ? 1 : -1, strafeT: 0, backT: 0, atkAt: 0, fleeT: 0, rest: 0, eatT: 0, stuckT: 0, px: p.x, pz: p.z, detour: 0, detourDir: 1, swingAt: 0, swings: 0, craftT: 0, wx: p.x, wz: p.z, lookT: 0, lookYaw: p.yaw };
 }
@@ -37,12 +38,13 @@ function botBag(b) {
   const out = []; if (b.gear !== 'fists') out.push({ id: b.gear, n: 1 });
   const m = [['wood', 'wood'], ['stone', 'stone'], ['fiber', 'fiber'], ['ore', 'ore'], ['sulfur', 'sulfur'], ['meat', 'raw_meat'], ['food', 'berries']];
   for (const [k, id] of m) if (b.inv[k] > 0) out.push({ id, n: Math.round(b.inv[k]) });
+  if (b.bombs > 0) out.push({ id: 'bomb', n: b.bombs }); if (b.loot) for (const id in b.loot) out.push({ id, n: Math.round(b.loot[id]) });
   if (Math.random() < .4) out.push({ id: 'arrow', n: (3 + Math.random() * 10) | 0 }); if (Math.random() < .3) out.push({ id: 'bandage', n: 1 + (Math.random() * 2 | 0) }); if (Math.random() < .12) out.push({ id: 'ingot', n: 1 + (Math.random() * 3 | 0) });
   return out;
 }
-function turn(p, want, rate) { const d = angDiff(p.yaw, want), s = Math.max(-rate * DT, Math.min(rate * DT, d)); p.yaw += s; return Math.abs(angDiff(p.yaw, want)); }
+export function turn(p, want, rate) { const d = angDiff(p.yaw, want), s = Math.max(-rate * DT, Math.min(rate * DT, d)); p.yaw += s; return Math.abs(angDiff(p.yaw, want)); }
 // camina hacia un punto con giro suave, rodeando agua, pendientes y obstáculos
-function walk(room, p, b, gx, gz, o = {}) {
+export function walk(room, p, b, gx, gz, o = {}) {
   const dx = gx - p.x, dz = gz - p.z, d = Math.hypot(dx, dz), stop = o.stop ?? .6;
   if (d <= stop) { p.input.mz = 0; p.input.mx = 0; p.input.sprint = false; return true; }
   let want = yawTo(dx, dz);
@@ -56,8 +58,8 @@ function walk(room, p, b, gx, gz, o = {}) {
   if (p.input.mz) { const m = Math.hypot(p.x - b.px, p.z - b.pz); b.stuckT += DT; if (b.stuckT > 1) { if (m < .5) { b.detour = rnd(1, 2); b.detourDir = Math.random() < .5 ? 1 : -1; p.input.jump = true; } b.px = p.x; b.pz = p.z; b.stuckT = 0; } }
   return false;
 }
-function stand(p) { p.input.mz = 0; p.input.mx = 0; p.input.sprint = false; }
-function setMode(room, b, m, secs) { b.mode = m; b.until = room.t + (secs || 0); b.swings = 0; }
+export function stand(p) { p.input.mz = 0; p.input.mx = 0; p.input.sprint = false; }
+export function setMode(room, b, m, secs) { b.mode = m; b.until = room.t + (secs || 0); b.swings = 0; }
 
 function perceive(room, p, b) {
   const t = room.t, fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), night = room.isNight, vis = night ? 16 : 32;
@@ -102,7 +104,7 @@ export function brain(room, p) {
   }
   // --- combate (solo si lo ha percibido o lo recuerda y no es pacífico, o si le han golpeado)
   // al notar a alguien decide (una vez por encuentro) si lo ataca o lo evita; si le golpean, pelea
-  if (tq && (!b.dec || b.dec.id !== tq.id || t > b.dec.until)) b.dec = { id: tq.id, until: t + rnd(25, 50), fight: !b.peaceful && Math.random() < .16 + .45 * b.bold };
+  if (tq && (!b.dec || b.dec.id !== tq.id || t > b.dec.until)) b.dec = { id: tq.id, until: t + rnd(25, 50), fight: !b.peaceful && Math.random() < .1 + .3 * b.bold };
   const provoked = t - b.hurtT < 8, wantFight = tq && (provoked || (b.dec && b.dec.fight)) && threat(room, p, b, tq) < .85 + (b.bold - .5) * .3;
   if (tq && wantFight && b.mode !== 'rest') {
     if (b.mode !== 'fight') setMode(room, b, 'fight', 0);
@@ -119,7 +121,7 @@ export function brain(room, p) {
     else { p.input.mz = dist < ideal - .3 ? -.4 : 0; p.input.mx = b.strafe; p.input.sprint = false; }
     if (Math.random() < .004) p.input.jump = true;
     if (dist <= g.reach + .3 && err < .45 && t >= b.atkAt && p.cd <= 0) {
-      b.atkAt = t + rnd(.65, 1.15) / b.skill * .8; room.broadcast({ t: 'swing', id: p.id }); p.atkT = t;
+      b.atkAt = t + rnd(.8, 1.4) / b.skill; room.broadcast({ t: 'swing', id: p.id }); p.atkT = t;
       if (Math.random() < b.skill) room.meleeHit(p, tq.id, b.gear); else p.cd = .35;
       if (Math.random() < .35) b.backT = rnd(.25, .6);
     }
@@ -145,13 +147,15 @@ export function brain(room, p) {
     if (b.gear === 'fists' && i.wood >= 10 && i.stone >= 6) nx = [b.line, { wood: 10, stone: 6 }];
     else if (TIER1.includes(b.gear) && i.wood >= 14 && i.fiber >= 5 && i.stone >= 4) nx = ['spear', { wood: 14, fiber: 5, stone: 4 }];
     else if (b.gear === 'spear' && i.ore >= 40 && i.wood >= 10 && i.stone >= 10) nx = [b.goal, { ore: 40, wood: 10, stone: 10 }];
+    if (!nx && b.gear !== 'fists' && (b.bombs || 0) < 4 && BB.isBotTid(p.tid) && i.sulfur >= 4 && i.fiber >= 2 && i.wood >= 4) nx = ['bomb', { sulfur: 4, fiber: 2, wood: 4 }];
     if (nx) { b.craftTo = nx; setMode(room, b, 'craft', 2.6); } else b.craftT = t + 4; }
-  if (b.mode === 'craft') { stand(p); if (t > b.until && b.craftTo) { const [g, cost] = b.craftTo; for (const k in cost) b.inv[k] -= cost[k]; b.gear = g; b.craftTo = null; room.setHeld(p, g); room.broadcast({ t: 'swing', id: p.id }); setMode(room, b, 'idle', .8); } return; }
+  if (b.mode === 'craft') { stand(p); if (t > b.until && b.craftTo) { const [g, cost] = b.craftTo; for (const k in cost) b.inv[k] -= cost[k]; if (g === 'bomb') b.bombs = (b.bombs || 0) + 1; else { b.gear = g; room.setHeld(p, g); } b.craftTo = null; room.broadcast({ t: 'swing', id: p.id }); setMode(room, b, 'idle', .8); } return; }
   // --- tareas: recolectar, cazar, explorar
   if (b.mode === 'idle' && t < b.until) { stand(p); if (t > b.lookT) { b.lookT = t + rnd(1.2, 3); b.lookYaw = p.yaw + rnd(-1.6, 1.6); } turn(p, b.lookYaw, 1.4); return; }
+  if (BB.BASE_MODES.has(b.mode) && BB.run(room, p, b)) return;
   if (b.mode === 'idle' || b.mode === 'look') {
     if (b.mode === 'look') { if (t < b.until) { stand(p); turn(p, p.yaw + Math.sin(t * 2) * .02 + .03, 2); return; } setMode(room, b, 'idle', 0); }
-    chooseTask(room, p, b); }
+    chooseTask(room, p, b); if (BB.BASE_MODES.has(b.mode) && BB.run(room, p, b)) return; }
   if (b.mode === 'gather') {
     const n = b.task; if (!n || room.nodes.has(n.id)) { setMode(room, b, 'idle', rnd(.5, 2)); return; }
     const d = Math.hypot(n.x - p.x, n.z - p.z), reach = n.type === 'tree' || n.type === 'appletree' ? 1.5 : n.type === 'bush' || n.type === 'berry' ? 1.2 : 1.9;
@@ -177,6 +181,7 @@ export function brain(room, p) {
 }
 function chooseTask(room, p, b) {
   const t = room.t, i = b.inv;
+  if (BB.choose(room, p, b)) return;
   // cazar si hay presa cerca y tiene hambre o poca vida
   const hungry = i.meat < 1 && i.food < 1;
   if (hungry && Math.random() < .5) { let best = null, bd = 40 * 40; for (const a of room.fauna.map.values()) { if (a.owner || (a.type !== 'deer' && a.type !== 'boar')) continue; const d = (a.x - p.x) ** 2 + (a.z - p.z) ** 2; if (d < bd) { bd = d; best = a; } } if (best) { b.huntId = best.id; setMode(room, b, 'hunt', 25); return; } }
@@ -186,8 +191,9 @@ function chooseTask(room, p, b) {
   else if (TIER1.includes(b.gear)) types = i.wood < 14 ? ['tree'] : i.fiber < 5 ? ['bush'] : ['rock'];
   else if (b.gear === 'spear') types = i.ore < 40 ? ['ore', 'sulfur'] : i.wood < 10 ? ['tree'] : ['rock'];
   else types = ['tree', 'rock', 'bush', 'berry'];
+  { const w = BB.want(room, p, b); if (w && Math.random() < .8) types = w; }
   if (Math.random() < .12) types = ['berry', 'appletree', 'bush'];
-  const n = nearestNode(room, p, types, types.includes('ore') ? 140 : 90);
+  const n = nearestNode(room, p, types, types.includes('ore') || types.includes('sulfur') ? 140 : 90);
   if (n && Math.random() < .85) { b.task = n; b.work = 0; b.swingAt = t + .5; setMode(room, b, 'gather', 0); b.until = t; return; }
   // si no hay recurso a mano: pasea hacia un punto de interés o una zona cercana
   const pois = worldOf(room).W.POIS; let gx, gz;
