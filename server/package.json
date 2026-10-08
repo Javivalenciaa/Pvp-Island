@@ -3,6 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node src/index.js", "load": "node src/loadtest.js", "sim": "node src/sim_bots.js", "test": "node src/test.js && node src/test_persist.js && node src/test_cave.js && node src/test_inv.js && node src/test_offline.js && node src/test_look.js && node src/test_rooms.js && node src/test_world.js && node src/test_botbag.js && node src/test_build.js && node src/test_raid.js && node src/test_sleep.js", "bases": "node src/sim_bases.js" },
+  "scripts": { "start": "node src/index.js", "load": "node src/loadtest.js", "sim": "node src/sim_bots.js", "test": "node src/test.js && node src/test_persist.js && node src/test_cave.js && node src/test_inv.js && node src/test_offline.js && node src/test_look.js && node src/test_rooms.js && node src/test_world.js && node src/test_botbag.js && node src/test_build.js && node src/test_raid.js && node src/test_sleep.js && node src/test_bags.js", "bases": "node src/sim_bases.js" },
   "dependencies": { "ws": "^8.18.0" }
 }

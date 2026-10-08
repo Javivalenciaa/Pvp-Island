@@ -125,6 +125,9 @@ export class Room {
     else if (m.t === 'explode') this.clientExplode(p, String(m.kind), +m.x, +m.y, +m.z);
     else if (m.t === 'drop') this.dropBag(p, m.slots);
     else if (m.t === 'lpick') this.pickBag(p, +m.id);
+    else if (m.t === 'toss') this.tossItem(p, m.item);
+    else if (m.t === 'bopen') this.bagOpen(p, +m.id);
+    else if (m.t === 'btake') this.bagTake(p, +m.id, +m.i, String(m.item), +m.n);
     else if (m.t === 'bed') this.setBed(p, +m.id);
     else if (m.t === 'gard') this.garden(p, +m.id, String(m.act));
     else if (m.t === 'coll') this.collect(p, +m.id, String(m.act));
@@ -255,6 +258,22 @@ export class Room {
   dropBag(p, slots, chestLike) {
     if (!Array.isArray(slots) || p.dead <= 0 || p.dropped) return; p.dropped = true; const clean = slots.slice(0, 40).map((s) => (s && typeof s.id === 'string' && s.n > 0 ? { id: s.id.slice(0, 24), n: Math.min(999, s.n | 0), dur: s.dur } : null));
     const bag = this.D.addBag(p.x, p.y + .3, p.z, clean); if (bag) { bag.expire = this.t + 600; this.broadcast({ t: 'lb', b: { id: bag.id, x: bag.x, y: bag.y, z: bag.z } }); }
+  }
+  // tirar objetos al suelo: aparecen como una caja durante 60 s
+  tossItem(p, it) {
+    if (p.dead > 0 || p.sleeping || !it || typeof it.id !== 'string' || it.id.length > 24 || !(+it.n >= 1) || this.t < (p.tossT || 0)) return; p.tossT = this.t + .15;
+    const tossed = [...this.D.bags.values()].filter((b) => b.k === 'toss'); if (tossed.length >= 250) { const old = tossed.sort((a, b) => a.expire - b.expire)[0]; this.D.bags.delete(old.id); this.broadcast({ t: 'lx', id: old.id }); }
+    const x = p.x - Math.sin(p.yaw) * 1.3, z = p.z - Math.cos(p.yaw) * 1.3, y = Math.max(p.y, this.T.terrainH(x, z)) + .3;
+    const item = { id: it.id, n: Math.min(999, it.n | 0) }; if (Number.isFinite(+it.dur)) item.dur = +it.dur;
+    const bag = this.D.addBag(x, y, z, [item]); if (!bag) return; bag.k = 'toss'; bag.expire = this.t + 60; this.broadcast({ t: 'lb', b: { id: bag.id, x: bag.x, y: bag.y, z: bag.z, c: 0, k: 'toss' } });
+  }
+  bagNear(p, b) { return p.dead <= 0 && !p.sleeping && Math.hypot(b.x - p.x, b.z - p.z) <= 4.5 && Math.abs(b.y - p.y) < 6; }
+  bagOpen(p, id) { const b = this.D.bags.get(id); if (!b || !this.bagNear(p, b)) return; this.send(p, { t: 'bag', id, slots: b.slots, left: Math.max(0, Math.round(b.expire - this.t)) }); }
+  // coger solo lo que quieres de una caja: el resto se queda dentro hasta que caduque
+  bagTake(p, id, i, item, n) {
+    const b = this.D.bags.get(id); if (!b || !this.bagNear(p, b)) return; const s = b.slots[i]; if (!s || s.id !== item) return this.bagOpen(p, id);
+    const k = Math.max(1, Math.min(s.n, n | 0 || s.n)); s.n -= k; this.send(p, { t: 'give', items: [[s.id, k, s.dur]] }); if (s.n <= 0) b.slots.splice(i, 1);
+    if (!b.slots.length) { this.D.bags.delete(id); this.broadcast({ t: 'lx', id }); this.send(p, { t: 'bag', id, slots: [], left: 0 }); } else this.bagOpen(p, id);
   }
   pickBag(p, id) { const b = this.D.bags.get(id); if (!b || p.dead > 0 || Math.hypot(b.x - p.x, b.z - p.z) > 4) return; this.D.bags.delete(id); this.broadcast({ t: 'lx', id }); this.send(p, { t: 'give', items: b.slots.map((s) => [s.id, s.n]) }); }
   // ---- trampas y torretas (se evalúan en cada tick)

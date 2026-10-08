@@ -406,9 +406,10 @@ body:not(.ready) .glass{backdrop-filter:none;-webkit-backdrop-filter:none}
   <div class="wrap">
     <div class="col">
       <section class="glass"><h2>Mochila</h2><div id="slots"></div>
+        <p class="tip" id="bagTimer" hidden></p>
         <p class="tip" id="slotTip">Haz clic en un objeto y después en otra casilla para moverlo. Las 6 casillas de arriba son tu barra rápida (teclas 1–6).</p>
       </section>
-      <section class="glass" id="chestSec" hidden><h2>Arcón</h2><div id="cslots"></div><p class="tip">Haz clic en un objeto para pasarlo entre la mochila y el Arcón. De noche los Errantes intentarán romperlo para robar.</p></section>
+      <section class="glass" id="chestSec" hidden><h2 id="chestTitle">Arcón</h2><div id="cslots"></div><p class="tip">Haz clic en un objeto para pasarlo entre la mochila y el Arcón. De noche los Errantes intentarán romperlo para robar.</p></section>
       <section class="glass"><h2>Retos de hoy</h2><div id="challenges"></div></section>
     </div>
     <section class="glass"><h2>Fabricación</h2><div id="stations"></div><div id="recipes"></div></section>
@@ -3790,7 +3791,8 @@ function renderPanel(force) {
   let h = ''; for (let i = 0; i < inv.slots.length; i++) h += `<div class="slot${i < 6 ? ' hot' : ''}${i === picked ? ' pick' : ''}" data-i="${i}" title="${inv.slots[i] ? ITEMS[inv.slots[i].id].name : ''}">${slotHTML(inv.slots[i], i, i < 6)}</div>`;
   ui.slots.innerHTML = h;
   ui.chestSec.hidden = !chestOpen;
-  ui.slotTip.textContent = chestOpen ? 'Haz clic en un objeto para guardarlo en el Arcón.' : 'Haz clic en un objeto y después en otra casilla para moverlo. Las 6 casillas de arriba son tu barra rápida (teclas 1–6).';
+  $('#chestTitle').textContent = chestOpen && chestOpen.bag ? LT('Caja', 'Crate') : 'Arcón';
+  ui.slotTip.textContent = chestOpen && chestOpen.bag ? LT('Haz clic en un objeto de la caja para cogerlo. Clic derecho en un objeto de tu mochila (o Q con la barra rápida) para tirarlo al suelo.', 'Click an item in the crate to take it. Right-click an item in your backpack (or press Q on the hotbar) to drop it on the ground.') : chestOpen ? 'Haz clic en un objeto para guardarlo en el Arcón.' : LT('Clic derecho en un objeto para tirarlo al suelo (también Q con la barra rápida).', 'Right-click an item to drop it on the ground (or press Q on the hotbar).') + ' ' + 'Haz clic en un objeto y después en otra casilla para moverlo. Las 6 casillas de arriba son tu barra rápida (teclas 1–6).';
   if (chestOpen) { let c = ''; for (let i = 0; i < chestOpen.inv.slots.length; i++) c += `<div class="slot" data-c="${i}">${slotHTML(chestOpen.inv.slots[i], i, false)}</div>`; ui.cslots.innerHTML = c; }
   ui.challenges.innerHTML = challenges.list.map((c) => `<div class="ch${c.done ? ' done' : ''}"><span>${c.t}</span><span class="n">${c.done ? 'Hecho' : Math.min(c.prog, c.n) + '/' + c.n}</span><span class="pb"><i style="width:${Math.min(1, c.prog / c.n) * 100}%"></i></span></div>`).join('') || '<p class="tip">Sin retos.</p>';
   const st = { workbench: hasStation('workbench'), furnace: hasStation('furnace'), campfire: hasStation('campfire') };
@@ -3838,8 +3840,8 @@ function updateBanners(dt) {
 }
 function recordsText() { return stats.bestNight ? `Récord: noche ${stats.bestNight} · ${stats.kills || 0} Errantes abatidos${stats.bosses ? ' · ' + stats.bosses + (stats.bosses > 1 ? ' jefes' : ' jefe') : ''}` : ''; }
 function updateToasts() { const now = performance.now(); for (const [k, t] of toastMap) if (now > t.until) { t.el.remove(); toastMap.delete(k); } }
-function giveItem(id, n) {
-  const over = inv.add(id, n); const got = n - over;
+function giveItem(id, n, dur) {
+  const over = inv.add(id, n, dur); const got = n - over;
   if (got > 0) { toast(ITEMS[id].name, got, 'g:' + id); stats.got[id] = (stats.got[id] || 0) + got; }
   if (over > 0) toast(`Mochila llena: pierdes ${over} ${ITEMS[id].name.toLowerCase()}`, 'bad');
 }
@@ -4023,7 +4025,7 @@ function updateRank() {
   $('#rkN').textContent = `${LT('Nv.', 'Lv.')} ${lv} · ${LANG === 'es' ? r[0] : r[1]}`; $('#rkB').style.width = Math.min(100, (tot - a) / (b - a) * 100) + '%'; el.hidden = false;
   if (clock - XP.save > 10) { XP.save = clock; try { store.set('pvp-xp', String(Math.round(tot))); } catch (e) { /* sin almacenamiento */ } }
 }
-function updateHook() { if (!NET.on) return; updateBasePing(); updateRank(); if (clock - (NET.invT || -9) > 4) { NET.invT = clock; sendInv(); } }
+function updateHook() { if (!NET.on) return; updateBagTimer(); updateBasePing(); updateRank(); if (clock - (NET.invT || -9) > 4) { NET.invT = clock; sendInv(); } }
 
 // ---------------------------------------------------------------- estado, entrada
 let state = 'menu', panelOpen = false, locked = false, lockWorked = false, fallbackLook = false;
@@ -4070,6 +4072,7 @@ addEventListener('keydown', (e) => {
   if (panelOpen) { if (e.code === 'Escape') togglePanel(); return; }
   if (e.code === 'Escape') { if (mapOpen) { toggleMap(); return; } pauseGame(); return; }
   if (/^Digit[1-6]$/.test(e.code)) { const n = +e.code.slice(5) - 1; if (buildMode) { if (n < 4) buildPiece = n; } else sel = n; }
+  if (e.code === 'KeyQ' && NET.on && !buildMode) { dropSlot(sel, e.shiftKey); return; }
   if (e.code === 'KeyF' && NET.on && NET.mount) { netSend({ t: 'dismount' }); return; }
   if (e.code === 'KeyB') { buildMode = !buildMode; ui.build.hidden = !buildMode; hotVer = -1; }
   if (e.code === 'KeyE') interact();
@@ -4086,15 +4089,36 @@ function togglePanel() {
   else if (!fallbackLook) requestLock();
 }
 $('#closePanel').addEventListener('click', togglePanel);
+// tirar objetos al suelo (caja de 60 s) y abrir/coger de cajas del suelo
+function dropSlot(i, one) {
+  if (!NET.on) return; const sl = inv.slots[i]; if (!sl) return; const n = one ? 1 : sl.n;
+  netSend({ t: 'toss', item: { id: sl.id, n, dur: sl.dur } }); sl.n -= n; if (sl.n <= 0) inv.slots[i] = null; inv.touch(); sfx.thud(); renderPanel(true);
+  toast(LT(`Has tirado ${n} ${ITEMS[sl.id].name.toLowerCase()}`, `You dropped ${n} ${tr(ITEMS[sl.id].name).toLowerCase()}`), 'info');
+}
+function bagClose(msg) { if (!chestOpen || !chestOpen.bag) return; chestOpen = null; if (msg) toast(msg, 'info'); if (panelOpen) togglePanel(); $('#bagTimer').hidden = true; }
+function onBagMsg(m) {
+  if (!m.slots.length) { if (chestOpen && chestOpen.bag && chestOpen.bid === m.id) bagClose(); return; }
+  if (!chestOpen || !chestOpen.bag || chestOpen.bid !== m.id) { chestOpen = { bag: true, bid: m.id, inv: new Inventory(24), until: 0 }; if (!panelOpen) togglePanel(); }
+  chestOpen.inv.slots.fill(null); m.slots.forEach((sl, i) => { if (i < 24 && ITEMS[sl.id]) chestOpen.inv.slots[i] = { id: sl.id, n: sl.n, dur: sl.dur }; }); chestOpen.inv.touch(); chestOpen.until = performance.now() / 1000 + m.left; chestOpen.srv = m.slots.map((sl) => sl.id); renderPanel(true); updateBagTimer();
+}
+setInterval(() => { try { updateBagTimer(); } catch (e) { /* aún sin cargar */ } }, 500);
+function updateBagTimer() {
+  const el = $('#bagTimer'); if (!(panelOpen && chestOpen && chestOpen.bag)) { el.hidden = true; return; }
+  const left = Math.max(0, Math.ceil(chestOpen.until - performance.now() / 1000)), b = NET.bags.get(chestOpen.bid);
+  if (left <= 0 || !b || Math.hypot(b.g.position.x - player.pos.x, b.g.position.z - player.pos.z) > 6) { bagClose(left <= 0 || !b ? LT('La caja se ha desvanecido', 'The crate has vanished') : null); return; }
+  el.textContent = LT(`La caja desaparece en ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`, `The crate disappears in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`); el.hidden = false;
+}
+ui.slots.addEventListener('contextmenu', (e) => { const el = e.target.closest('[data-i]'); if (!el) return; e.preventDefault(); dropSlot(+el.dataset.i, e.shiftKey); });
 function chestSync() { if (NET.on && chestOpen) netSend({ t: 'cset', id: chestOpen.sid, slots: chestOpen.inv.slots.map((sl) => (sl ? { id: sl.id, n: sl.n, dur: sl.dur } : null)) }); }
 ui.cslots.addEventListener('click', (e) => {
   const el = e.target.closest('[data-c]'); if (!el || !chestOpen) return; const i = +el.dataset.c, s = chestOpen.inv.slots[i]; if (!s) return;
+  if (chestOpen.bag) { const k = Math.min(s.n, inv.space(s.id)); if (k <= 0) { toast('Mochila llena', 'bad'); return; } NET.lastPick = clock; netSend({ t: 'btake', id: chestOpen.bid, i, item: s.id, n: k }); return; }
   const over = inv.add(s.id, s.n, s.dur); if (over === s.n) { toast('Mochila llena', 'bad'); return; }
   if (over > 0) s.n = over; else chestOpen.inv.slots[i] = null; chestOpen.inv.touch(); renderPanel(true); chestSync();
 });
 ui.slots.addEventListener('click', (e) => {
   const el = e.target.closest('[data-i]'); if (!el) return; const i = +el.dataset.i;
-  if (chestOpen) {
+  if (chestOpen && !chestOpen.bag) {
     const s = inv.slots[i]; if (!s) return;
     const over = chestOpen.inv.add(s.id, s.n, s.dur); if (over === s.n) { toast('El Arcón está lleno', 'bad'); return; }
     if (over > 0) s.n = over; else inv.slots[i] = null; inv.touch(); renderPanel(true); chestSync(); return;
@@ -4282,7 +4306,7 @@ function interact() {
   }
   if (a.kind === 'dep') useDeployable(a.dep);
   if (a.kind === 'crate') openCrate(a.crate);
-  if (a.kind === 'loot') { NET.lastPick = clock; netSend({ t: 'lpick', id: a.id }); }
+  if (a.kind === 'loot') { netSend({ t: 'bopen', id: a.id }); }
   if (a.kind === 'animal' && NET.on && a.an.sid != null && !a.an.dead) {
     const an = a.an;
     if (an.owned) { if (an.type === 'horse') netSend({ t: NET.mount ? 'dismount' : 'mount', id: an.sid }); else toast('Este animal ya está domado', 'info'); return; }
@@ -4477,7 +4501,7 @@ function updateHint() {
     else if (NET.on && an.sid != null && (an.type === 'horse' || an.type === 'wolf')) h = `<span>${an.def.name}${an.owned ? ' (domado)' : ''}</span><span class="bar"><i style="width:${an.hp / an.def.hp * 100}%;background:var(--blood)"></i></span><span><span class="key">E</span>${an.owned ? (an.type === 'horse' ? (NET.mount ? 'Desmontar' : 'Montar') : 'Domado') : 'Domar (' + (an.type === 'horse' ? 'manzana o bayas' : 'carne') + ')'}</span>`;
     else h = `<span class="${an.def.temper === 'flee' ? '' : 'warn'}">${an.def.name}${an.def.temper === 'hunt' ? ' (peligroso)' : ''}</span><span class="bar"><i style="width:${an.hp / an.def.hp * 100}%;background:var(--blood)"></i></span>${an.def.temper === 'flee' ? '<span>Acércate sin correr, o usa el arco</span>' : ''}`;
   } else if (a && a.kind === 'loot') {
-    h = '<span>Bolsa de botín</span><span><span class="key">E</span>Recoger</span>';
+    h = '<span>' + LT('Caja', 'Crate') + '</span><span><span class="key">E</span>' + LT('Abrir', 'Open') + '</span>';
   } else if (a && a.kind === 'remote') {
     const r = NET.remotes.get(a.id); if (r) h = `<span class="${r.friend ? '' : 'warn'}">${r.info.name}</span><span class="bar"><i style="width:${r.hp}%;background:${r.friend ? 'var(--moss)' : 'var(--blood)'}"></i></span><span>Tribu: ${r.info.tribe}</span>`;
   } else if (a && a.kind === 'bot') {
@@ -4954,10 +4978,11 @@ function netMsg(m) {
   else if (m.t === 'fx') netFx(m);
   else if (m.t === 'slow') { NET.slowUntil = clock + m.dur; NET.slowF = m.s; }
   else if (m.t === 'stun') { player.stun = m.dur; sfx.clank(); }
-  else if (m.t === 'give') { for (const [id, n] of m.items) if (ITEMS[id]) giveItem(id, n); sfx.craft(); if (clock - (NET.lastPick || -9) < 3 && m.items.length >= 2) stats.looted = (stats.looted || 0) + 1; }
+  else if (m.t === 'give') { for (const [id, n, dur] of m.items) if (ITEMS[id]) giveItem(id, n, dur); sfx.craft(); if (clock - (NET.lastPick || -9) < 3 && m.items.length >= 2) stats.looted = (stats.looted || 0) + 1; }
   else if (m.t === 'bags') { for (const b of m.list) netBag(b);
     try { const d = JSON.parse(store.get('pvp-death') || 'null'); if (d && d.map === MAP_ID && m.list.some((b) => Math.hypot(b.x - d.x, b.z - d.z) < 4)) NET.lastDeath = { x: d.x, y: terrainH(d.x, d.z), z: d.z }; else store.del('pvp-death'); } catch (e) { /* nada */ } }
   else if (m.t === 'lb') { netBag(m.b); }
+  else if (m.t === 'bag') onBagMsg(m);
   else if (m.t === 'lx') { const b = NET.bags.get(m.id); if (b && NET.lastDeath && Math.hypot(b.g.position.x - NET.lastDeath.x, b.g.position.z - NET.lastDeath.z) < 4) { NET.lastDeath = null; try { store.del('pvp-death'); } catch (e) { /* nada */ } } if (b) { lootRoot.remove(b.g); disposeModel(b.g); NET.bags.delete(m.id); } }
   else if (m.t === 'alarm') { sfx.bell(); toast('¡La campana suena: están atacando tu base!', 'bad'); siege.baseHitT = clock; }
   else if (m.t === 'ev') onWorldEvent(m);
@@ -5001,7 +5026,7 @@ function updateNetAnimals(dt) {
 }
 function netBag(b) {
   if (NET.bags.has(b.id)) return; const g = new THREE.Group(), k = new Kit();
-  k.add(gS(10, 8), MT.leather, 0, .22, 0, 0, 0, 0, .3, .26, .3); k.add(gS(7, 5), MT.leatherD, 0, .46, 0, 0, 0, 0, .12, .09, .12); k.add(gRing(.1, .02, 8), MT.rope, 0, .4, 0); k.bake(g);
+  k.add(gB(.62, .36, .46), MT.woodL, 0, .18, 0); k.add(gB(.67, .07, .5), MT.woodD, 0, .39, 0); k.add(gB(.06, .38, .5), MT.ironD, -.2, .19, 0); k.add(gB(.06, .38, .5), MT.ironD, .2, .19, 0); k.bake(g);
   if (b.c) { const beam = new THREE.Mesh(new THREE.CylinderGeometry(.18, .18, 14, 8, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.7, .5), transparent: true, opacity: .32, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); beam.position.y = 7; g.add(beam); }
   g.position.set(b.x, Math.max(b.y - .3, terrainH(b.x, b.z)), b.z); g.traverse((o) => { o.userData.loot = b.id; }); lootRoot.add(g); NET.bags.set(b.id, { g, id: b.id });
 }
@@ -5356,7 +5381,7 @@ setLang(LANG);
 requestAnimationFrame(frame);
 requestAnimationFrame(() => requestAnimationFrame(() => { document.body.classList.add('ready'); performance.mark('ready'); const pb = $('#btnPlay'); if (pb && typeof THREE !== 'undefined') pb.disabled = false; menuCharStart(); (async () => { if (inCG()) { await cgBoot(); cgLoaded(); } await cgAutoPlay(); })(); }));
 // gancho de pruebas: avanza la simulación sin depender de los FPS
-window.__isla = { pauseGame, renderPauseRoster, sendInv, deployables, remoteRoot, pressR(v) { mouseR = v; }, remotes: () => NET.remotes.values(), NET, netMsg, netSend, remoteHit, hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
+window.__isla = { dropSlot, get chestOpen() { return chestOpen; }, pauseGame, renderPauseRoster, sendInv, deployables, remoteRoot, pressR(v) { mouseR = v; }, remotes: () => NET.remotes.values(), NET, netMsg, netSend, remoteHit, hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
   caveRoofs, BIOMES, biomeAt, CAVES, caveDark, caveInfo, roofH, player, inv, nodes, pieces, animals, spawnAnimal, LAKES, waterSurfaceAt, stats, giveItem, spawnBot, terrainH, spawn: SPAWN, scene, refreshEnv, renderer, POIS, destroyPiece, post, weather, setWeather(w) { wxState = w; wxTimer = 999; }, ctlData, N, CELL, HALF, camera, pieceRoot, get state() { return state; }, get aim() { return aim; }, get placement() { return placement; }, get waterAim() { return waterAim; },
   sim(sec, hold) { const n = Math.round(sec / .05); for (let k = 0; k < n; k++) { if (hold) mouseL = true; if (hold === 'click' && k === 0) clickQueued = true; waterTime.value += .05; scene.updateMatrixWorld(); tick(.05, performance.now()); } if (hold) mouseL = false; },
   setPhase(p) { dayPhase = p; } };
