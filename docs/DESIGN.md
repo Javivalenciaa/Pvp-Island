@@ -55,3 +55,12 @@
 - Si muere, `killSleeper` suelta una bolsa con todo (casillas + armadura), lo quita del mapa y guarda un aviso para su dueño. Si el dueño vuelve antes, `join` con el mismo `token` despierta el mismo cuerpo (mismo id) y la bienvenida incluye `restore` (inventario, armadura, hambre, sed, vida) y la posición.
 - Un segundo `join` con el mismo token mientras hay otra conexión releva a la anterior. Los tramposos expulsados no dejan cuerpo.
 - Persistencia: `sleepers` y `deadSleepers` van en el JSON de la sala; los cuerpos dormidos caducan a las 24 h (se sueltan en una bolsa).
+
+
+## Asedio y defensa (server/src/room.js, deps.js, buildings.js)
+
+- **C4** (deployable `c4`, 40 de vida, máx. 8 por tribu): se coloca pegada a una pared u objeto; el dueño pulsa **G** y detona todas las suyas a ≤90 m (`det`), con una pequeña cascada de 0,12 s. Usa la explosión `charge` (380 × 1,6 contra piezas, R 3,2): a quemarropa son ~243 contra metal, así que **7 rompen una pared de metal (1500)**, 5 una puerta metálica y 2 una pared de piedra. Quien la golpea antes la **desactiva** (sin explosión).
+- **Torretas**: ballesta 650, lanzallamas 520, mortero 750 de vida (antes 260/240/280). Mejora (`dup`, tecla U apuntando): nivel 1 = 30 lingotes + 8 engranajes, nivel 2 = 60 + 16; cada nivel +50 % de munición y +35 % de vida. Si la mejora se rechaza se devuelve el coste.
+- **Caja fuerte** (`safe`): 1500 de vida, 48 huecos, los golpes de arma hacen el 3 % (solo la rompen los explosivos: ~7 C4); receta carísima (40 lingotes, 10 engranajes, 60 piedra).
+- **Escudo** (item `shield`, clic derecho para alzarlo): reduce un 78 % los golpes, flechas y virotes de torreta que vienen de frente (≤ ~63°); **no** protege de explosiones ni fuego. Se desgasta con cada golpe bloqueado. Los clanes de bots lo usan en raids contra bases con torretas (`ai.shielded`, −70 % sin comprobar ángulo).
+- **Rampas** (pieza `ramp`, sobre un cimiento sin techo, 4 direcciones): 7 escalones de 0,46 m que llegan a la altura del techo vecino, para subir a los tejados y construir más pisos.

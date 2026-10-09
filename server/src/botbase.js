@@ -291,6 +291,8 @@ export function startRaid(room, bt, target) {
   room.feed('raid', ti.name, target.name, { x: Math.round(target.x), z: Math.round(target.z) });
   for (const o of target.owners) if (o.ws) room.send(o, { t: 'alert', k: 'incoming', by: ti.name });
   for (const m of members(room, bt.tid)) if (m.ai && !['fight', 'flee', 'rest', 'eat', 'craft'].includes(m.ai.mode) && m.ai.gear !== 'fists') { m.ai.mode = 'idle'; m.ai.until = 0; }
+  const turrets = [...room.D.map.values()].filter((d) => d.owner === target.tid && (d.t === 'ballista' || d.t === 'flamer' || d.t === 'mortar')).length; bt.raid.shielded = turrets > 0;
+  for (const m of members(room, bt.tid)) if (m.ai) m.ai.shielded = bt.raid.shielded; // escudos contra torretas
 }
 function raidPieces(room, tid) { const out = []; for (const q of room.B.map.values()) if (q.owner === tid) out.push(q); return out; }
 function runRaid(room, p, b, bt) {
@@ -366,6 +368,7 @@ export function tick(room) {
     // camas: los bots reaparecen en su base
     for (const m of mem) if (bt.bedId && room.D.map.has(bt.bedId)) m.bed = bt.bedId;
     // raid en marcha: terminar si no queda nadie
+    if (!bt.raid) for (const m of mem) if (m.ai && m.ai.shielded) m.ai.shielded = false;
     if (bt.raid) { const r = bt.raid; const alive = [...r.members].filter((id) => room.players.get(id) && room.players.get(id).dead <= 0).length; if (r.phase === 'over' || t > r.ends + 60 || (t - r.started > 20 && !alive && !mem.some((m) => m.ai && m.ai.mode === 'raid'))) { bt.raid = null; bt.lastRaid = t; } }
     // lanzar un raid nuevo
     if (!bt.raid && bt.base && bt.built && mem.length) {

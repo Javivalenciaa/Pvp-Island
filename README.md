@@ -35,6 +35,9 @@ Juego de supervivencia multijugador PvP para navegador (pensado para CrazyGames)
 | **Cuerpo dormido al desconectarse (estilo ARK)**: tu personaje se queda durmiendo donde estaba; otros jugadores pueden matarlo y llevarse sus cosas, y si nadie lo mata vuelves con tu inventario, armadura, posición y vida (`server/src/test_sleep.js`, `tools/test_sleep_ui.js`). Persiste en disco (24 h) | Hecho |
 | Los bots se presentan como jugadores (nombres de una lista fija de 61, sin etiquetas), la pausa lista a todos los jugadores del mapa y rechazan invitaciones a tribu | Hecho |
 | Arcón de un clan roto: el botín queda en el suelo con una baliza dorada y el clan no lo rehace hasta 10 min después | Hecho |
+| **Arranque inmediato + tutorial jugable** (primera partida: revienta una base de paja con bombas, fabrica, construye, farmea y pasa a la isla con kit; saltable) y regalo/racha al volver cada día (`tools/test_tutorial_ui.js`) | Hecho |
+| **Asedio y defensa avanzados**: C4 con detonación remota (pegada a un muro, 7 rompen una pared de metal), torretas con mucha más vida y mejorables en 2 niveles (muy caras), caja fuerte de hierro (48 huecos, solo explosivos), escudos (clic derecho), rampas para subir a los techos (`server/src/test_siege.js`, `tools/test_siege_ui.js`) | Hecho |
+| Tirar objetos al suelo (Q / clic derecho: caja de 60 s) y cajas de botín que se abren, se coge lo que se quiere y tienen cuenta atrás (`test_bags.js`) | Hecho |
 | Inventario y crafting con autoridad total del servidor | Pendiente (hoy el cliente manda; solo hay detección de abusos gruesos) |
 | Prueba de rendimiento en GPU real con 20 jugadores | Pendiente (el servidor aguanta 20 jugadores con ~1,3 ms por tick) |
 

@@ -4,11 +4,11 @@ import { buildWorld } from '../../shared/world.js';
 import { createTerrain } from '../../shared/terrain.js';
 import { MAPS, DT } from '../../shared/maps.js';
 import { Buildings, PIECE_DMG, TIER_MULT, TIER_RES, EXP_RES, pieceCenter } from './buildings.js';
-import { Deps, DEF, DEP_DMG, EXPLOSIONS } from './deps.js';
+import { Deps, DEF, DEP_DMG, EXPLOSIONS, TURRET_UPG, C4_MAX } from './deps.js';
 import { Fauna, ANI } from './animals.js';
 import * as BB from './botbase.js';
 const WEAPONS = { fists: [4, 3.2], stone_axe: [13, 3.8], stone_pick: [13, 3.8], hammer: [10, 3.8], spear: [26, 4.8], iron_axe: [22, 4], iron_pick: [22, 4], iron_sword: [48, 4.2] }, RANGED = { bow: 40, crossbow: 80 };
-const HELD = new Set(['stone_axe', 'stone_pick', 'iron_axe', 'iron_pick', 'hammer', 'spear', 'iron_sword']);
+const HELD = new Set(['shield', 'stone_axe', 'stone_pick', 'iron_axe', 'iron_pick', 'hammer', 'spear', 'iron_sword']);
 const PROT = process.env.PROT_SECONDS !== undefined ? +process.env.PROT_SECONDS : 30;
 const SPEED = 4.8, SPRINT = 7.8, RADIUS = 160, HP = 100, REACH = 2.6, DMG = 14, ATK_CD = .6;
 const isBotOwner = (tid) => typeof tid === 'string' && tid.startsWith('tb');
@@ -126,6 +126,9 @@ export class Room {
     else if (m.t === 'drop') this.dropBag(p, m.slots);
     else if (m.t === 'lpick') this.pickBag(p, +m.id);
     else if (m.t === 'toss') this.tossItem(p, m.item);
+    else if (m.t === 'det') this.detonate(p);
+    else if (m.t === 'dup') this.upgradeDep(p, +m.id);
+    else if (m.t === 'block') p.blocking = !!m.on && p.held === 'shield' && p.dead <= 0;
     else if (m.t === 'bopen') this.bagOpen(p, +m.id);
     else if (m.t === 'btake') this.bagTake(p, +m.id, +m.i, String(m.item), +m.n);
     else if (m.t === 'bed') this.setBed(p, +m.id);
@@ -206,6 +209,7 @@ export class Room {
     if (!DEF[t] || !Number.isFinite(x + y + z)) return fail('Objeto no válido');
     if (Math.hypot(x - p.x, z - p.z) > 14) return fail('Está demasiado lejos');
     if (this.D.countOf(p.tid) >= 150) return fail('Tu tribu ha alcanzado el límite de objetos');
+    if (t === 'c4' && [...this.D.map.values()].filter((q) => q.t === 'c4' && q.owner === p.tid).length >= C4_MAX) return fail('Demasiadas cargas C4 colocadas');
     const o = this.D.add(t, x, y, z, d.r, p.tid); this.broadcast({ t: 'db', d: this.D.pub(o) });
   }
   ownDep(p, id) { const d = this.D.map.get(id); return d && d.owner === p.tid ? d : null; }
@@ -213,23 +217,35 @@ export class Room {
   spill(d) { const bag = this.D.addBag(d.x, d.y + .3, d.z, d.slots); if (bag) { bag.expire = this.t + 900; this.broadcast({ t: 'lb', b: { id: bag.id, x: bag.x, y: bag.y, z: bag.z, c: d.t === 'chest' ? 1 : 0 } }); } }
   destroyDep(d, by) {
     if (by) this.reportAdd(d.owner, by, d.t === 'chest' ? 'chest' : 'deps', 1);
-    if (by && d.t === 'chest' && by.tid !== d.owner) this.feed('chest', by.bot ? this.tribeLabel(by.tid) : by.name, this.tribeLabel(d.owner));
+    if (by && (d.t === 'chest' || d.t === 'safe') && by.tid !== d.owner) this.feed('chest', by.bot ? this.tribeLabel(by.tid) : by.name, this.tribeLabel(d.owner));
     this.D.map.delete(d.id); this.broadcast({ t: 'dd', id: d.id, by: 0, refund: null });
     if (d.slots) this.spill(d);
     if (d.t === 'barrel') this.explode('barrel', d.x, d.y + .6, d.z, by);
   }
   damageDep(d, dmg, by) { if (by) this.raidHit(d.owner, by); d.hp -= dmg; if (d.hp > 0) { this.broadcast({ t: 'dh', id: d.id, hp: Math.round(d.hp) }); return; } this.destroyDep(d, by); }
   depHit(p, id, weapon) {
-    const d = this.D.map.get(id); if (!d || p.dead > 0 || p.cd > 0 || d.owner === p.tid || !this.depNear(p, d, 5.2)) return; p.cd = .4; this.broadcast({ t: 'swing', id: p.id }); this.damageDep(d, DEP_DMG[weapon] ?? 1, p);
+    const d = this.D.map.get(id); if (!d || p.dead > 0 || p.cd > 0 || d.owner === p.tid || !this.depNear(p, d, 5.2)) return; p.cd = .4; this.broadcast({ t: 'swing', id: p.id }); this.damageDep(d, (DEP_DMG[weapon] ?? 1) * (d.t === 'safe' ? .03 : 1), p);
   }
   loadTurret(p, id, n) {
     const d = this.ownDep(p, id); if (!d || !DEF[d.t].turret || !this.depNear(p, d, 6)) return this.send(p, { t: 'dammo', id, refund: n });
-    const cap = DEF[d.t].turret.cap, ok = Math.max(0, Math.min(n, cap - d.ammo)); d.ammo += ok; this.send(p, { t: 'dammo', id, ammo: d.ammo, refund: n - ok }); this.broadcast({ t: 'da', id, ammo: d.ammo });
+    const cap = this.capOf(d), ok = Math.max(0, Math.min(n, cap - d.ammo)); d.ammo += ok; this.send(p, { t: 'dammo', id, ammo: d.ammo, refund: n - ok }); this.broadcast({ t: 'da', id, ammo: d.ammo });
+  }
+  // C4: el dueño las detona a distancia (hasta 90 m); quien las destruye antes solo las desactiva
+  detonate(p) {
+    if (p.dead > 0 || p.sleeping || this.t < (p.detT || 0)) return; p.detT = this.t + .5; const mine = [...this.D.map.values()].filter((d) => d.t === 'c4' && d.owner === p.tid && Math.hypot(d.x - p.x, d.z - p.z) <= 90);
+    if (!mine.length) return this.notice(p, 'No tienes cargas C4 a menos de 90 m'); this.broadcast({ t: 'fx', k: 'det', id: 0, x: p.x, y: p.y + 1.5, z: p.z, tx: p.x, ty: p.y, tz: p.z });
+    mine.forEach((d, i) => this.later(.12 * i, () => { if (!this.D.map.has(d.id)) return; this.D.map.delete(d.id); this.broadcast({ t: 'dd', id: d.id, by: 0, refund: null }); this.explode('charge', d.x, d.y, d.z, p); }));
+  }
+  capOf(d) { const T = DEF[d.t].turret; return T ? Math.round(T.cap * (1 + .5 * (d.lvl || 0))) : 0; }
+  upgradeDep(p, id) {
+    const d = this.ownDep(p, id), lvl = d ? d.lvl || 0 : 0, cost = TURRET_UPG[lvl];
+    if (!d || !DEF[d.t].turret || !cost || !this.depNear(p, d, 6)) { for (const c of TURRET_UPG[Math.max(0, Math.min(1, +(d && d.lvl) || 0))] || []) this.send(p, { t: 'give', items: [[c[0], c[1]]] }); return this.notice(p, 'No se puede mejorar'); }
+    d.lvl = lvl + 1; d.maxHp = Math.round(DEF[d.t].hp * (1 + .35 * d.lvl)); d.hp = d.maxHp; this.broadcast({ t: 'da', id, lvl: d.lvl }); this.broadcast({ t: 'dh', id, hp: Math.round(d.hp) }); this.notice(p, 'Torreta mejorada al nivel ' + d.lvl);
   }
   armTrap(p, id) { const d = this.ownDep(p, id); if (!d || d.t !== 'beartrap' || d.armed || !this.depNear(p, d, 4)) return; d.armed = true; this.broadcast({ t: 'da', id, armed: true }); }
-  chestOpen(p, id) { const d = this.D.map.get(id); if (!d || d.t !== 'chest' || d.owner !== p.tid || !this.depNear(p, d, 6)) return this.notice(p, 'No puedes abrir este cofre'); this.send(p, { t: 'chest', id, slots: d.slots }); }
+  chestOpen(p, id) { const d = this.D.map.get(id); if (!d || (d.t !== 'chest' && d.t !== 'safe') || d.owner !== p.tid || !this.depNear(p, d, 6)) return this.notice(p, 'No puedes abrir este cofre'); this.send(p, { t: 'chest', id, slots: d.slots }); }
   chestSet(p, id, slots) {
-    const d = this.D.map.get(id); if (!d || d.t !== 'chest' || d.owner !== p.tid || !this.depNear(p, d, 8) || !Array.isArray(slots) || slots.length !== 24) return;
+    const d = this.D.map.get(id); if (!d || (d.t !== 'chest' && d.t !== 'safe') || d.owner !== p.tid || !this.depNear(p, d, 8) || !Array.isArray(slots) || slots.length !== d.slots.length) return;
     this.chestOut(p, d, slots.map((s) => (s && typeof s.id === 'string' ? { id: s.id.slice(0, 24), n: Math.min(999, s.n | 0) } : null)));
     d.slots = slots.map((s) => (s && typeof s.id === 'string' && s.n > 0 ? { id: s.id.slice(0, 24), n: Math.min(999, s.n | 0), dur: s.dur } : null));
   }
@@ -286,7 +302,7 @@ export class Room {
       else if (T && d.ammo > 0) {
         const es = this.enemiesNear(d, T.range, T.min || 0); if (!es.length) continue;
         if (d.cd > 0) continue; d.cd = T.cd; const tgt = d.t === 'mortar' ? es.sort((a, b) => b[1] - a[1])[0][0] : es.sort((a, b) => a[1] - b[1])[0][0];
-        if (d.t === 'ballista') { d.ammo--; this.broadcast({ t: 'fx', k: 'bolt', id: d.id, x: d.x, y: d.y + 1.15, z: d.z, tx: tgt.x, ty: tgt.y + 1.1, tz: tgt.z }); this.hurt(tgt, T.dmg, null, 'trap'); }
+        if (d.t === 'ballista') { d.ammo--; this.broadcast({ t: 'fx', k: 'bolt', id: d.id, x: d.x, y: d.y + 1.15, z: d.z, tx: tgt.x, ty: tgt.y + 1.1, tz: tgt.z }); this.hurt(tgt, T.dmg, null, 'trap', d); }
         else if (d.t === 'flamer') { d.fuel = (d.fuel || 0) + T.cd; if (d.fuel >= 3) { d.fuel = 0; d.ammo--; } this.broadcast({ t: 'fx', k: 'flame', id: d.id, x: d.x, y: d.y + 1.1, z: d.z, tx: tgt.x, ty: tgt.y, tz: tgt.z }); for (const [q] of es) { const a = Math.atan2(q.x - d.x, q.z - d.z), b = Math.atan2(tgt.x - d.x, tgt.z - d.z); let da = Math.abs(a - b); if (da > Math.PI) da = 2 * Math.PI - da; if (da < .5) this.hurt(q, T.dmg, null, 'fire'); } }
         else { d.ammo--; this.broadcast({ t: 'fx', k: 'shell', id: d.id, x: d.x, y: d.y + .9, z: d.z, tx: tgt.x, ty: tgt.y, tz: tgt.z }); const tx = tgt.x, ty = tgt.y, tz = tgt.z; setTimeout(() => this.explode('shell', tx, ty + .3, tz, null), 2400); }
         this.broadcast({ t: 'da', id: d.id, ammo: d.ammo });
@@ -359,7 +375,8 @@ export class Room {
   // arma o herramienta que lleva cada jugador en la mano (los demás la ven)
   setHeld(p, w) { w = HELD.has(w) ? w : ''; if (p.held !== undefined && p.held === w) return; p.held = w; this.broadcast({ t: 'held', id: p.id, w }); }
   get world() { return this._w || (this._w = buildWorld(this.T)); }
-  hurt(q, dmg, by, cause) { if (!(dmg > 0)) return; if (by && by !== q) { q.lastBy = by.id; q.lastByT = this.t; } if ((by || cause === 'trap' || cause === 'fire' || cause === 'explosion' || cause === 'animal') && by !== q && cause !== 'selfdmg' && q.prot > this.t) return; if (by && by.prot > this.t) by.prot = 0; q.hp -= dmg; q.regenT = this.t + 10; this.broadcast({ t: 'hit', id: q.id, hp: Math.max(0, Math.round(q.hp)), by: by ? by.id : 0 }); if (q.hp <= 0 && !(q.dead > 0)) { q.dead = 4; q.deaths++; if (by) by.kills++; this.broadcast({ t: 'kill', victim: q.id, killer: by ? by.id : 0, cause: cause || '' }); if (q.sleeping) this.killSleeper(q, by); } }
+  hurt(q, dmg, by, cause, src) { if (!(dmg > 0)) return;
+    if ((q.blocking || (q.ai && q.ai.shielded)) && cause !== 'explosion' && cause !== 'fire' && cause !== 'selfdmg') { const s = src || by, fx = -Math.sin(q.yaw), fz = -Math.cos(q.yaw); if (q.ai || (s && ((s.x - q.x) * fx + (s.z - q.z) * fz) / (Math.hypot(s.x - q.x, s.z - q.z) || 1) > .45)) { dmg *= q.ai ? .3 : .22; if (q.ws) this.send(q, { t: 'blocked' }); } } if (by && by !== q) { q.lastBy = by.id; q.lastByT = this.t; } if ((by || cause === 'trap' || cause === 'fire' || cause === 'explosion' || cause === 'animal') && by !== q && cause !== 'selfdmg' && q.prot > this.t) return; if (by && by.prot > this.t) by.prot = 0; q.hp -= dmg; q.regenT = this.t + 10; this.broadcast({ t: 'hit', id: q.id, hp: Math.max(0, Math.round(q.hp)), by: by ? by.id : 0 }); if (q.hp <= 0 && !(q.dead > 0)) { q.dead = 4; q.deaths++; if (by) by.kills++; this.broadcast({ t: 'kill', victim: q.id, killer: by ? by.id : 0, cause: cause || '' }); if (q.sleeping) this.killSleeper(q, by); } }
   tick() {
     this.t += DT;
     for (const p of this.players.values()) {

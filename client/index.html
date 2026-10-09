@@ -201,6 +201,8 @@ body.touch #rank{top:calc(12px + env(safe-area-inset-top,0px))}body.touch #feed{
 #pauseRoster .pl span{background:rgba(236,229,212,.07);border:1px solid rgba(236,229,212,.1);border-radius:4px;padding:2px 8px;font-size:13px;color:#d6d0bf;white-space:nowrap}
 #pauseRoster .pl span.me{border-color:var(--ember);color:#ffd7a8}#pauseRoster .pl span.zz{opacity:.6}
 #pauseRoster .pl small{color:#ffb27a;margin-left:5px;font-size:11px}
+body.blocking #cross{transform:translate(-50%,-50%) scale(2.2);opacity:.45}
+body.blocking #hurt{box-shadow:inset 0 0 120px rgba(90,160,255,.4)}
 #toasts{position:absolute;left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(120px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:4px;align-items:flex-start}
 .toast{padding:5px 10px;font-size:14px;font-weight:600;border-radius:4px;background:rgba(10,14,12,.75);border-left:3px solid var(--moss);animation:tin .2s ease-out}
 .toast.bad{border-left-color:var(--blood)}
@@ -471,7 +473,7 @@ body:not(.ready) .glass{backdrop-filter:none;-webkit-backdrop-filter:none}
     <h2 class="brand" style="font-size:56px">Pausa</h2>
     <div id="pauseUser" hidden></div>
     <p class="lede" id="pauseTxt">Tu progreso se guarda automáticamente.</p>
-    <div class="ctas"><button class="btn" id="btnResume" type="button">Continuar</button><button class="btn ghost" id="btnMenuBack" type="button">Salir al menú</button><button class="btn ghost" id="btnReset" type="button">Nueva partida</button><button class="btn ghost" id="btnTLeave" type="button" hidden>Abandonar tribu</button><button class="btn ghost" id="btnLook2" type="button">Personalizar personaje</button><button class="btn ghost" id="btnPriv" type="button">Privacidad</button></div>
+    <div class="ctas"><button class="btn" id="btnResume" type="button">Continuar</button><button class="btn ghost" id="btnMenuBack" type="button">Salir al menú</button><button class="btn ghost" id="btnTutSkip" type="button" hidden>Saltar tutorial</button><button class="btn ghost" id="btnReset" type="button">Nueva partida</button><button class="btn ghost" id="btnTLeave" type="button" hidden>Abandonar tribu</button><button class="btn ghost" id="btnLook2" type="button">Personalizar personaje</button><button class="btn ghost" id="btnPriv" type="button">Privacidad</button></div>
     <p class="records" id="records2"></p>
     <div class="qrow"><span>Idioma</span><div class="qb"><button type="button" class="chipbtn" data-lang="en">English</button><button type="button" class="chipbtn" data-lang="es">Español</button></div></div>
     <div class="qrow"><span>Calidad gráfica</span><div class="qb"><button type="button" class="chipbtn" data-q="baja">Baja</button><button type="button" class="chipbtn" data-q="media">Media</button><button type="button" class="chipbtn" data-q="alta">Alta</button><button type="button" class="chipbtn" data-q="ultra">Ultra</button></div></div>
@@ -529,7 +531,7 @@ function fbm(x, y, o) { let s = 0, a = .5, f = 1, n = 0; for (let i = 0; i < o; 
 let LANG = 'en';
 try { const l = store.get('isla-lang'); if (l === 'es' || l === 'en') LANG = l; } catch (e) { /* sin almacenamiento */ }
 const NAMES = {
-  'Madera': 'Wood', 'Piedra': 'Stone', 'Fibra': 'Fiber', 'Mineral de hierro': 'Iron ore', 'Lingote de hierro': 'Iron ingot', 'Flecha': 'Arrow', 'Venda': 'Bandage',
+  'C4': 'C4', 'Caja fuerte': 'Safe', 'Escudo': 'Shield', 'Rampa': 'Ramp', 'Madera': 'Wood', 'Piedra': 'Stone', 'Fibra': 'Fiber', 'Mineral de hierro': 'Iron ore', 'Lingote de hierro': 'Iron ingot', 'Flecha': 'Arrow', 'Venda': 'Bandage',
   'Hacha de piedra': 'Stone axe', 'Pico de piedra': 'Stone pickaxe', 'Lanza de madera': 'Wooden spear', 'Arco': 'Bow', 'Hacha de hierro': 'Iron axe', 'Pico de hierro': 'Iron pickaxe', 'Espada de hierro': 'Iron sword',
   'Banco de trabajo': 'Workbench', 'Horno': 'Furnace', 'Hoguera': 'Campfire', 'Bayas': 'Berries', 'Manzana': 'Apple', 'Carne cruda': 'Raw meat', 'Carne asada': 'Cooked meat', 'Piel': 'Hide',
   'Odre vacío': 'Empty waterskin', 'Odre con agua': 'Full waterskin', 'Odre lleno': 'Full waterskin', 'Carbón': 'Charcoal', 'Azufre': 'Sulfur', 'Pólvora': 'Gunpowder', 'Grasa': 'Fat', 'Engranaje': 'Gear', 'Semillas': 'Seeds',
@@ -648,11 +650,12 @@ Object.assign(ES_EN, { 'Nombre': 'Name', 'Tribu (opcional)': 'Tribe (optional)',
   'Está demasiado lejos': 'They are too far away', 'Ese jugador ya tiene tribu': 'That player already has a tribe', 'Tu tribu está completa (máximo 3)': 'Your tribe is full (maximum 3)', 'Esa tribu está completa (máximo 3)': 'That tribe is full (maximum 3)', 'Ya tienes tribu': 'You already have a tribe',
   'Tu tribu se ha disuelto': 'Your tribe has been dissolved', 'No tienes tribu': "You don't have a tribe", 'Has abandonado la tribu': 'You left the tribe', 'Escribe y pulsa Enter (/t para tu tribu)': 'Type and press Enter (/t for your tribe)' });
 Object.assign(ES_EN, {
+  'Saltar tutorial': 'Skip tutorial', 'La rampa va sobre un cimiento': 'Ramps go on a foundation', 'Ya hay una rampa aquí': 'There is already a ramp here', 'Quita el techo para poner una rampa': 'Remove the ceiling to place a ramp', 'Hay una rampa aquí': 'There is a ramp here', 'La rampa va sobre un cimiento sin techo': 'Ramps go on a foundation without a ceiling', 'Demasiadas cargas C4 colocadas': 'Too many C4 charges placed', 'No tienes cargas C4 a menos de 90 m': 'You have no C4 charges within 90 m', 'No se puede mejorar': 'Cannot be upgraded', 'Rampa': 'Ramp',
   'Una isla, muchos clanes y una sola ley: lo que construyes puede ser raideado. Recoge recursos, levanta tu base, guarda tu botín en un arcón y asalta las bases de otros jugadores y clanes. Forma una tribu de hasta 3 y defiende lo vuestro: aquí nadie está a salvo, ni siquiera cuando te desconectas.': "One island, many clans and a single law: whatever you build can be raided. Gather resources, build your base, stash your loot in a chest and raid the bases of other players and clans. Form a tribe of up to 3 and defend what's yours: nobody is safe here, not even when you log off.",
   'Base de clan': 'Clan base', 'CONSTRUYE': 'BUILD', 'RAIDEA': 'RAID', 'SOBREVIVE': 'SURVIVE', 'Cimientos, paredes, una puerta y un arcón con tu botín.': 'Foundations, walls, a door and a chest for your loot.', 'Rompe las bases de otros clanes y roba sus arcones.': "Break into other clans' bases and steal their chests.", 'Forma una tribu de 3 y defiende lo vuestro.': "Form a tribe of 3 and defend what's yours.",
   'Fabrica un Arcón en el banco de trabajo y colócalo dentro de tu casa: guarda ahí tu botín. Otros clanes irán a por él.': 'Craft a Chest at the workbench and place it inside your house: keep your loot there. Other clans will come for it.',
   'Derrota a un jugador o a un bot en combate.': 'Defeat a player or a bot in combat.' });
-RULES.unshift([/^Tu cuerpo dormido fue abatido(?: por (.+))?\. Has perdido tus pertenencias\.$/, (m) => `Your sleeping body was killed${m[1] ? ' by ' + m[1] : ''}. You lost your belongings.`], [/^Domar \((.+)\)$/, (m) => `Tame (${tr(m[1])})`], [/^Domando: (\d+)%$/, (m) => `Taming: ${m[1]}%`], [/^(.+) ha domado un animal$/, (m) => `${m[1]} tamed an animal`], [/^(.+) \(domado\)$/, (m) => `${tr(m[1])} (tamed)`], [/^manzana o bayas$/, () => 'apple or berries'],
+RULES.unshift([/^Torreta mejorada al nivel (\d+)$/, (m) => `Turret upgraded to level ${m[1]}`], [/^Tu cuerpo dormido fue abatido(?: por (.+))?\. Has perdido tus pertenencias\.$/, (m) => `Your sleeping body was killed${m[1] ? ' by ' + m[1] : ''}. You lost your belongings.`], [/^Domar \((.+)\)$/, (m) => `Tame (${tr(m[1])})`], [/^Domando: (\d+)%$/, (m) => `Taming: ${m[1]}%`], [/^(.+) ha domado un animal$/, (m) => `${m[1]} tamed an animal`], [/^(.+) \(domado\)$/, (m) => `${tr(m[1])} (tamed)`], [/^manzana o bayas$/, () => 'apple or berries'],
   [/^(.+) te invita a su tribu$/, (m) => `${m[1]} invites you to their tribe`], [/^Invitar a tribu: (.+)$/, (m) => `Invite to tribe: ${m[1]}`], [/^Invitación enviada a (.+)$/, (m) => `Invitation sent to ${m[1]}`], [/^(.+) ha rechazado la invitación$/, (m) => `${m[1]} declined the invitation`],
   [/^(.+) se ha unido a la tribu$/, (m) => `${m[1]} joined the tribe`], [/^(.+) ha abandonado la tribu$/, (m) => `${m[1]} left the tribe`], [/^(.+) se ha unido$/, (m) => `${m[1]} joined`], [/^(.+) ha salido$/, (m) => `${m[1]} left`], [/^Tribu de (.+)$/, (m) => `${m[1]}'s tribe`],
   [/^Tribu: (.+)$/, (m) => `Tribe: ${m[1]}`], [/^(.+) ha abatido a (.+)$/, (m) => `${m[1]} killed ${m[2]}`], [/^Te ha abatido (.+)\. Tus pertenencias han quedado en una bolsa donde caíste \(marcada en el mapa\)\.$/, (m) => `${m[1]} took you down. Your belongings are in a bag where you fell (marked on the map).`], [/^Has muerto\. Reapareces en otro punto de la isla\.$/, () => 'You died. You respawn somewhere else on the island.']);
@@ -756,6 +759,9 @@ const ITEMS = {
   bed: { name: 'Cama', stack: 1, icon: 'bed', deploy: 'bed' },
   garden: { name: 'Huerto', stack: 4, icon: 'garden', deploy: 'garden' },
   collector: { name: 'Recolector de lluvia', stack: 2, icon: 'collector', deploy: 'collector' },
+  c4: { name: 'C4', stack: 8, icon: 'c4', deploy: 'c4' },
+  safe: { name: 'Caja fuerte', stack: 1, icon: 'safe', deploy: 'safe' },
+  shield: { name: 'Escudo', stack: 1, icon: 'shield', tint: IRON_TINT, shield: true, dur: 260 },
 };
 // planos: estas recetas no se pueden fabricar hasta encontrarlos
 const BLUEPRINTS = { ballista: 'Torreta de ballesta', flamer: 'Lanzallamas', mortar: 'Mortero', mine: 'Mina', barrel: 'Barril explosivo', bomb: 'Bomba de pólvora', crossbow: 'Ballesta' };
@@ -816,8 +822,11 @@ const RECIPES = [
   { id: 'ballista', out: 'ballista', n: 1, cost: { ingot: 10, wood: 40, gear: 2 }, time: 8, tier: 2, station: 'workbench', bp: 'ballista' },
   { id: 'flamer', out: 'flamer', n: 1, cost: { ingot: 14, gear: 3, fat: 6 }, time: 8, tier: 2, station: 'workbench', bp: 'flamer' },
   { id: 'mortar', out: 'mortar', n: 1, cost: { ingot: 18, gear: 4, stone: 40 }, time: 10, tier: 2, station: 'workbench', bp: 'mortar' },
+  { id: 'shield', out: 'shield', n: 1, cost: { wood: 30, ingot: 5, hide: 2 }, time: 5, tier: 2, station: 'workbench' },
+  { id: 'c4', out: 'c4', n: 1, cost: { gunpowder: 12, ingot: 8, gear: 3 }, time: 8, tier: 2, station: 'workbench' },
+  { id: 'safe', out: 'safe', n: 1, cost: { ingot: 40, gear: 10, stone: 60 }, time: 14, tier: 2, station: 'workbench' },
 ];
-const MULTI = new Set(['ingot', 'arrow', 'bandage', 'cooked_meat', 'charcoal', 'gunpowder', 'torch', 'spikes', 'palisade', 'bomb', 'mine', 'seeds']);
+const MULTI = new Set(['ingot', 'arrow', 'bandage', 'cooked_meat', 'charcoal', 'gunpowder', 'torch', 'spikes', 'palisade', 'bomb', 'mine', 'seeds', 'c4']);
 const BTIERS = [
   { name: 'Paja', mult: .25, cost: { wood: 8 }, res: 0, expRes: 0, fire: 2 },
   { name: 'Madera', mult: 1, cost: { wood: 40 }, res: .25, expRes: 0, fire: 1 },
@@ -829,13 +838,17 @@ const PIECES = {
   wall: { name: 'Pared', hp: 300, units: 1 },
   door: { name: 'Puerta', hp: 220, units: 1 },
   ceiling: { name: 'Techo', hp: 250, units: 1 },
+  ramp: { name: 'Rampa', hp: 300, units: 1.5 },
 };
-const PIECE_ORDER = ['foundation', 'wall', 'door', 'ceiling'];
+const PIECE_ORDER = ['foundation', 'wall', 'door', 'ceiling', 'ramp'];
 const pieceCost = (kind, tier) => { const c = {}; for (const k in BTIERS[tier].cost) c[k] = Math.ceil(BTIERS[tier].cost[k] * PIECES[kind].units); return c; };
 const costText = (c) => Object.keys(c).map((k) => c[k] + ' ' + ITEMS[k].name.toLowerCase()).join(', ');
 const maxDur = (id) => (ITEMS[id] && ITEMS[id].dur) || 0;
 
 const ICON = {
+  c4: '<svg viewBox="0 0 24 24"><rect x="3" y="9" width="18" height="9" rx="1.5" fill="#b8372c"/><rect x="5" y="11" width="9" height="5" fill="#1b1b1b"/><circle cx="18" cy="13.5" r="1.6" fill="#ff5a3a"/><path d="M8 9V6l5-3" stroke="#d9b36b" stroke-width="1.6" fill="none"/></svg>',
+  safe: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="#3b3f45"/><rect x="5" y="6" width="14" height="12" rx="1" fill="#5a6068"/><circle cx="12" cy="12" r="3.4" fill="#d4b062"/><path d="M12 9.6v4.8M9.6 12h4.8" stroke="#3b3f45" stroke-width="1.2"/></svg>',
+  shield: '<svg viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.4 9-8 11-4.6-2-8-6-8-11V5z" fill="currentColor"/><path d="M12 5l5 1.8v4.2c0 3.4-2.2 6.2-5 7.6V5z" fill="rgba(255,255,255,.22)"/></svg>',
   charcoal: '<svg viewBox="0 0 24 24"><path d="M4 16l3-7 6-3 6 3 1 7-5 4H8z" fill="#2b2b2b"/><path d="M7 9l6-3 6 3-6 2z" fill="#4a4a4a"/></svg>',
   sulfur: '<svg viewBox="0 0 24 24"><path d="M3 17l3-8 6-4 6 3 3 7-4 4H6z" fill="#8a8243"/><path d="M8 12l3-3 3 2-2 4zM14 15l2-2 2 2-2 2z" fill="#f0d63a"/></svg>',
   powder: '<svg viewBox="0 0 24 24"><path d="M5 20l2-9h10l2 9z" fill="#3a3a3a"/><path d="M8 11c0-3 2-5 4-5s4 2 4 5z" fill="#6e4421"/><circle cx="12" cy="16" r="1.4" fill="#d4493c"/></svg>',
@@ -897,7 +910,7 @@ class Inventory {
       const m = Math.min(it.stack - s.n, rem); if (m <= 0) continue; s.n += m; rem -= m;
     }
     // herramientas y objetos usables van primero a la barra rápida; los recursos, a la mochila
-    const usable = it.tool || it.bow || it.deploy || it.heal || it.food || it.water || it.armor || it.throwable, n = this.slots.length;
+    const usable = it.tool || it.bow || it.deploy || it.heal || it.food || it.water || it.armor || it.throwable || it.shield, n = this.slots.length;
     for (let k = 0; k < n && rem > 0; k++) {
       const i = usable ? k : (k + 6) % n;
       if (this.slots[i]) continue;
@@ -1969,13 +1982,25 @@ function boxGeo(w, h, d) {
 const GEO = { wall: boxGeo(3, WALL_H, .2), ceiling: boxGeo(3, .2, 3), pillar: boxGeo(.9, WALL_H, .2), lintel: boxGeo(1.2, .7, .2), panel: boxGeo(1.2, 2.3, .08) };
 
 // geometría local de cada pieza: cajas [x0,x1,y0,y1,z0,z1] relativas al grupo
+// rampa: 7 escalones de ~0,46 m (el jugador sube hasta 0,55 m) que llevan al nivel del techo vecino
+function rampShape(dir) {
+  const N = 7, H = 3.2 / N, D = 3 / N, boxes = [], meshes = [];
+  for (let k = 0; k < N; k++) {
+    const lo = -1.5 + k * D, h = (k + 1) * H; let b;
+    if (dir === 's') b = [-1.4, 1.4, 0, h, lo, 1.5]; else if (dir === 'n') b = [-1.4, 1.4, 0, h, -1.5, 1.5 - k * D]; else if (dir === 'e') b = [lo, 1.5, 0, h, -1.4, 1.4]; else b = [-1.5, 1.5 - k * D, 0, h, -1.4, 1.4];
+    boxes.push(b); meshes.push([boxGeo(b[1] - b[0], h, b[5] - b[4]), (b[0] + b[1]) / 2, h / 2, (b[4] + b[5]) / 2]);
+  }
+  return { boxes, meshes };
+}
 function pieceShape(p) {
+  if (p.kind === 'ramp') return rampShape(p.dir);
   if (p.kind === 'foundation') { const h = p.top - p.bottom; return { boxes: [[-1.5, 1.5, -h, 0, -1.5, 1.5]], meshes: [[boxGeo(3, h, 3), 0, -h / 2, 0, true]] }; }
   if (p.kind === 'wall') return { boxes: [[-1.5, 1.5, 0, WALL_H, -.1, .1]], meshes: [[GEO.wall, 0, WALL_H / 2, 0]] };
   if (p.kind === 'ceiling') return { boxes: [[-1.5, 1.5, 0, .2, -1.5, 1.5]], meshes: [[GEO.ceiling, 0, .1, 0]] };
   return { boxes: [[-1.5, -.6, 0, WALL_H, -.1, .1], [.6, 1.5, 0, WALL_H, -.1, .1], [-.6, .6, 2.3, WALL_H, -.1, .1]], door: [-.6, .6, 0, 2.3, -.06, .06], meshes: [[GEO.pillar, -1.05, WALL_H / 2, 0], [GEO.pillar, 1.05, WALL_H / 2, 0], [GEO.lintel, 0, 2.65, 0]] };
 }
 function pieceOrigin(p) {
+  if (p.kind === 'ramp') return { x: p.i * GRID + 1.5, y: p.top, z: p.j * GRID + 1.5, rot: 0 };
   if (p.kind === 'foundation') return { x: p.i * GRID + 1.5, y: p.top, z: p.j * GRID + 1.5, rot: 0 };
   if (p.kind === 'ceiling') return { x: p.i * GRID + 1.5, y: p.top + p.L * LEVEL_H + WALL_H, z: p.j * GRID + 1.5, rot: 0 };
   const y = p.top + p.L * LEVEL_H;
@@ -2054,11 +2079,14 @@ const stdMat = (c, o) => new THREE.MeshStandardMaterial(Object.assign({ color: l
 const DEP_DEFS = {
   workbench: { half: [.9, .45], h: 1.1, hp: 300 }, furnace: { half: [.65, .65], h: 2.4, hp: 400 }, campfire: { half: [.6, .6], h: .3, hp: 150, light: 1, lightY: .8 },
   chest: { half: [.72, .45], h: .95, hp: 700 }, spikes: { half: [.95, .45], h: .5, hp: 420, noCollide: true }, beartrap: { half: [.45, .45], h: .15, hp: 120, noCollide: true },
-  palisade: { half: [1.5, .3], h: 2.6, hp: 380 }, ballista: { half: [.55, .55], h: 1.5, hp: 260, turret: { range: 28, cd: 1.5, ammo: 'arrow', cap: 60 } },
-  flamer: { half: [.5, .5], h: 1.4, hp: 240, turret: { range: 9.5, cd: .25, ammo: 'fat', cap: 20 } }, mortar: { half: [.6, .6], h: 1.1, hp: 280, turret: { range: 46, min: 12, cd: 4.5, ammo: 'gunpowder', cap: 20 } },
+  palisade: { half: [1.5, .3], h: 2.6, hp: 380 }, ballista: { half: [.55, .55], h: 1.5, hp: 650, turret: { range: 28, cd: 1.5, ammo: 'arrow', cap: 60 } },
+  flamer: { half: [.5, .5], h: 1.4, hp: 520, turret: { range: 9.5, cd: .25, ammo: 'fat', cap: 20 } }, mortar: { half: [.6, .6], h: 1.1, hp: 750, turret: { range: 46, min: 12, cd: 4.5, ammo: 'gunpowder', cap: 20 } },
   mine: { half: [.35, .35], h: .12, hp: 20, noCollide: true }, barrel: { half: [.4, .4], h: 1.1, hp: 30 }, torch: { half: [.15, .15], h: 1.9, hp: 80, light: 1, lightY: 2.0, noCollide: true },
   bell: { half: [.55, .25], h: 2.2, hp: 150 }, bed: { half: [1.1, .52], h: .6, hp: 180 }, garden: { half: [1, 1], h: .3, hp: 150, noCollide: true }, collector: { half: [.55, .55], h: 1.35, hp: 140 },
+  c4: { half: [.22, .14], h: .16, hp: 40, noCollide: true }, safe: { half: [.72, .52], h: 1.15, hp: 1500 },
 };
+const TURRET_UPG = [[['ingot', 30], ['gear', 8]], [['ingot', 60], ['gear', 16]]];
+const capOfD = (d) => { const T = DEP_DEFS[d.t] && DEP_DEFS[d.t].turret; return T ? Math.round(T.cap * (1 + .5 * (d.lvl || 0))) : 0; };
 const DEP_MATS = { gold: stdMat('#d4b062', { metalness: .7, roughness: .35 }), red: stdMat('#b8372c'), black: stdMat('#2b2f33', { metalness: .5, roughness: .5 }), soil: stdMat('#3d2a1a'), leaf: stdMat('#4f7d33'), water: stdMat('#3d8aa6', { roughness: .1 }), cloth: stdMat('#d6cfbd'), blanket: stdMat('#a83a2e'), hidem: stdMat('#a0764a', { side: THREE.DoubleSide }), wood: stdMat('#9c6a3a'), dark: stdMat('#6e4421'), stone: stdMat('#7c7d78', { flatShading: true }), stone2: stdMat('#5e5f5b', { flatShading: true }), fire: stdMat('#ff9b47', { emissive: lin('#ff6a10'), emissiveIntensity: 1.6 }), metal: stdMat('#b9c0c3', { metalness: .6, roughness: .4 }) };
 function depModel(type) {
   const g = new THREE.Group(); const add = (geo, mat, x, y, z, parent) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; (parent || g).add(m); return m; };
@@ -2068,6 +2096,14 @@ function depModel(type) {
     add(B(1.4, .7, .85), DEP_MATS.wood, 0, .35, 0); add(B(1.44, .24, .89), DEP_MATS.dark, 0, .8, 0);
     for (const x of [-.55, .55]) add(B(.08, .94, .91), DEP_MATS.metal, x, .47, 0);
     add(B(.22, .26, .06), DEP_MATS.gold, 0, .6, .45); return out;
+  }
+  if (type === 'c4') {
+    add(B(.44, .1, .26), DEP_MATS.red, 0, .06, 0); add(B(.4, .02, .22), DEP_MATS.black, 0, .12, 0); add(B(.08, .05, .06), DEP_MATS.gold, .12, .14, 0);
+    const led = add(new THREE.SphereGeometry(.025, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff2a1f }), -.12, .15, 0); led.castShadow = false; return out;
+  }
+  if (type === 'safe') {
+    add(B(1.3, 1.05, .95), DEP_MATS.black, 0, .55, 0); add(B(1.18, .93, .06), DEP_MATS.metal, 0, .55, .5); add(new THREE.CylinderGeometry(.16, .16, .08, 14), DEP_MATS.gold, .0, .56, .56).rotation.x = Math.PI / 2;
+    add(B(.08, .26, .05), DEP_MATS.gold, .38, .55, .55); for (const x of [-.55, .55]) add(B(.14, .1, .14), DEP_MATS.metal, x, .05, .35); return out;
   }
   if (type === 'spikes') {
     const log = add(C(.12, .12, 1.9, 8), DEP_MATS.dark, 0, .14, -.2); log.rotation.z = Math.PI / 2;
@@ -2159,7 +2195,7 @@ function addDeployable(d) {
   d.fire = mdl.fire; d.head = mdl.head; d.jaws = mdl.jaws; d.plants = mdl.plants; d.fruit = mdl.fruit; d.waterMesh = mdl.waterMesh;
   d.maxHp = def.hp; if (d.hp == null) d.hp = d.maxHp; d.ammo = d.ammo || 0; d.grow = d.grow || 0; d.water = d.water || 0;
   if (d.t === 'beartrap' && d.armed == null) d.armed = true;
-  if (d.t === 'chest') { const ci = new Inventory(24); if (d.slots) d.slots.forEach((sl, i) => { ci.slots[i] = sl && ITEMS[sl.id] ? sl : null; }); d.inv = ci; delete d.slots; }
+  if (d.t === 'chest' || d.t === 'safe') { const ci = new Inventory(d.t === 'safe' ? 48 : 24); if (d.slots) d.slots.forEach((sl, i) => { ci.slots[i] = sl && ITEMS[sl.id] ? sl : null; }); d.inv = ci; delete d.slots; }
   if (d.jaws) setTrap(d); if (d.plants) setGarden(d); if (d.waterMesh) setCollector(d);
   d.obj.traverse((m) => { m.userData.dep = d; });
   depRoot.add(d.obj); deployables.push(d); rebuildColliders();
@@ -2703,6 +2739,7 @@ const AXE_STONE = [[0, .12], [.09, .14], [.16, .07], [.18, -.04], [.13, -.12], [
 // armas: la empuñadura queda en el origen, el cuerpo del arma crece hacia +Y y el filo mira a +Z
 function weaponModel(kind, tier) {
   const g = new THREE.Group(), k = new Kit(), stone = tier === 1, head = stone ? MT.stone : MT.iron;
+  if (kind === 'shield') { k.add(new THREE.CylinderGeometry(.34, .34, .05, 18), MT.woodL, 0, 0, 0, Math.PI / 2, 0, 0); k.add(new THREE.TorusGeometry(.34, .03, 6, 20), MT.ironD, 0, 0, .0, 0, 0, 0); k.add(gS(8, 6), head, 0, 0, .05, 0, 0, 0, .1, .1, .06); k.add(gB(.7, .05, .02), MT.ironD, 0, 0, .03); k.add(gB(.05, .7, .02), MT.ironD, 0, 0, .03); k.bake(g, true); g.rotation.y = Math.PI / 2; return g; }
   const lash = (y, r) => k.add(gRing(r, .0075, 10), MT.rope, 0, y, 0);
   if (kind === 'axe' || kind === 'pick' || kind === 'hammer') {
     const H = kind === 'hammer' ? .55 : .76;
@@ -2871,6 +2908,7 @@ function buildVM(key) {
   else if (it.icon === 'axe' || it.icon === 'pick' || it.icon === 'spear' || it.icon === 'sword' || key === 'hammer') {
     const kind = key === 'hammer' ? 'hammer' : it.icon, w = weaponModel(kind, it.tint === IRON_TINT ? 2 : 1); w.rotation.y = Math.PI; root.add(w, handModel());
     vmS.anim = kind === 'spear' ? 'thrust' : kind === 'sword' ? 'slash' : 'chop';
+  } else if (it.shield) { const w = weaponModel('shield', 2); w.rotation.y = 0; w.position.set(-.18, -.02, -.28); root.add(w, holdHand(-1, -.1, -.1, -.2)); vmS.anim = 'hold';
   } else if (it.deploy) { const d = depModel(it.deploy); d.g.scale.setScalar(.22); d.g.rotation.y = .6; d.g.position.y = -.05; root.add(d.g, holdHand(1, 0, -.2, .04)); vmS.own = false; vmS.anim = 'hold'; }
   else { const m = itemModel(key, it); root.add(m, holdHand(1, 0, -.12, .03)); vmS.anim = it.food || it.water || it.heal ? 'use' : it.throwable ? 'chop' : 'hold'; }
   root.traverse((m) => { if (m.isMesh) { m.castShadow = false; m.material = vmLit(m.material); } });
@@ -3963,6 +4001,7 @@ const ONLINE_OBJ = [
 ];
 const objList = () => (NET.on ? ONLINE_OBJ : OBJECTIVES);
 function updateObjective() {
+  if (TUT.on) { tutObjective(); return; }
   const LIST = objList();
   while (objIndex < LIST.length && LIST[objIndex].ok()) { objIndex++; if (objIndex < LIST.length) { toast('Objetivo completado', 'info'); cgHappy(); sfx.craft(); } }
   if (objIndex >= LIST.length) {
@@ -4025,6 +4064,78 @@ function updateRank() {
   $('#rkN').textContent = `${LT('Nv.', 'Lv.')} ${lv} · ${LANG === 'es' ? r[0] : r[1]}`; $('#rkB').style.width = Math.min(100, (tot - a) / (b - a) * 100) + '%'; el.hidden = false;
   if (clock - XP.save > 10) { XP.save = clock; try { store.set('pvp-xp', String(Math.round(tot))); } catch (e) { /* sin almacenamiento */ } }
 }
+// ---------------------------------------------------------------- tutorial jugable (3 minutos, saltable) y regalo de regreso
+const TUT = { on: false, step: 0, snap: {}, base: null, t0: 0 };
+const tutNeeded = () => { try { return !store.get('pvp-tut') && !/[?&]notut=1/.test(location.search); } catch (e) { return false; } };
+function tutSite() {
+  const G = GRID;
+  for (let rr = 13; rr < 120; rr += 2) for (let a = 0; a < 6.28; a += .3) {
+    const x = Math.round((SPAWN.x + Math.cos(a) * rr) / 3) * 3, z = Math.round((SPAWN.z + Math.sin(a) * rr) / 3) * 3, hs = [];
+    for (let u = 0; u <= 6; u += 1.5) for (let v = 0; v <= 6; v += 1.5) hs.push(terrainH(x + u, z + v));
+    if (Math.min(...hs) < 2.2 || Math.max(...hs) - Math.min(...hs) > .8 || LAKES.some((L) => Math.hypot(x - L.x, z - L.z) < L.R * 1.7) || POIS.some((q) => Math.hypot(x - q.x, z - q.z) < 25)) continue;
+    for (const n of nodes) if (Math.abs(n.x - x - 3) < 8 && Math.abs(n.z - z - 3) < 8 && !n.depleted) { n.depleted = true; writeNode(n); }
+    return { x, z, top: Math.max(...hs) + .3, bottom: Math.min(...hs) - .6, i0: x / G, j0: z / G };
+  }
+  return null;
+}
+function tutBuildDummy() {
+  const site = tutSite(); if (!site) return null; const P = [];
+  for (const [di, dj] of [[0, 0], [1, 0], [0, 1], [1, 1]]) P.push({ kind: 'foundation', key: `F${site.i0 + di},${site.j0 + dj}`, i: site.i0 + di, j: site.j0 + dj });
+  [['h', 0, 0], ['h', 1, 0], ['v', 0, 0], ['v', 0, 1], ['v', 2, 0], ['v', 2, 1], ['h', 0, 2], ['h', 1, 2]].forEach(([d, i, j], k) => P.push({ kind: k === 7 ? 'door' : 'wall', key: `W${d}${site.i0 + i},${site.j0 + j},0`, i: site.i0 + i, j: site.j0 + j, dir: d }));
+  for (const [di, dj] of [[0, 0], [1, 0], [0, 1], [1, 1]]) P.push({ kind: 'ceiling', key: `C${site.i0 + di},${site.j0 + dj},0`, i: site.i0 + di, j: site.j0 + dj });
+  for (const q of P) addPiece(Object.assign({ L: 0, tier: 0, top: site.top, bottom: site.bottom, owner: 'tut' }, q));
+  return { x: site.x + 3, z: site.z + 3 };
+}
+const tutSnap = () => ({ crafted: { ...stats.crafted }, placed: { ...stats.placed }, wood: stats.got.wood || 0 });
+const TUT_STEPS = [
+  { t: () => LT('¡Revienta la base de paja! Selecciona la bomba (1) y lánzala con clic.', 'Blow up the straw base! Select the bomb (1) and throw it with a click.'), dir: true,
+    enter() { TUT.base = tutBuildDummy(); giveItem('bomb', 5); sel = 0; },
+    ok: () => !TUT.base || pieces.filter((p) => p.owner === 'tut' && p.kind !== 'foundation').length <= 3,
+    done() { giveItem('wood', 140); giveItem('stone', 70); giveItem('fiber', 14); giveItem('hide', 2); showBanner(LT('¡BOOM!', 'BOOM!'), LT('Botín conseguido: materiales para tu primera base', 'Loot secured: materials for your first base'), false); sfx.craft(); } },
+  { t: () => LT('Abre la mochila con Tab y fabrica una lanza.', 'Open your backpack with Tab and craft a spear.'), ok: () => (stats.crafted.spear || 0) > (TUT.snap.crafted.spear || 0) },
+  { t: () => LT('Pulsa B y coloca un cimiento en el suelo.', 'Press B and place a foundation on the ground.'), ok: () => (stats.placed.foundation || 0) > (TUT.snap.placed.foundation || 0) },
+  { t: () => LT('Levanta 3 paredes y una puerta sobre el cimiento (teclas 2 y 3 en modo construcción).', 'Raise 3 walls and a door on the foundation (keys 2 and 3 in build mode).'), ok: () => (stats.placed.wall || 0) - (TUT.snap.placed.wall || 0) >= 3 && (stats.placed.door || 0) > (TUT.snap.placed.door || 0) },
+  { t: () => LT('Farmea: golpea un árbol con tu hacha hasta reunir 15 de madera.', 'Farm: hit a tree with your axe until you have 15 wood.'), enter() { giveItem('stone_axe', 1); }, ok: () => (stats.got.wood || 0) - TUT.snap.wood >= 15 },
+];
+function tutGoto(n) {
+  TUT.step = n; TUT.snap = tutSnap(); const st = TUT_STEPS[n]; if (!st) { tutFinish(false); return; }
+  if (st.enter) st.enter(); toast(LT(`Tutorial ${n + 1}/${TUT_STEPS.length}`, `Tutorial ${n + 1}/${TUT_STEPS.length}`), 'info'); updateObjective();
+}
+function tutStart() {
+  if (TUT.on) return; TUT.on = true; TUT.t0 = performance.now(); clearTimeout(CG.autoT); document.body.classList.add('tutorial');
+  if (!myLook) { curLook = randomLook(); try { store.set('pvp-look', JSON.stringify(curLook)); } catch (e) { /* sin almacenamiento */ } }
+  startGame(); player.pos.set(SPAWN.x, terrainH(SPAWN.x, SPAWN.z) + .1, SPAWN.z); player.yaw = SPAWN.yaw || 0; tutGoto(0);
+  showBanner('Pvp-Island', LT('Aprende en 3 minutos: raidea, fabrica, construye', 'Learn in 3 minutes: raid, craft, build'), false);
+}
+function tutObjective() {
+  const st = TUT_STEPS[TUT.step]; if (!st) return;
+  ui.objLab.textContent = LT(`Tutorial ${TUT.step + 1} de ${TUT_STEPS.length}`, `Tutorial ${TUT.step + 1} of ${TUT_STEPS.length}`); ui.objTxt.textContent = st.t();
+  ui.objSub.textContent = st.dir && TUT.base ? bearingLT(TUT.base.x, TUT.base.z) : LT('Esc → «Saltar tutorial» para ir directo a la isla', 'Esc → "Skip tutorial" to go straight to the island');
+}
+function tutUpdate() {
+  if (!TUT.on) return; const st = TUT_STEPS[TUT.step]; if (!st || !st.ok()) return;
+  if (st.done) st.done(); sfx.craft(); cgHappy(); tutGoto(TUT.step + 1);
+}
+function tutFinish(skipped) {
+  if (!TUT.on) return; TUT.on = false; document.body.classList.remove('tutorial'); try { store.set('pvp-tut', '1'); } catch (e) { /* sin almacenamiento */ }
+  for (const p of pieces.slice()) if (p.owner === 'tut' || !NET.on) { try { destroyPiece(p); } catch (e) { /* ya retirada */ } }
+  for (const d of deployables.slice()) { try { removeDeployable(d); } catch (e) { /* ya retirado */ } }
+  for (const a of animals.slice()) removeAnimal(a); inv.slots.fill(null); player.armorId = null;
+  inv.add('stone_axe', 1); inv.add('stone_pick', 1); inv.add('bandage', 2); inv.add('cooked_meat', 3); inv.add('wood', 60); inv.add('stone', 30); inv.add('bomb', 1); inv.touch(); sel = 0;
+  showBanner(LT('¡A LA ISLA!', 'TO THE ISLAND!'), LT('Otros jugadores construyen y raidean. Te hemos dado un kit inicial.', 'Other players build and raid. We gave you a starter kit.'), false);
+  if (!NET.on) { $('#inName').value = (($('#inName').value || (CG.user && CG.user.username) || store.get('pvp-name') || 'Player') + '').slice(0, 16); netConnect(); }
+}
+// regalo por volver (cada día nuevo) y racha de días
+function retentionGift() {
+  try {
+    const now = Date.now(), last = +store.get('pvp-seen') || 0, day = new Date(now).toDateString(), lastDay = store.get('pvp-day') || '';
+    store.set('pvp-seen', String(now)); if (lastDay === day) return;
+    let streak = +store.get('pvp-streak') || 0; streak = lastDay === new Date(now - 864e5).toDateString() ? streak + 1 : 1; store.set('pvp-day', day); store.set('pvp-streak', String(streak));
+    if (!last) return; const kit = [['bandage', 3], ['cooked_meat', 5], ['wood', 60], ['stone', 30]]; if (streak >= 3) kit.push(['ingot', 3]); if (streak >= 5) kit.push(['bomb', 1]);
+    setTimeout(() => { for (const [id, n] of kit) giveItem(id, n); showBanner(LT(`Racha de ${streak} día${streak > 1 ? 's' : ''}`, `${streak}-day streak`), LT('Regalo de bienvenida añadido a tu mochila. Vuelve mañana para más.', 'Welcome-back gift added to your backpack. Come back tomorrow for more.'), false); }, 2500);
+  } catch (e) { /* sin almacenamiento */ }
+}
+$('#btnTutSkip').addEventListener('click', () => { tutFinish(true); startGame(); });
 function updateHook() { if (!NET.on) return; updateBagTimer(); updateBasePing(); updateRank(); if (clock - (NET.invT || -9) > 4) { NET.invT = clock; sendInv(); } }
 
 // ---------------------------------------------------------------- estado, entrada
@@ -4045,9 +4156,10 @@ canvas.addEventListener('mousedown', (e) => {
   audio();
   if (!locked && !fallbackLook) { requestLock(); return; }
   if (e.button === 0) { mouseL = true; clickQueued = true; }
-  if (e.button === 2) mouseR = true;
+  if (e.button === 2) { mouseR = true; shieldSync(); }
 });
-addEventListener('mouseup', (e) => { if (e.button === 0) mouseL = false; if (e.button === 2) mouseR = false; });
+addEventListener('mouseup', (e) => { if (e.button === 0) mouseL = false; if (e.button === 2) { mouseR = false; shieldSync(); } });
+function shieldSync() { const sl = inv.slots[sel], want = !!(NET.on && state === 'playing' && mouseR && sl && ITEMS[sl.id].shield); if (want !== !!NET.block) { NET.block = want; netSend({ t: 'block', on: want }); document.body.classList.toggle('blocking', want); } }
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 addEventListener('mousemove', (e) => {
   if (state !== 'playing' || panelOpen) return;
@@ -4071,8 +4183,13 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Tab' || e.code === 'KeyI') { togglePanel(); return; }
   if (panelOpen) { if (e.code === 'Escape') togglePanel(); return; }
   if (e.code === 'Escape') { if (mapOpen) { toggleMap(); return; } pauseGame(); return; }
-  if (/^Digit[1-6]$/.test(e.code)) { const n = +e.code.slice(5) - 1; if (buildMode) { if (n < 4) buildPiece = n; } else sel = n; }
+  if (/^Digit[1-6]$/.test(e.code)) { const n = +e.code.slice(5) - 1; if (buildMode) { if (n < PIECE_ORDER.length) buildPiece = n; } else sel = n; }
   if (e.code === 'KeyQ' && NET.on && !buildMode) { dropSlot(sel, e.shiftKey); return; }
+  if (e.code === 'KeyG' && NET.on) { netSend({ t: 'det' }); return; }
+  if (e.code === 'KeyU' && NET.on && aim && aim.kind === 'dep' && aim.dep.owner === NET.tid && DEP_DEFS[aim.dep.t].turret) {
+    const up = TURRET_UPG[aim.dep.lvl || 0]; if (!up) { toast(LT('Nivel máximo', 'Max level'), 'info'); return; } const cost = Object.fromEntries(up);
+    if (!inv.has(cost)) { toast(LT('Necesitas ', 'You need ') + costText(cost), 'bad'); sfx.bad(); return; } for (const k in cost) inv.remove(k, cost[k]); netSend({ t: 'dup', id: aim.dep.sid }); sfx.craft(); return;
+  }
   if (e.code === 'KeyF' && NET.on && NET.mount) { netSend({ t: 'dismount' }); return; }
   if (e.code === 'KeyB') { buildMode = !buildMode; ui.build.hidden = !buildMode; hotVer = -1; }
   if (e.code === 'KeyE') interact();
@@ -4134,13 +4251,14 @@ function startGame() {
 }
 function renderPauseRoster() {
   const box = $('#pauseRoster'); if (!NET.on) { box.hidden = true; return; }
+  $('#pauseTxt').textContent = LT('Si sales, tu personaje se queda durmiendo en el mapa: otros jugadores pueden saquearlo. Vuelve para recuperarlo todo.', 'If you leave, your character stays asleep on the map: other players can loot it. Come back to recover everything.');
   const list = [...NET.roster.values()].sort((a, b) => (a.id === NET.id ? -1 : b.id === NET.id ? 1 : a.name.localeCompare(b.name)));
   $('#prH').textContent = LT(`Jugadores en el mapa (${list.length})`, `Players on the map (${list.length})`); const L = $('#prL'); L.innerHTML = '';
   for (const q of list) { const sp = document.createElement('span'); sp.className = (q.id === NET.id ? 'me' : '') + (q.sleep ? ' zz' : ''); sp.textContent = q.name + (q.id === NET.id ? LT(' (tú)', ' (you)') : ''); if (q.tribe) { const t = document.createElement('small'); t.textContent = q.tribe; sp.appendChild(t); } if (q.sleep) { const z = document.createElement('small'); z.textContent = 'Zzz'; sp.appendChild(z); } L.appendChild(sp); }
   box.hidden = false;
 }
-function pauseGame() { if (state !== 'playing') return; state = 'paused'; mouseL = false; $('#pause').hidden = false; renderPauseRoster(); $('#resetConfirm').hidden = true; $('#records2').textContent = recordsText(); save(); }
-$('#btnPlay').addEventListener('click', () => { if (ONLINE && !NET.on) { audio(); netConnect(); } else startGame(); });
+function pauseGame() { if (state !== 'playing') return; state = 'paused'; mouseL = false; $('#pause').hidden = false; $('#btnTutSkip').hidden = !TUT.on; renderPauseRoster(); $('#resetConfirm').hidden = true; $('#records2').textContent = recordsText(); save(); }
+$('#btnPlay').addEventListener('click', () => { if (ONLINE && !NET.on) { audio(); if (tutNeeded()) tutStart(); else netConnect(); } else startGame(); });
 $('#btnResume').addEventListener('click', startGame);
 // salir de la partida: sin conexión vuelve al menú al instante; en línea cierra la conexión y recarga directo al menú (estado limpio)
 $('#btnMenuBack').addEventListener('click', () => {
@@ -4386,6 +4504,11 @@ function computeBuildPlacement() {
       if (pieceMap.has(res.key)) { res.ok = false; res.why = 'Ya hay una pared aquí'; }
       else if (!wallSupported(res)) { res.ok = false; res.why = 'Necesita un techo debajo'; }
     }
+  } else if (kind === 'ramp') {
+    res.i = i; res.j = j; const f = foundationAt(i, j), d = new THREE.Vector3(); camera.getWorldDirection(d);
+    res.dir = Math.abs(d.x) > Math.abs(d.z) ? (d.x > 0 ? 'e' : 'w') : (d.z > 0 ? 's' : 'n'); res.L = 0; res.key = `R${i},${j}`;
+    if (!f) { res.ok = false; res.why = 'La rampa va sobre un cimiento'; res.top = p.y; }
+    else { res.top = f.top; if (pieceMap.has(res.key)) { res.ok = false; res.why = 'Ya hay una rampa aquí'; } else if (pieceMap.has(cKey(i, j, 0))) { res.ok = false; res.why = 'Quita el techo para poner una rampa'; } }
   } else {
     res.i = i; res.j = j; const f = foundationAt(i, j);
     if (!f) { res.ok = false; res.why = 'El techo va sobre un cimiento con paredes'; res.top = p.y; res.L = 0; }
@@ -4406,6 +4529,7 @@ function computeBuildPlacement() {
 }
 function computeDeployPlacement(type) {
   const hit = placementPoint(5); if (!hit) return null;
+  if (type === 'c4') { const res = { dep: 'c4', x: hit.p.x, y: hit.p.y, z: hit.p.z, r: 0, ok: !!(hit.piece || hit.dep), why: '' }; if (!res.ok) res.why = LT('Pega la C4 a una pared o a un objeto', 'Stick the C4 to a wall or an object'); return res; }
   const x = hit.p.x, z = hit.p.z, y = groundAt(x, z, hit.p.y + .3);
   const r = depRot * Math.PI / 2, mdl = DEP_DEFS[type].half, swap = depRot % 2 === 1, hx = swap ? mdl[1] : mdl[0], hz = swap ? mdl[0] : mdl[1];
   const res = { dep: type, x, y, z, r, ok: true, why: '' };
@@ -4422,7 +4546,7 @@ function updateGhost() {
   else if (s && ITEMS[s.id].deploy) placement = computeDeployPlacement(ITEMS[s.id].deploy);
   if (!placement) { if (ghost) ghost.visible = false; return; }
   const mat = placement.ok ? ghostOk : ghostBad;
-  const key = placement.dep ? `D${placement.dep}${depRot}` : `${placement.key}|${placement.top.toFixed(2)}|${placement.bottom ? placement.bottom.toFixed(2) : ''}`;
+  const key = placement.dep ? `D${placement.dep}${depRot}` : `${placement.key}|${placement.dir || ''}|${placement.top.toFixed(2)}|${placement.bottom ? placement.bottom.toFixed(2) : ''}`;
   if (key !== ghostKey || !ghost) {
     if (ghost) { scene.remove(ghost); if (ghost.userData.disposeGeo) ghost.traverse((m) => { if (m.isMesh) m.geometry.dispose(); }); }
     ghostKey = key;
@@ -4484,8 +4608,9 @@ function updateHint() {
     h = clock < a.crate.readyAt ? '<span>Caja de suministros</span><span class="warn">Vacía · vuelve más tarde</span>' : '<span>Caja de suministros</span><span><span class="key">E</span>Abrir</span>';
   } else if (a && a.kind === 'dep' && a.d < 4) {
     const d = a.dep, def = DEP_DEFS[d.t]; let ex = '';
-    if (def.turret) ex = `Munición ${d.ammo}/${def.turret.cap} · <span class="key">E</span>Cargar ${ITEMS[def.turret.ammo].name.toLowerCase()}`;
-    else if (d.t === 'chest') ex = d.broken ? '<span class="warn">Roto: repáralo con el martillo</span>' : '<span class="key">E</span>Abrir';
+    if (def.turret) { const up = TURRET_UPG[d.lvl || 0]; ex = `Munición ${d.ammo}/${NET.on ? capOfD(d) : def.turret.cap} · <span class="key">E</span>Cargar ${ITEMS[def.turret.ammo].name.toLowerCase()}` + (NET.on && d.owner === NET.tid ? (up ? ` · <span class="key">U</span>${LT('Mejorar', 'Upgrade')} (${costText(Object.fromEntries(up))})` : ' · ' + LT('Nivel máximo', 'Max level')) + (d.lvl ? ` · ${LT('Nv.', 'Lv.')} ${d.lvl}` : '') : ''); }
+    else if (d.t === 'chest' || d.t === 'safe') ex = d.broken ? '<span class="warn">Roto: repáralo con el martillo</span>' : '<span class="key">E</span>Abrir' + (d.t === 'safe' ? LT(' · solo los explosivos la rompen', ' · only explosives break it') : '');
+    else if (d.t === 'c4') ex = d.owner === NET.tid ? LT('<span class="key">G</span>Detonar todas tus C4', '<span class="key">G</span>Detonate all your C4') : LT('¡Golpéala para desactivarla!', 'Hit it to defuse it!');
     else if (d.t === 'beartrap') ex = d.armed ? 'Armado' : '<span class="key">E</span>Armar';
     else if (d.t === 'garden') ex = !d.planted ? '<span class="key">E</span>Plantar semillas' : d.grow >= 1 ? '<span class="key">E</span>Cosechar' : `Creciendo ${Math.round(d.grow * 100)}%`;
     else if (d.t === 'collector') ex = `Agua ${Math.floor(d.water)}/10 · <span class="key">E</span>Beber o llenar odre`;
@@ -4840,7 +4965,8 @@ async function cgAutoPlay() {
   if (!myLook) { curLook = randomLook(); store.set('pvp-look', JSON.stringify(curLook)); }
   $('#boot span').textContent = 'Entrando en la isla…'; $('#boot').style.display = 'flex';
   if (!ONLINE) { startGame(); return true; }
-  netConnect(); CG.autoT = setTimeout(() => { if (!NET.on) cgGoOffline(); }, 7000);
+  if (tutNeeded()) { tutStart(); return true; }
+  startGame(); player.pos.set(SPAWN.x, terrainH(SPAWN.x, SPAWN.z) + .1, SPAWN.z); netConnect(); CG.autoT = setTimeout(() => { if (!NET.on) toast(LT('Sin conexión con el servidor: jugando en local', 'No connection to the server: playing locally'), 'info'); }, 9000);
   return true;
 }
 
@@ -4857,7 +4983,7 @@ function nameTag(text, color) {
   const t = new THREE.CanvasTexture(c); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false })); sp.scale.set(1.9, .48, 1); sp.renderOrder = 10; return sp;
 }
 // arma que sostiene un jugador remoto (la del servidor); sin arma lleva los puños
-const HELD_OK = new Set(['stone_axe', 'stone_pick', 'iron_axe', 'iron_pick', 'hammer', 'spear', 'iron_sword']);
+const HELD_OK = new Set(['shield', 'stone_axe', 'stone_pick', 'iron_axe', 'iron_pick', 'hammer', 'spear', 'iron_sword']);
 function remoteHold(mdl, id) {
   const m = mdl.mountR; if (!m) return; disposeModel(m); m.clear(); mdl.heldId = id;
   if (!HELD_OK.has(id) || !ITEMS[id]) return; const it = ITEMS[id], kind = id === 'hammer' ? 'hammer' : it.icon, w = weaponModel(kind, it.tint === IRON_TINT ? 2 : 1);
@@ -4916,7 +5042,7 @@ function netMsg(m) {
     dayPhase = m.phase; dayCount = m.day; if (m.wx) wxState = m.wx; NET.id = m.id; NET.tid = m.tid; NET.tribe = m.tribe; $('#btnTLeave').hidden = !m.tribe; NET.roster.clear(); for (const q of m.roster) NET.roster.set(q.id, q);
     player.pos.set(m.x, Math.max(terrainH(m.x, m.z), Number.isFinite(m.y) ? m.y : -1e9) + .1, m.z); player.vel.set(0, 0, 0); player.hp = 100; NET.on = true;
     if (m.restore) { const R = m.restore; inv.slots.fill(null); (R.slots || []).forEach((sl, i) => { if (i < inv.slots.length && sl && ITEMS[sl.id]) inv.slots[i] = { id: sl.id, n: sl.n, dur: sl.dur }; }); inv.touch(); player.armorId = R.armor && ITEMS[R.armor] ? R.armor : null; if (R.hp > 0) player.hp = R.hp; if (Number.isFinite(R.hunger) && R.hunger > 0) player.hunger = R.hunger; if (Number.isFinite(R.thirst) && R.thirst > 0) player.thirst = R.thirst; setTimeout(() => toast(LT('Vuelves a tu cuerpo: conservas todo lo que llevabas', 'You return to your body: you keep everything you were carrying'), 'info'), 1500); } document.body.classList.add('online-on');
-    NET.bases = []; NET.joinT = clock; $('#netStatus').textContent = ''; clearTimeout(CG.autoT); startGame(); cgRoom(true); showBanner('Pvp-Island', LT('Construye tu base · Raidea a los clanes · Sobrevive', 'Build your base · Raid the clans · Survive'), false); if (!store.get('pvp-priv')) privacyShow(); if (m.tribe) toast(`Tribu: ${m.tribe}`, 'info');
+    NET.bases = []; NET.joinT = clock; if (!m.restore) retentionGift(); $('#netStatus').textContent = ''; clearTimeout(CG.autoT); startGame(); cgRoom(true); showBanner('Pvp-Island', LT('Construye tu base · Raidea a los clanes · Sobrevive', 'Build your base · Raid the clans · Survive'), false); if (!store.get('pvp-priv')) privacyShow(); if (m.tribe) toast(`Tribu: ${m.tribe}`, 'info');
   } else if (m.t === 'snap') netSnap(m);
   else if (m.t === 'join') { NET.roster.set(m.id, { id: m.id, name: m.name, tid: m.tid, tribe: m.tribe, sleep: m.sleep, look: m.look || (NET.roster.get(m.id) || {}).look, held: m.held !== undefined ? m.held : (NET.roster.get(m.id) || {}).held }); chatAdd('', `${m.name} se ha unido`, false, true); }
   else if (m.t === 'tribe') {
@@ -4971,7 +5097,8 @@ function netMsg(m) {
   else if (m.t === 'dd') { const d = NET.deps.get(m.id); if (d && m.by === NET.id && d.t === 'chest' && d.owner !== NET.tid) stats.raidChests = (stats.raidChests || 0) + 1; if (d) { burst(new THREE.Vector3(d.x, d.y + .5, d.z), 'wood', 8, 1.2); removeDeployable(d); NET.deps.delete(m.id); if (chestOpen === d) togglePanel(); } if (m.by === NET.id && m.refund) giveItem(m.refund, 1); }
   else if (m.t === 'dh') { const d = NET.deps.get(m.id); if (d) { const dmg = d.hp > m.hp; d.hp = m.hp; if (dmg && Math.hypot(d.x - player.pos.x, d.z - player.pos.z) < 40) { sfx.wood(); burst(new THREE.Vector3(d.x, d.y + .6, d.z), 'wood', 3); } } }
   else if (m.t === 'cwater') { if (m.mode === 'fill') { const sl = inv.slots[sel]; if (sl && sl.id === 'waterskin') { inv.slots[sel] = { id: 'waterskin_full', n: 1, dur: m.k }; inv.touch(); sfx.drink(); toast('Odre lleno', 'info'); } } else { player.thirst = Math.min(100, player.thirst + 20); sfx.drink(); stats.drank = (stats.drank || 0) + 1; toast('Agua', 20, 'w:drink'); } }
-  else if (m.t === 'da') { const d = NET.deps.get(m.id); if (d) { if (m.water != null) { d.water = m.water; if (d.t === 'collector') setCollector(d); } if (m.ammo != null) d.ammo = m.ammo; if (m.armed != null) { d.armed = m.armed; if (d.jaws) setTrap(d); sfx.clank(); } if (m.planted != null) { d.planted = m.planted; d.grow = m.grow || 0; if (d.plants) setGarden(d); } } }
+  else if (m.t === 'blocked') { sfx.clank(); const sl = inv.slots[sel]; if (sl && ITEMS[sl.id].shield && inv.wear(sel, 1)) toast(LT('Tu escudo se ha roto', 'Your shield broke'), 'bad'); }
+  else if (m.t === 'da') { const d = NET.deps.get(m.id); if (d && m.lvl != null) { d.lvl = m.lvl; toast(LT(`Torreta mejorada: nivel ${m.lvl}`, `Turret upgraded: level ${m.lvl}`), 'info'); } if (d) { if (m.water != null) { d.water = m.water; if (d.t === 'collector') setCollector(d); } if (m.ammo != null) d.ammo = m.ammo; if (m.armed != null) { d.armed = m.armed; if (d.jaws) setTrap(d); sfx.clank(); } if (m.planted != null) { d.planted = m.planted; d.grow = m.grow || 0; if (d.plants) setGarden(d); } } }
   else if (m.t === 'dammo') { const d = NET.deps.get(m.id); if (d) { if (m.ammo != null) { d.ammo = m.ammo; toast(`Cargada: ${d.ammo}/${DEP_DEFS[d.t].turret.cap} ${ITEMS[DEP_DEFS[d.t].turret.ammo].name.toLowerCase()}`, 'info'); sfx.craft(); } if (m.refund > 0) giveItem(DEP_DEFS[d.t].turret.ammo, m.refund); } }
   else if (m.t === 'chest') { const d = NET.deps.get(m.id); if (d) { m.slots.forEach((sl, i) => { d.inv.slots[i] = sl && ITEMS[sl.id] ? sl : null; }); d.inv.touch(); chestOpen = d; if (!panelOpen) togglePanel(); else renderPanel(true); } }
   else if (m.t === 'boom') { explode(new THREE.Vector3(m.x, m.y, m.z), m.R, m.dmg, {}); }
@@ -5042,13 +5169,14 @@ function netFx(m) {
   if (m.k === 'bolt') { spawnProj('bolt', from, dir.clone().multiplyScalar(70).add(new THREE.Vector3(0, .3, 0)), { dmg: 0, owner: 'fx' }); sfx.bow(); }
   else if (m.k === 'flame') { for (let k = 0; k < 4; k++) { const f = .2 + Math.random() * .8; burst(from.clone().addScaledVector(dir, 9.5 * f).add(new THREE.Vector3((Math.random() - .5), 0, (Math.random() - .5))), 'fire', 1, 1.6); } if (Math.random() < .3) sfx.flame(); }
   else if (m.k === 'toss') { const T = m.T || .9; spawnProj('shell', from, new THREE.Vector3((to.x - from.x) / T, (to.y + .3 - from.y) / T + 9.8 * T / 2, (to.z - from.z) / T), { dmg: 0, R: 0, owner: 'fx' }); sfx.thud(); }
+  else if (m.k === 'det') { sfx.clank(); }
   else if (m.k === 'shell') { const T = 2.4; spawnProj('shell', from, new THREE.Vector3((to.x - from.x) / T, (to.y + .3 - from.y) / T + 9.8 * T / 2, (to.z - from.z) / T), { dmg: 0, R: 0, owner: 'fx' }); sfx.thud(); }
 }
 function netUse(d) {
   if (d.owner !== NET.tid && !STATION_NAMES[d.t]) { toast('Esto no es de tu tribu', 'bad'); sfx.bad(); return; }
-  if (d.t === 'chest') { netSend({ t: 'copen', id: d.sid }); return; }
+  if (d.t === 'chest' || d.t === 'safe') { netSend({ t: 'copen', id: d.sid }); return; }
   const def = DEP_DEFS[d.t];
-  if (def.turret) { const T = def.turret, n = Math.min(T.cap - d.ammo, inv.count(T.ammo)); if (n <= 0) { toast(d.ammo >= T.cap ? 'Está cargada al máximo' : 'Necesitas ' + ITEMS[T.ammo].name.toLowerCase() + ' para cargarla', 'info'); return; } inv.remove(T.ammo, n); netSend({ t: 'load', id: d.sid, n }); return; }
+  if (def.turret) { const T = def.turret, cp = capOfD(d), n = Math.min(cp - d.ammo, inv.count(T.ammo)); if (n <= 0) { toast(d.ammo >= cp ? 'Está cargada al máximo' : 'Necesitas ' + ITEMS[T.ammo].name.toLowerCase() + ' para cargarla', 'info'); return; } inv.remove(T.ammo, n); netSend({ t: 'load', id: d.sid, n }); return; }
   if (d.t === 'beartrap') { netSend({ t: 'arm', id: d.sid }); return; }
   if (d.t === 'garden') { if (!d.planted) { if (!inv.remove('seeds', 1)) { toast('Necesitas semillas (de los arbustos de bayas o fabrícalas con bayas)', 'bad'); return; } netSend({ t: 'gard', id: d.sid, act: 'plant' }); sfx.bush(); } else if (d.grow < 1) toast(`Aún está creciendo (${Math.round(d.grow * 100)}%)`, 'info'); else netSend({ t: 'gard', id: d.sid, act: 'harvest' }); return; }
   if (d.t === 'bed') { netSend({ t: 'bed', id: d.sid }); return; }
@@ -5086,8 +5214,8 @@ function netConnect() {
   NET.ws = ws; let opened = false;
   ws.onopen = () => { opened = true; ws.send(JSON.stringify({ t: 'join', name, token, map: MAP_ID, look: curLook })); };
   ws.onmessage = (e) => { try { netMsg(JSON.parse(e.data)); } catch (err) { /* mensaje inválido */ } };
-  ws.onerror = () => { if (!opened) { $('#netStatus').textContent = 'No se pudo conectar con el servidor'; if (CG.auto && !NET.on) cgGoOffline(); } };
-  ws.onclose = () => { const was = NET.on; if (CG.auto && !was && !opened) { cgGoOffline(); return; } netClose(); if (was) { toast('Conexión perdida', 'bad'); if (state === 'playing') pauseGame(); } else if (opened) $('#netStatus').textContent = 'Conexión perdida'; };
+  ws.onerror = () => { if (!opened) { $('#netStatus').textContent = 'No se pudo conectar con el servidor'; if (CG.auto && !NET.on && !TUT.on && state !== 'playing') cgGoOffline(); } };
+  ws.onclose = () => { const was = NET.on; if (CG.auto && !was && !opened && !TUT.on && state !== 'playing') { cgGoOffline(); return; } netClose(); if (was) { toast('Conexión perdida', 'bad'); if (state === 'playing') pauseGame(); } else if (opened) $('#netStatus').textContent = 'Conexión perdida'; };
 }
 function renderRooms() {
   const box = $('#roomList'); box.innerHTML = '';
@@ -5126,6 +5254,7 @@ function netTick(dt) {
   } else { NET.invT = 0; $('#invring').hidden = true; }
   updateRemotes(dt); updateNetAnimals(dt);
   if (state === 'playing' && inv.version !== NET.invV && (NET.invT = (NET.invT || 0) - dt) <= 0) { NET.invT = 2; NET.invV = inv.version; const items = {}; for (const sl of inv.slots) if (sl) items[sl.id] = (items[sl.id] || 0) + sl.n; netSend({ t: 'inv', items }); }
+  shieldSync();
   { const hid = state === 'playing' && inv.slots[sel] && HELD_OK.has(inv.slots[sel].id) ? inv.slots[sel].id : ''; if (NET.on && hid !== NET.held) { NET.held = hid; netSend({ t: 'held', w: hid }); } }
   if (state === 'playing' && (NET.sendT -= dt) <= 0) { NET.sendT = .05; netSend({ t: 'pos', x: +player.pos.x.toFixed(2), y: +player.pos.y.toFixed(2), z: +player.pos.z.toFixed(2), yaw: +player.yaw.toFixed(3), pitch: +player.pitch.toFixed(3) }); }
 }
@@ -5287,7 +5416,7 @@ function updateNodes(dt) {
     if (!NET.on) for (const n of nodes) if (n.depleted && !n.fall && clock >= n.respawnAt && Math.hypot(n.x - player.pos.x, n.z - player.pos.z) > 25) { n.depleted = false; n.hp = n.def.hp; n.acc.fill(0); writeNode(n); }
     for (const q of POIS) if (!q.found && Math.hypot(q.x - player.pos.x, q.z - player.pos.z) < 55) { q.found = true; toast('Has descubierto: ' + q.name, 'info'); sfx.craft(); }
     for (const c of CAVES) if (!c.found && Math.hypot(c.x - player.pos.x, c.z - player.pos.z) < 40) { c.found = true; toast('Has descubierto una cueva', 'info'); sfx.craft(); }
-    updateObjective(); updateHook(); renderPanel();
+    updateObjective(); updateHook(); tutUpdate(); renderPanel();
   }
 }
 function updateParts(dt) {
@@ -5381,7 +5510,7 @@ setLang(LANG);
 requestAnimationFrame(frame);
 requestAnimationFrame(() => requestAnimationFrame(() => { document.body.classList.add('ready'); performance.mark('ready'); const pb = $('#btnPlay'); if (pb && typeof THREE !== 'undefined') pb.disabled = false; menuCharStart(); (async () => { if (inCG()) { await cgBoot(); cgLoaded(); } await cgAutoPlay(); })(); }));
 // gancho de pruebas: avanza la simulación sin depender de los FPS
-window.__isla = { dropSlot, get chestOpen() { return chestOpen; }, pauseGame, renderPauseRoster, sendInv, deployables, remoteRoot, pressR(v) { mouseR = v; }, remotes: () => NET.remotes.values(), NET, netMsg, netSend, remoteHit, hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
+window.__isla = { shieldSync, get sel() { return sel; }, ITEMS, TUT, tutFinish, dropSlot, get chestOpen() { return chestOpen; }, pauseGame, renderPauseRoster, sendInv, deployables, remoteRoot, pressR(v) { mouseR = v; }, remotes: () => NET.remotes.values(), NET, netMsg, netSend, remoteHit, hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
   caveRoofs, BIOMES, biomeAt, CAVES, caveDark, caveInfo, roofH, player, inv, nodes, pieces, animals, spawnAnimal, LAKES, waterSurfaceAt, stats, giveItem, spawnBot, terrainH, spawn: SPAWN, scene, refreshEnv, renderer, POIS, destroyPiece, post, weather, setWeather(w) { wxState = w; wxTimer = 999; }, ctlData, N, CELL, HALF, camera, pieceRoot, get state() { return state; }, get aim() { return aim; }, get placement() { return placement; }, get waterAim() { return waterAim; },
   sim(sec, hold) { const n = Math.round(sec / .05); for (let k = 0; k < n; k++) { if (hold) mouseL = true; if (hold === 'click' && k === 0) clickQueued = true; waterTime.value += .05; scene.updateMatrixWorld(); tick(.05, performance.now()); } if (hold) mouseL = false; },
   setPhase(p) { dayPhase = p; } };
