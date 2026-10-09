@@ -11,14 +11,14 @@ data:{getItem:function(k){return st[k]===undefined?null:st[k];},setItem:function
 window.__cgTrigger=function(s){Object.assign(settings,s);ls.forEach(function(f){f(settings);});};})();`;
 const ok = (c, m) => { console.log((c ? 'OK   ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function run(name, { port, invite, adMode, serverUp = true, query = '' }) {
+async function run(name, { port, invite, adMode, serverUp = true, query = '', tut = false }) {
   const srv = serverUp ? spawn('node', ['src/index.js'], { cwd: path.join(ROOT, 'server'), env: Object.assign({}, process.env, { PORT: port, MIN_PLAYERS: '2' }), stdio: 'ignore' }) : null; await sleep(1200);
   const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] }); const errors = [];
   const p = await b.newPage({ viewport: { width: 900, height: 560 } }); p.on('pageerror', (e) => errors.push(e.message)); p.on('console', (m) => { if (m.type() === 'error' && !/ERR_FAILED|WebSocket|ERR_CONNECTION/.test(m.text())) errors.push(m.text().slice(0, 200)); });
-  await p.addInitScript(([invite, adMode]) => { try { localStorage.setItem('isla-quality', 'baja'); } catch (e) {} window.__inviteRoom = invite || null; window.__adMode = adMode || null; }, [invite, adMode]);
+  await p.addInitScript(([invite, adMode]) => { try { localStorage.setItem('isla-quality', 'baja'); localStorage.setItem('pvp-tut', '1'); } catch (e) {} window.__inviteRoom = invite || null; window.__adMode = adMode || null; }, [invite, adMode]);
   await p.route('**/*', (r) => r.request().url().startsWith('file:') ? r.continue() : r.abort());
   await p.route('https://sdk.crazygames.com/**', (r) => r.fulfill({ contentType: 'application/javascript', body: MOCK }));
-  await p.goto('file://' + path.join(ROOT, 'client', 'index.html') + '?server=ws://localhost:' + port + query);
+  await p.goto('file://' + path.join(ROOT, 'client', 'index.html') + '?server=ws://localhost:' + port + (tut ? '' : '&notut=1') + query);
   await p.waitForFunction(() => window.__isla && window.__isla.state === 'playing', null, { timeout: 120000 }).catch(() => {}); await p.waitForTimeout(1500);
   const info = await p.evaluate(() => ({ state: window.__isla.state, log: window.__cgLog, name: window.__isla.NET.name, online: window.__isla.NET.on, creator: !document.querySelector('#creator').hidden, privacy: !document.querySelector('#privacy').hidden, offline: /offline=1/.test(location.search), hint: !document.querySelector('#lockHint').hidden }));
   console.log('---', name); console.log(JSON.stringify(info));
@@ -54,7 +54,11 @@ async function run(name, { port, invite, adMode, serverUp = true, query = '' }) 
   ok(await r.p.evaluate(() => window.__isla.state) === 'playing', 'con anuncio bloqueado (adError) el juego continúa');
   await r.b.close(); r.srv.kill();
   r = await run('servidor caído → respaldo sin conexión', { port: 8993, serverUp: false });
-  ok(r.info.state === 'playing' && r.info.offline, 'si el servidor no responde entra igualmente en modo un jugador');
+  ok(r.info.state === 'playing' && !r.info.online, 'si el servidor no responde entra igualmente a jugar en local (sin esperar ni recargar)');
+  await r.b.close();
+  r = await run('primera vez → tutorial inmediato', { port: 8992, tut: true });
+  ok(r.info.state === 'playing' && await r.p.evaluate(() => window.__isla.TUT.on && window.__isla.inv.count('bomb') > 0), 'la primera partida empieza directamente en el tutorial (con bombas), sin servidor ni menú');
+  ok(r.info.log.includes('gameplayStart'), 'y gameplayStart se envía al instante');
   await r.b.close();
   process.exit(process.exitCode || 0);
 })();

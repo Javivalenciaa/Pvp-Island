@@ -4066,7 +4066,7 @@ function updateRank() {
 }
 // ---------------------------------------------------------------- tutorial jugable (3 minutos, saltable) y regalo de regreso
 const TUT = { on: false, step: 0, snap: {}, base: null, t0: 0 };
-const tutNeeded = () => { try { return !store.get('pvp-tut') && !/[?&]notut=1/.test(location.search); } catch (e) { return false; } };
+const tutNeeded = () => { try { return !store.get('pvp-tut') && !window.__cgInvite && !/[?&]notut=1/.test(location.search); } catch (e) { return false; } };
 function tutSite() {
   const G = GRID;
   for (let rr = 13; rr < 120; rr += 2) for (let a = 0; a < 6.28; a += .3) {
@@ -5520,7 +5520,7 @@ window.__isla = { shieldSync, get sel() { return sel; }, ITEMS, TUT, tutFinish, 
 // el menú se pinta primero; el motor (generación del mundo y compilación de shaders) arranca justo después
 (function () { var started = false, boot = function () { if (started) return; started = true; performance.mark('boot'); var s = document.createElement('script'); s.textContent = document.getElementById('gameSrc').textContent; document.body.appendChild(s); };
   var go = function () { Promise.race([window.__cgInit, new Promise(function (r) { setTimeout(function () { r(null); }, 2500); })]).then(function (K) {
-    try { if (K && K.environment !== 'disabled') { window.__cgEnv = K.environment; window.__cgData = K.data || null; var r = K.game.getInviteParam && K.game.getInviteParam('roomId'); if (r) window.__mapId = String(r); } } catch (e) {}
+    try { if (K && K.environment !== 'disabled') { window.__cgEnv = K.environment; window.__cgData = K.data || null; var r = K.game.getInviteParam && K.game.getInviteParam('roomId'); if (r) { window.__cgInvite = true; window.__mapId = String(r); } } } catch (e) {}
     boot(); }, boot); };
   requestAnimationFrame(function () { setTimeout(go, 40); }); setTimeout(function () { if (!started) go(); }, 700); })();
 </script>
