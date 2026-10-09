@@ -512,7 +512,7 @@ const store = {
 'use strict';
 const $ = (s) => document.querySelector(s);
 const ONLINE = !/[?&]offline=1/.test(location.search);
-const isTouch = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches;
+let isTouch = (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) || (navigator.maxTouchPoints > 0 && matchMedia('(any-pointer: coarse)').matches && !matchMedia('(hover: hover)').matches);
 if (isTouch) $('#touchNote').hidden = false;
 if (typeof THREE === 'undefined') { $('#libNote').hidden = false; $('#btnPlay').disabled = true; return; }
 
@@ -4881,6 +4881,8 @@ addEventListener('beforeunload', save);
 
 // ---------------------------------------------------------------- controles táctiles
 if (isTouch) { fallbackLook = true; document.body.classList.add('touch'); }
+// dispositivos híbridos (portátil/tablet táctil con ratón): activa los controles táctiles al primer toque real
+addEventListener('touchstart', () => { if (!isTouch) { isTouch = true; fallbackLook = true; document.body.classList.add('touch'); const n = $('#touchNote'); if (n) n.hidden = false; } }, { passive: true, capture: true });
 (function touchControls() {
   const joy = $('#tjoy'), knob = $('#tknob'), cv = canvas;
   const hold = (el, down, up) => { el.addEventListener('touchstart', (e) => { e.preventDefault(); el.classList.add('on'); down(); }, { passive: false }); const end = (e) => { e.preventDefault(); el.classList.remove('on'); if (up) up(); }; el.addEventListener('touchend', end, { passive: false }); el.addEventListener('touchcancel', end, { passive: false }); };
