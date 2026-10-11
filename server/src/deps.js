@@ -1,7 +1,7 @@
 // Objetos colocables (cofres, trampas, torretas…): estado, daño y comportamiento autoritativos.
 export const DEF = {
   workbench: { hp: 300 }, furnace: { hp: 400 }, campfire: { hp: 150 }, chest: { hp: 700 }, spikes: { hp: 420 }, beartrap: { hp: 120 }, palisade: { hp: 380 },
-  ballista: { hp: 650, turret: { range: 28, cd: 1.5, cap: 60, dmg: 48 } }, flamer: { hp: 520, turret: { range: 9.5, cd: .25, cap: 20, dmg: 9 } }, mortar: { hp: 750, turret: { range: 46, min: 12, cd: 4.5, cap: 20, dmg: 115, R: 5 } },
+  ballista: { hp: 650, turret: { range: 28, cd: 1.7, cap: 60, dmg: 32 } }, flamer: { hp: 520, turret: { range: 9.5, cd: .3, cap: 20, dmg: 5 } }, mortar: { hp: 750, turret: { range: 46, min: 12, cd: 4.5, cap: 20, dmg: 80, R: 4.5 } },
   mine: { hp: 20 }, c4: { hp: 40 }, safe: { hp: 1500 }, barrel: { hp: 30 }, torch: { hp: 80 }, bell: { hp: 150 }, bed: { hp: 180 }, garden: { hp: 150 }, collector: { hp: 140 },
 };
 // daño de cada arma contra objetos
@@ -9,7 +9,7 @@ export const DEF = {
 export const TURRET_UPG = [[['ingot', 30], ['gear', 8]], [['ingot', 60], ['gear', 16]]];
 export const SAFE_SLOTS = 48, C4_MAX = 8;
 export const DEP_DMG = { fists: 1, stone_axe: 9, stone_pick: 9, spear: 6, hammer: 7, iron_axe: 16, iron_pick: 16, iron_sword: 12 };
-export const EXPLOSIONS = { bomb: { R: 4.5, dmg: 150, pm: .5 }, barrel: { R: 5.5, dmg: 220, pm: .7 }, mine: { R: 4, dmg: 170, pm: .2 }, shell: { R: 5, dmg: 115, pm: .1 }, charge: { R: 3.2, dmg: 380, pm: 1.6 } };
+export const EXPLOSIONS = { bomb: { R: 4.5, dmg: 150, pm: .5 }, barrel: { R: 5.5, dmg: 220, pm: .7 }, mine: { R: 4, dmg: 170, pm: .2 }, shell: { R: 4.5, dmg: 80, pm: .1 }, charge: { R: 3.2, dmg: 380, pm: 1.6 } };
 export class Deps {
   constructor() { this.map = new Map(); this.next = 1; this.bags = new Map(); this.nextBag = 1; }
   pub(d) { return { id: d.id, t: d.t, x: d.x, y: d.y, z: d.z, r: d.r, hp: Math.round(d.hp), o: d.owner, ammo: d.ammo, armed: d.armed, lvl: d.lvl || 0, planted: d.planted, grow: +d.grow.toFixed(2), water: +d.water.toFixed(1), broken: d.broken }; }

@@ -40,6 +40,7 @@ export function createServer({ port = 8080, maxPlayers = 20, minPlayers = 8, dat
         if (room.count >= room.max) { const b = [...room.players.values()].find((p) => p.bot); if (b) room.leave(b); }
         me = room.join(m.name, m.token, ws, false, null, m.look);
         if (!me) { ws.send(JSON.stringify({ t: 'full' })); return; }
+        me.lang = m.lang === 'en' ? 'en' : 'es'; room.ambient('join');
         ws.send(JSON.stringify({ t: 'welcome', id: me.id, map: room.mapId, seed: room.map.seed, world: room.map.world, tid: me.tid, tribe: room.pub(me).tribe, phase: room.phase(), wx: room.wx.state, day: Math.floor((room.t + 42) / 600) + 1, x: me.x, y: me.y, z: me.z, restore: me.restored ? { slots: me.slots || [], armor: me.armor || null, hunger: me.hunger, thirst: me.thirst, hp: Math.round(me.hp) } : undefined, roster: [...room.players.values()].map((q) => room.pub(q)) }));
         if (room.B.map.size) ws.send(JSON.stringify({ t: 'pieces', list: [...room.B.map.values()].map((q) => room.B.pub(q)) }));
         if (room.D.map.size) ws.send(JSON.stringify({ t: 'deps', list: [...room.D.map.values()].map((d) => room.D.pub(d)) }));

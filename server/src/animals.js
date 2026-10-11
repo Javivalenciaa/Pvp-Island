@@ -46,13 +46,13 @@ export class Fauna {
         // sigue a su tribu y ataca a los enemigos cercanos
         let own = null, od = 1e9; for (const q of players) if (q.tid === a.owner) { const d = Math.hypot(q.x - a.x, q.z - a.z); if (d < od) { od = d; own = q; } }
         let foe = null, fd = 14; for (const q of players) if (q.tid !== a.owner) { const d = Math.hypot(q.x - a.x, q.z - a.z); if (d < fd) { fd = d; foe = q; } }
-        if (foe && (!own || Math.hypot(foe.x - own.x, foe.z - own.z) < 30)) { tgt = foe; mode = 1; mx = foe.x - a.x; mz = foe.z - a.z; sp = D.run; const dist = Math.hypot(mx, mz); if (dist < D.reach + .4) { sp = 0; if (a.atk <= 0) { a.atk = D.cd; r.hurt(foe, D.dmg, null, 'animal'); } } }
+        if (foe && (!own || Math.hypot(foe.x - own.x, foe.z - own.z) < 30)) { tgt = foe; mode = 1; mx = foe.x - a.x; mz = foe.z - a.z; sp = D.run; const dist = Math.hypot(mx, mz); if (dist < D.reach + .4) { sp = 0; if (a.atk <= 0) { a.atk = D.cd; r.hurt(foe, D.dmg, null, 'animal', a); } } }
         else if (own && od > 5) { mx = own.x - a.x; mz = own.z - a.z; sp = od > 14 ? D.run : D.walk * 1.5; }
       } else if (!tame || a.type !== 'wolf') {
         const hunter = D.temper === 'hunt' && !tame, def = D.temper === 'defend';
         if (near && D.temper === 'flee' && !tame && (nd < 2.5 || a.provoked > 0 || nd < D.fleeR * .35)) { mode = 3; mx = a.x - near.x; mz = a.z - near.z; sp = D.run; }
-        else if (near && hunter && (nd < D.aggro * (r.isNight ? 1.4 : 1) || a.provoked > 0) && a.hp > D.hp * .25) { mode = 1; tgt = near; mx = near.x - a.x; mz = near.z - a.z; sp = D.run; if (nd < D.reach + .4) { sp = 0; if (a.atk <= 0) { a.atk = D.cd; r.hurt(near, D.dmg, null, 'animal'); } } }
-        else if (near && def && (a.provoked > 0 || nd < D.provokeR) && nd < 30) { mode = 1; tgt = near; mx = near.x - a.x; mz = near.z - a.z; sp = D.run; if (nd < D.reach + .4) { sp = 0; if (a.atk <= 0) { a.atk = D.cd; r.hurt(near, D.dmg, null, 'animal'); } } }
+        else if (near && hunter && (nd < D.aggro * (r.isNight ? 1.4 : 1) || a.provoked > 0) && a.hp > D.hp * .25) { mode = 1; tgt = near; mx = near.x - a.x; mz = near.z - a.z; sp = D.run; if (nd < D.reach + .4) { sp = 0; if (a.atk <= 0) { a.atk = D.cd; r.hurt(near, D.dmg, null, 'animal', a); } } }
+        else if (near && def && (a.provoked > 0 || nd < D.provokeR) && nd < 30) { mode = 1; tgt = near; mx = near.x - a.x; mz = near.z - a.z; sp = D.run; if (nd < D.reach + .4) { sp = 0; if (a.atk <= 0) { a.atk = D.cd; r.hurt(near, D.dmg, null, 'animal', a); } } }
         else if (near && hunter && a.hp <= D.hp * .25 && nd < 30) { mode = 3; mx = a.x - near.x; mz = a.z - near.z; sp = D.run; }
         else { a.timer -= dt; if (a.timer <= 0) { if (Math.random() < .45) { a.wx = a.x; a.wz = a.z; a.timer = 2 + Math.random() * 4; } else { const ang = Math.random() * 6.283, rr = 5 + Math.random() * 10; a.wx = a.x + Math.cos(ang) * rr; a.wz = a.z + Math.sin(ang) * rr; a.timer = 6 + Math.random() * 6; } } const wd = Math.hypot(a.wx - a.x, a.wz - a.z); if (wd > 1) { mx = a.wx - a.x; mz = a.wz - a.z; sp = D.walk; } }
       }

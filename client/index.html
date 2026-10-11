@@ -177,7 +177,12 @@ body.touch #bottom{transform:scale(.68);transform-origin:bottom center}
 #tbuild #tDem{bottom:calc(100px + env(safe-area-inset-bottom,0px))}
 #cross.draw{transition:transform .25s}
 .qrow .chipbtn{margin-left:4px}
-#feed{position:absolute;right:calc(16px + env(safe-area-inset-right,0px));top:calc(112px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:3px;align-items:flex-end;max-width:min(340px,48vw);pointer-events:none}
+#feedCol{position:absolute;right:calc(16px + env(safe-area-inset-right,0px));top:calc(112px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:8px;align-items:flex-end;max-width:min(340px,48vw);pointer-events:none}
+#feed,#kfeed{display:flex;flex-direction:column;gap:3px;align-items:flex-end}
+#kfeed .kl{background:rgba(13,18,16,.78);border-right:3px solid #ff5a3a;padding:4px 9px;border-radius:3px;font-size:13px;line-height:1.3;color:var(--bone);text-align:right;animation:feedin .25s ease-out;transition:opacity .6s}
+#kfeed .kl.me{border-color:#ffd27a;background:rgba(60,40,10,.8)}#kfeed .kl.dead{border-color:#c0392b}
+#kfeed .kl b{font-weight:700;color:#ffd7a8}#kfeed .kl i{font-style:normal;color:var(--muted)}
+#ktop{background:rgba(13,18,16,.7);padding:5px 9px;border-radius:4px;font-size:12px;color:var(--bone);text-align:right;line-height:1.35}#ktop:empty{display:none}#ktop span{color:var(--muted);letter-spacing:.1em;text-transform:uppercase;font-size:10px;font-weight:700;display:block}#ktop b{color:#ffd7a8}
 #feed .ev{background:rgba(13,18,16,.7);border-right:3px solid var(--ember);padding:4px 9px;border-radius:3px;font-size:13px;line-height:1.3;color:var(--bone);text-align:right;animation:feedin .25s ease-out;transition:opacity .6s}
 #feed .ev.raid{border-color:#ff5a3a}#feed .ev.loot{border-color:#ffd27a}#feed .ev.base{border-color:#8fbf6a}
 #feed .ev b{font-weight:700;color:#ffd7a8}
@@ -188,7 +193,7 @@ body.touch #bottom{transform:scale(.68);transform-origin:bottom center}
 #rank{position:absolute;right:calc(16px + env(safe-area-inset-right,0px));top:calc(74px + env(safe-area-inset-top,0px));padding:5px 10px;min-width:150px;text-align:right}
 #rank .n{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#ffd7a8}
 #rank .b{display:block;height:4px;margin-top:4px;background:rgba(236,229,212,.15);border-radius:2px;overflow:hidden}#rank .b i{display:block;height:100%;width:0;background:var(--ember);transition:width .4s}
-body.touch #rank{top:calc(12px + env(safe-area-inset-top,0px))}body.touch #feed{top:calc(56px + env(safe-area-inset-top,0px))}body.touch #baseping{top:calc(50px + env(safe-area-inset-top,0px));font-size:11px;padding:3px 8px}
+body.touch #rank{top:calc(12px + env(safe-area-inset-top,0px))}body.touch #feedCol{top:calc(56px + env(safe-area-inset-top,0px))}body.touch #ktop{display:none}body.touch #baseping{top:calc(50px + env(safe-area-inset-top,0px));font-size:11px;padding:3px 8px}
 .howto{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:2px 0}
 .howto div{background:rgba(236,229,212,.06);border:1px solid rgba(236,229,212,.12);border-radius:6px;padding:8px 10px;font-size:13px;line-height:1.35;color:#d6d0bf}
 .howto b{display:block;font-family:var(--display);letter-spacing:.08em;font-size:15px;color:var(--ember);margin-bottom:2px}
@@ -362,7 +367,7 @@ body:not(.ready) .glass{backdrop-filter:none;-webkit-backdrop-filter:none}
 #report h3{margin:4px 0 10px;font-family:var(--display);font-size:32px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ember)}
 #report .row{display:flex;justify-content:space-between;gap:12px;font-size:15px;padding:3px 0;border-bottom:1px solid rgba(236,229,212,.08)}
 #report .row b{font-weight:700}
-#report .bad{color:var(--blood)}
+#report .bad{color:var(--blood)}#report .rw2{color:var(--moss)}
 #report .rw{margin-top:10px;font-size:14px;color:var(--moss);font-weight:600}
 #report .x{margin-top:10px;font-size:12px;color:var(--muted)}
 .records{margin-top:12px;font-size:14px;color:var(--ember);font-weight:600}
@@ -393,7 +398,7 @@ body:not(.ready) .glass{backdrop-filter:none;-webkit-backdrop-filter:none}
   <div id="invring" hidden><i id="invbar"></i><span id="invtxt"></span></div>
   <div id="invite" class="glass" hidden><span id="invwho"></span><button type="button" id="invYes">Aceptar [Y]</button><button type="button" id="invNo">Rechazar [N]</button></div>
   <div id="toasts"></div>
-  <div id="feed"></div>
+  <div id="feedCol"><div id="ktop"></div><div id="kfeed"></div><div id="feed"></div></div>
   <div id="baseping" class="glass" hidden></div>
   <div id="rank" class="glass" hidden><div class="n" id="rkN"></div><span class="b"><i id="rkB"></i></span></div>
   <div id="banner" hidden><div class="t" id="bannerT"></div><div class="s" id="bannerS"></div></div>
@@ -3980,7 +3985,7 @@ function bearingLT(tx, tz) { const dx = tx - player.pos.x, dz = tz - player.pos.
 const ONLINE_OBJ = [
   { t: 'Golpea un árbol con las manos hasta reunir 20 de madera.', ok: () => (stats.got.wood || 0) >= 20 },
   { t: () => { const b = nearestFoeBase(); return b ? LT(`Hay una base cerca: ${b.name}. Acércate a verla: aquí se construye… y se raidea.`, `There is a base nearby: ${b.name}. Go take a look: on this island people build… and raid.`) : LT('Explora la isla: otros clanes tienen bases. Busca construcciones.', 'Explore the island: other clans have bases. Look for buildings.'); },
-    ok: () => { const b = nearestFoeBase(); return (!!b && b.d < 38) || clock - (NET.joinT || 0) > 150; }, dir: nearestFoeBase, dirF: (od) => LT('La base está a ', 'The base is ') + bearingLT(od.x, od.z) },
+    ok: () => { const b = nearestFoeBase(); return stats.sawBase || (!!b && b.d < 38) || clock - (NET.joinT || 0) > 150; }, dir: nearestFoeBase, dirF: (od) => LT('La base está a ', 'The base is ') + bearingLT(od.x, od.z) },
   { t: 'Golpea una roca gris hasta reunir 10 de piedra.', ok: () => (stats.got.stone || 0) >= 10 },
   { t: 'Abre la mochila con Tab y fabrica un hacha de piedra.', ok: () => stats.crafted.stone_axe },
   { t: 'Fabrica también un pico de piedra. Pon el hacha en la barra (1–6) para talar más rápido.', ok: () => stats.crafted.stone_pick },
@@ -4033,9 +4038,54 @@ function onBaseAlert(m) {
   sfx.bell(); siege.baseHitT = clock;
 }
 function onRaidReport(m) {
-  const el = $('#report'), rows = m.list.map((e) => { const p = []; if (e.pieces) p.push(LT(`${e.pieces} piezas destruidas`, `${e.pieces} pieces destroyed`)); if (e.chest) p.push(LT('arcón robado', 'chest looted')); if (e.deps) p.push(LT(`${e.deps} objetos`, `${e.deps} objects`)); return `<div class="row"><span>${escH(e.who)}</span><b class="bad">${p.join(' · ') || '—'}</b></div>`; }).join('');
-  el.innerHTML = `<div class="lab">${LT('Mientras estabas fuera', 'While you were away')}</div><h3>${LT('Han raideado tu base', 'Your base was raided')}</h3>${rows}<div class="x">${LT('Repárala con el martillo y refuerza los muros. Para la revancha, busca su base en el mapa (M).', 'Repair it with the hammer and reinforce the walls. For revenge, find their base on the map (M).')}</div>`;
+  const el = $('#report'), tk = m.tk || [];
+  const rows = (m.list || []).map((e) => { const p = []; if (e.pieces) p.push(LT(`${e.pieces} piezas destruidas`, `${e.pieces} pieces destroyed`)); if (e.chest) p.push(LT('arcón robado', 'chest looted')); if (e.deps) p.push(LT(`${e.deps} objetos`, `${e.deps} objects`)); return `<div class="row"><span>${escH(e.who)}</span><b class="bad">${p.join(' · ') || '—'}</b></div>`; }).join('');
+  const trows = tk.map((e) => `<div class="row"><span>${LT('Tu', 'Your')} ${escH(wName(e.w))}</span><b class="rw2">${LT('abatió a', 'killed')} ${escH(e.v)}</b></div>`).join('');
+  const title = rows ? LT('Han raideado tu base', 'Your base was raided') : LT('Tus defensas han actuado', 'Your defenses were active');
+  el.innerHTML = `<div class="lab">${LT('Mientras estabas fuera', 'While you were away')}</div><h3>${title}</h3>${trows}${rows}<div class="x">${rows ? LT('Repárala con el martillo y refuerza los muros. Para la revancha, busca su base en el mapa (M).', 'Repair it with the hammer and reinforce the walls. For revenge, find their base on the map (M).') : LT('Recarga la munición de tus torretas con E.', 'Reload your turrets with E.')}</div>`;
   el.hidden = false; reportT = 16; sfx.bell();
+}
+// ---------------------------------------------------------------- kills del mapa y causa de muerte
+const KW = { ballista: ['torreta de ballesta', 'ballista turret'], flamer: ['lanzallamas', 'flamethrower'], mortar: ['mortero', 'mortar'], spikes: ['estacas', 'spikes'], beartrap: ['cepo', 'bear trap'], mine: ['mina', 'mine'], wolf: ['lobo', 'wolf'], boar: ['jabalí', 'boar'], deer: ['ciervo', 'deer'], horse: ['caballo', 'horse'] };
+const KCAUSE = { explosion: ['una explosión', 'an explosion'], fire: ['fuego', 'fire'], hunger: ['hambre', 'hunger'], thirst: ['sed', 'thirst'], drown: ['ahogamiento', 'drowning'], fall: ['una caída', 'a fall'], food: ['comida en mal estado', 'bad food'], trap: ['una trampa', 'a trap'], animal: ['un animal', 'an animal'], turret: ['una torreta', 'a turret'], raider: ['un enemigo', 'an enemy'], arrow: ['una flecha', 'an arrow'], boss: ['el jefe', 'the boss'], selfdmg: ['daño', 'damage'] };
+const wName = (w) => { if (!w) return ''; if (KW[w]) return LT(KW[w][0], KW[w][1]); return ITEMS[w] ? (LANG === 'en' ? tr(ITEMS[w].name) : ITEMS[w].name).toLowerCase() : ''; };
+const kfEl = $('#kfeed');
+function kfAdd(html, cls) {
+  const el = document.createElement('div'); el.className = 'kl ' + (cls || ''); el.innerHTML = html; kfEl.appendChild(el);
+  while (kfEl.children.length > 6) kfEl.firstChild.remove();
+  setTimeout(() => { el.style.opacity = 0; setTimeout(() => el.remove(), 700); }, 11000);
+}
+function killTop() {
+  const l = [...NET.roster.values()].filter((q) => q.k > 0).sort((a, b) => b.k - a.k).slice(0, 3);
+  $('#ktop').innerHTML = l.length ? `<span>${LT('Más kills', 'Top kills')}</span>` + l.map((q, i) => `${i + 1}. <b>${escH(q.name)}</b> ${q.k}`).join('<br>') : '';
+}
+function killHow(m) {
+  const turret = ['ballista', 'flamer', 'mortar'].includes(m.w);
+  if (turret) return { who: LT(`${wName(m.w)}${m.o ? ' de ' + m.o : ''}`, `${m.o ? m.o + "'s " : ''}${wName(m.w)}`), how: '' };
+  if (m.cause === 'animal' && m.w) return { who: wName(m.w), how: '' };
+  if (['spikes', 'beartrap', 'mine'].includes(m.w)) return { who: LT(`${wName(m.w)}${m.o ? ' de ' + m.o : ''}`, `${m.o ? m.o + "'s " : ''}${wName(m.w)}`), how: '' };
+  const how = m.cause === 'explosion' ? LT('explosivo', 'explosive') : wName(m.w);
+  return { who: m.kn || '', how };
+}
+function onKill(m) {
+  const v = NET.roster.get(m.victim), k = NET.roster.get(m.killer), vn = m.vn || (v && v.name) || '?'; if (k && m.k) k.k = m.k; if (k && !m.k) k.k = (k.k || 0) + 1;
+  const h = killHow(m), me = m.killer === NET.id, dead = m.victim === NET.id;
+  let html;
+  if (h.who) html = `<b>${escH(h.who)}</b> ⚔ <b>${escH(vn)}</b>${h.how ? ` <i>· ${escH(h.how)}</i>` : ''}${m.k > 1 && m.kn ? ` <i>(${m.k})</i>` : ''}`;
+  else { const c = KCAUSE[m.cause] || KCAUSE.selfdmg; html = `<b>${escH(vn)}</b> <i>${LT('muere por', 'died of')} ${LT(c[0], c[1])}</i>`; }
+  kfAdd(html, me ? 'me' : dead ? 'dead' : ''); killTop();
+}
+function deathText(m) {
+  const h = killHow(m); let es, en;
+  if (['ballista', 'flamer', 'mortar', 'spikes', 'beartrap', 'mine'].includes(m.w) || (m.cause === 'animal' && m.w)) { es = `Causa de la muerte: ${h.who}.`; en = `Cause of death: ${h.who}.`; }
+  else if (m.kn) { es = `Te ha matado ${m.kn}${h.how ? ' con ' + h.how : ''}.`; en = `${m.kn} killed you${h.how ? ' with ' + h.how : ''}.`; }
+  else { const c = KCAUSE[m.cause]; es = c ? `Causa de la muerte: ${c[0]}.` : 'Has muerto.'; en = c ? `Cause of death: ${c[1]}.` : 'You died.'; if (DEATH_TXT[m.cause]) es = DEATH_TXT[m.cause]; }
+  return LT(es, en) + ' ' + LT('Tus pertenencias han quedado en una bolsa donde caíste (marcada en el mapa).', 'Your belongings are in a bag where you fell (marked on the map).');
+}
+function onTurretWarn(m) {
+  const wn = wName(m.w); if (!wn) return;
+  toast(LT(`¡${m.o ? 'La ' + wn + ' de ' + m.o : 'Una ' + wn} te está disparando! Sal de su alcance.`, `${m.o ? m.o + "'s " : 'A '}${wn} is firing at you! Get out of range.`), 'bad');
+  camShake = Math.max(camShake, .3); ui.hurt.style.boxShadow = 'inset 0 0 160px rgba(255,120,20,.45)'; setTimeout(() => { ui.hurt.style.boxShadow = 'inset 0 0 160px rgba(200,30,20,0)'; }, 220);
 }
 // brújula a la base enemiga más cercana
 function updateBasePing() {
@@ -4125,17 +4175,46 @@ function tutFinish(skipped) {
   showBanner(LT('¡A LA ISLA!', 'TO THE ISLAND!'), LT('Otros jugadores construyen y raidean. Te hemos dado un kit inicial.', 'Other players build and raid. We gave you a starter kit.'), false);
   if (!NET.on) { $('#inName').value = (($('#inName').value || (CG.user && CG.user.username) || store.get('pvp-name') || 'Player') + '').slice(0, 16); netConnect(); }
 }
-// regalo por volver (cada día nuevo) y racha de días
+// regalo por volver (cada día nuevo) y racha de días: cada día un premio mejor, ciclo de 7
+const GIFTS = [
+  { kit: [['iron_axe', 1], ['bandage', 3]], es: 'un hacha de hierro', en: 'an iron axe' },
+  { kit: [['bomb', 2], ['bandage', 2]], es: '2 bombas', en: '2 bombs' },
+  { kit: [['ingot', 40], ['wood', 100], ['stone', 80], ['gunpowder', 20]], es: 'un stack de materiales', en: 'a stack of materials' },
+  { kit: [['ballista', 1], ['arrow', 30]], es: 'una torreta de ballesta', en: 'a ballista turret' },
+  { kit: [['c4', 2], ['cooked_meat', 5]], es: '2 C4', en: '2 C4' },
+  { kit: [['iron_armor', 1], ['shield', 1]], es: 'armadura de hierro y escudo', en: 'iron armor and a shield' },
+  { kit: [['safe', 1], ['bomb', 3], ['mortar', 1]], es: 'caja fuerte, mortero y 3 bombas', en: 'a safe, a mortar and 3 bombs' },
+];
+const giftOf = (streak) => GIFTS[(Math.max(1, streak) - 1) % GIFTS.length];
 function retentionGift() {
   try {
-    const now = Date.now(), last = +store.get('pvp-seen') || 0, day = new Date(now).toDateString(), lastDay = store.get('pvp-day') || '';
+    const now = Date.now(), day = new Date(now).toDateString(), lastDay = store.get('pvp-day') || '';
     store.set('pvp-seen', String(now)); if (lastDay === day) return;
     let streak = +store.get('pvp-streak') || 0; streak = lastDay === new Date(now - 864e5).toDateString() ? streak + 1 : 1; store.set('pvp-day', day); store.set('pvp-streak', String(streak));
-    if (!last) return; const kit = [['bandage', 3], ['cooked_meat', 5], ['wood', 60], ['stone', 30]]; if (streak >= 3) kit.push(['ingot', 3]); if (streak >= 5) kit.push(['bomb', 1]);
-    setTimeout(() => { for (const [id, n] of kit) giveItem(id, n); showBanner(LT(`Racha de ${streak} día${streak > 1 ? 's' : ''}`, `${streak}-day streak`), LT('Regalo de bienvenida añadido a tu mochila. Vuelve mañana para más.', 'Welcome-back gift added to your backpack. Come back tomorrow for more.'), false); }, 2500);
+    const g = giftOf(streak), nx = giftOf(streak + 1);
+    setTimeout(() => {
+      for (const [id, n] of g.kit) if (ITEMS[id]) giveItem(id, n);
+      showBanner(LT(`Día ${streak} de racha: ¡${g.es}!`, `Day ${streak} streak: ${g.en}!`), LT(`Ya está en tu mochila. Vuelve mañana y consigue ${nx.es}.`, `It is in your backpack. Come back tomorrow for ${nx.en}.`), false); sfx.craft(); cgHappy();
+    }, 2500);
   } catch (e) { /* sin almacenamiento */ }
 }
 $('#btnTutSkip').addEventListener('click', () => { tutFinish(true); startGame(); });
+// objetivos del modo en línea: se guardan y se deducen del inventario para no repetirlos al volver
+const OBJ_KEY = 'pvp-ostate';
+function objSave() { if (!NET.on || TUT.on) return; try { store.set(OBJ_KEY, JSON.stringify({ i: objIndex, st: stats })); } catch (e) { /* sin almacenamiento */ } }
+function objInfer() {
+  const c = (id) => inv.count(id) > 0 || player.armorId === id, mk = (o, k, n) => { o[k] = Math.max(o[k] || 0, n); };
+  if (c('stone_axe') || c('iron_axe') || c('iron_pick')) { mk(stats.crafted, 'stone_axe', 1); mk(stats.got, 'wood', 20); mk(stats.got, 'stone', 10); }
+  if (c('stone_pick') || c('iron_pick') || c('iron_axe')) mk(stats.crafted, 'stone_pick', 1);
+  if (c('iron_axe') || c('iron_pick') || c('iron_sword') || c('ingot') || c('metal_armor') || c('iron_armor')) { mk(stats.got, 'ore', 10); mk(stats.crafted, 'ingot', 5); mk(stats.crafted, 'iron_axe', 1); mk(stats.crafted, 'stone_axe', 1); mk(stats.crafted, 'stone_pick', 1); mk(stats.got, 'wood', 20); mk(stats.got, 'stone', 10); mk(stats.placed, 'workbench', 1); mk(stats, 'ate', 1); mk(stats, 'drank', 1); mk(stats, 'sawBase', 1); mk(stats, 'raidChests', 1); mk(stats, 'looted', 1); }
+  if (c('workbench') || c('furnace') || c('chest')) mk(stats.placed, 'workbench', 1);
+}
+function objRestore() {
+  try { const d = JSON.parse(store.get(OBJ_KEY) || 'null'); if (d && d.st) { for (const k of ['got', 'crafted', 'placed']) Object.assign(stats[k], d.st[k] || {}); for (const k of Object.keys(d.st)) if (typeof d.st[k] === 'number') stats[k] = Math.max(stats[k] || 0, d.st[k]); if (d.i > objIndex) objIndex = d.i; } } catch (e) { /* datos corruptos */ }
+  objInfer();
+}
+addEventListener('beforeunload', objSave);
+setInterval(objSave, 10000);
 function updateHook() { if (!NET.on) return; updateBagTimer(); updateBasePing(); updateRank(); if (clock - (NET.invT || -9) > 4) { NET.invT = clock; sendInv(); } }
 
 // ---------------------------------------------------------------- estado, entrada
@@ -4254,11 +4333,11 @@ function renderPauseRoster() {
   $('#pauseTxt').textContent = LT('Si sales, tu personaje se queda durmiendo en el mapa: otros jugadores pueden saquearlo. Vuelve para recuperarlo todo.', 'If you leave, your character stays asleep on the map: other players can loot it. Come back to recover everything.');
   const list = [...NET.roster.values()].sort((a, b) => (a.id === NET.id ? -1 : b.id === NET.id ? 1 : a.name.localeCompare(b.name)));
   $('#prH').textContent = LT(`Jugadores en el mapa (${list.length})`, `Players on the map (${list.length})`); const L = $('#prL'); L.innerHTML = '';
-  for (const q of list) { const sp = document.createElement('span'); sp.className = (q.id === NET.id ? 'me' : '') + (q.sleep ? ' zz' : ''); sp.textContent = q.name + (q.id === NET.id ? LT(' (tú)', ' (you)') : ''); if (q.tribe) { const t = document.createElement('small'); t.textContent = q.tribe; sp.appendChild(t); } if (q.sleep) { const z = document.createElement('small'); z.textContent = 'Zzz'; sp.appendChild(z); } L.appendChild(sp); }
+  for (const q of list) { const sp = document.createElement('span'); sp.className = (q.id === NET.id ? 'me' : '') + (q.sleep ? ' zz' : ''); sp.textContent = q.name + (q.id === NET.id ? LT(' (tú)', ' (you)') : '') + (q.k > 0 ? ' · ⚔' + q.k : ''); if (q.tribe) { const t = document.createElement('small'); t.textContent = q.tribe; sp.appendChild(t); } if (q.sleep) { const z = document.createElement('small'); z.textContent = 'Zzz'; sp.appendChild(z); } L.appendChild(sp); }
   box.hidden = false;
 }
 function pauseGame() { if (state !== 'playing') return; state = 'paused'; mouseL = false; $('#pause').hidden = false; $('#btnTutSkip').hidden = !TUT.on; renderPauseRoster(); $('#resetConfirm').hidden = true; $('#records2').textContent = recordsText(); save(); }
-$('#btnPlay').addEventListener('click', () => { if (ONLINE && !NET.on) { audio(); if (tutNeeded()) tutStart(); else netConnect(); } else startGame(); });
+$('#btnPlay').addEventListener('click', () => { if (ONLINE && !NET.on) { audio(); if (inCG()) CG.auto = true; if (tutNeeded()) tutStart(); else netConnect(); } else startGame(); });
 $('#btnResume').addEventListener('click', startGame);
 // salir de la partida: sin conexión vuelve al menú al instante; en línea cierra la conexión y recarga directo al menú (estado limpio)
 $('#btnMenuBack').addEventListener('click', () => {
@@ -5044,7 +5123,7 @@ function netMsg(m) {
     dayPhase = m.phase; dayCount = m.day; if (m.wx) wxState = m.wx; NET.id = m.id; NET.tid = m.tid; NET.tribe = m.tribe; $('#btnTLeave').hidden = !m.tribe; NET.roster.clear(); for (const q of m.roster) NET.roster.set(q.id, q);
     player.pos.set(m.x, Math.max(terrainH(m.x, m.z), Number.isFinite(m.y) ? m.y : -1e9) + .1, m.z); player.vel.set(0, 0, 0); player.hp = 100; NET.on = true;
     if (m.restore) { const R = m.restore; inv.slots.fill(null); (R.slots || []).forEach((sl, i) => { if (i < inv.slots.length && sl && ITEMS[sl.id]) inv.slots[i] = { id: sl.id, n: sl.n, dur: sl.dur }; }); inv.touch(); player.armorId = R.armor && ITEMS[R.armor] ? R.armor : null; if (R.hp > 0) player.hp = R.hp; if (Number.isFinite(R.hunger) && R.hunger > 0) player.hunger = R.hunger; if (Number.isFinite(R.thirst) && R.thirst > 0) player.thirst = R.thirst; setTimeout(() => toast(LT('Vuelves a tu cuerpo: conservas todo lo que llevabas', 'You return to your body: you keep everything you were carrying'), 'info'), 1500); } document.body.classList.add('online-on');
-    NET.bases = []; NET.joinT = clock; if (!m.restore) retentionGift(); $('#netStatus').textContent = ''; clearTimeout(CG.autoT); startGame(); cgRoom(true); showBanner('Pvp-Island', LT('Construye tu base · Raidea a los clanes · Sobrevive', 'Build your base · Raid the clans · Survive'), false); if (!store.get('pvp-priv')) privacyShow(); if (m.tribe) toast(`Tribu: ${m.tribe}`, 'info');
+    NET.bases = []; NET.joinT = clock; objRestore(); retentionGift(); $('#netStatus').textContent = ''; clearTimeout(CG.autoT); startGame(); cgRoom(true); showBanner('Pvp-Island', LT('Construye tu base · Raidea a los clanes · Sobrevive', 'Build your base · Raid the clans · Survive'), false); if (!store.get('pvp-priv')) privacyShow(); if (m.tribe) toast(`Tribu: ${m.tribe}`, 'info');
   } else if (m.t === 'snap') netSnap(m);
   else if (m.t === 'join') { NET.roster.set(m.id, { id: m.id, name: m.name, tid: m.tid, tribe: m.tribe, sleep: m.sleep, look: m.look || (NET.roster.get(m.id) || {}).look, held: m.held !== undefined ? m.held : (NET.roster.get(m.id) || {}).held }); chatAdd('', `${m.name} se ha unido`, false, true); }
   else if (m.t === 'tribe') {
@@ -5062,11 +5141,11 @@ function netMsg(m) {
   else if (m.t === 'swing') { const r = NET.remotes.get(m.id); if (r) r.b.swing = 0; }
   else if (m.t === 'hit') { if (m.id === NET.id) { player.hp = m.hp; sfx.hurt(); camShake = Math.max(camShake, .25); ui.hurt.style.boxShadow = 'inset 0 0 160px rgba(200,30,20,.55)'; setTimeout(() => { ui.hurt.style.boxShadow = 'inset 0 0 160px rgba(200,30,20,0)'; }, 160); } else { const r = NET.remotes.get(m.id); if (r) { r.hp = m.hp; burst(r.pos.clone().setY(r.pos.y + 1.2), 'blood', 5); } } }
   else if (m.t === 'kill') {
-    const v = NET.roster.get(m.victim), k = NET.roster.get(m.killer);
-    if (k && v) toast(`${k.name} ha abatido a ${v.name}`, m.killer === NET.id ? 'info' : undefined);
-    if (m.victim === NET.id) netDie(k ? k.name : '', m.cause);
+    onKill(m);
+    if (m.victim === NET.id) netDie(m);
     else if (m.killer === NET.id) { stats.kills = (stats.kills || 0) + 1; }
   }
+  else if (m.t === 'warn') onTurretWarn(m);
   else if (m.t === 'correct') { player.pos.set(m.x, m.y, m.z); player.vel.set(0, 0, 0); }
   else if (m.t === 'respawn') { if (NET.wantRespawn) { NET.wantRespawn = false; player.pos.set(m.x, terrainH(m.x, m.z) + .1, m.z); player.vel.set(0, 0, 0); player.hp = 100; player.hunger = Math.max(player.hunger, 70); player.thirst = Math.max(player.thirst, 70); player.air = 1; $('#death').hidden = true; startGame(); } }
   else if (m.t === 'chat') chatAdd(m.from, m.text, m.tribe, false);
@@ -5193,9 +5272,9 @@ function netPiece(d) {
   const p = addPiece({ kind: d.kind, key: d.key, i: d.i, j: d.j, L: d.L, dir: d.dir, tier: d.tier, top: d.top, bottom: d.bottom, open: d.open, owner: d.o });
   p.hp = d.hp; p.owner = d.o;
 }
-function netDie(by, cause) {
+function netDie(m) {
   if (state === 'dead') return;
-  $('#deathTxt').textContent = by ? `Te ha abatido ${by}. Tus pertenencias han quedado en una bolsa donde caíste (marcada en el mapa).` : 'Has muerto. Tus pertenencias han quedado en una bolsa donde caíste (marcada en el mapa).';
+  $('#deathTxt').textContent = deathText(m);
   { const slots = inv.slots.map((sl) => (sl ? { id: sl.id, n: sl.n, dur: sl.dur } : null)); if (player.armorId) slots.push({ id: player.armorId, n: 1 });
     NET.lastDeath = { x: player.pos.x, y: player.pos.y, z: player.pos.z, at: clock }; try { store.set('pvp-death', JSON.stringify({ x: NET.lastDeath.x, z: NET.lastDeath.z, map: MAP_ID, t: Date.now() })); } catch (e) { /* sin almacenamiento */ }
     netSend({ t: 'drop', slots }); inv.slots.fill(null); inv.touch(); player.armorId = null; }
@@ -5214,7 +5293,7 @@ function netConnect() {
   $('#netStatus').textContent = 'Conectando…'; NET.name = name;
   let ws; try { ws = new WebSocket(SERVER_URL); } catch (e) { $('#netStatus').textContent = 'No se pudo conectar con el servidor'; return; }
   NET.ws = ws; let opened = false;
-  ws.onopen = () => { opened = true; ws.send(JSON.stringify({ t: 'join', name, token, map: MAP_ID, look: curLook })); };
+  ws.onopen = () => { opened = true; ws.send(JSON.stringify({ t: 'join', name, token, map: MAP_ID, look: curLook, lang: LANG })); };
   ws.onmessage = (e) => { try { netMsg(JSON.parse(e.data)); } catch (err) { /* mensaje inválido */ } };
   ws.onerror = () => { if (!opened) { $('#netStatus').textContent = 'No se pudo conectar con el servidor'; if (CG.auto && !NET.on && !TUT.on && state !== 'playing') cgGoOffline(); } };
   ws.onclose = () => { const was = NET.on; if (CG.auto && !was && !opened && !TUT.on && state !== 'playing') { cgGoOffline(); return; } netClose(); if (was) { toast('Conexión perdida', 'bad'); if (state === 'playing') pauseGame(); } else if (opened) $('#netStatus').textContent = 'Conexión perdida'; };
@@ -5510,9 +5589,9 @@ applyQuality(qualityName);
 updateObjective();
 setLang(LANG);
 requestAnimationFrame(frame);
-requestAnimationFrame(() => requestAnimationFrame(() => { document.body.classList.add('ready'); performance.mark('ready'); const pb = $('#btnPlay'); if (pb && typeof THREE !== 'undefined') pb.disabled = false; menuCharStart(); (async () => { if (inCG()) { await cgBoot(); cgLoaded(); } await cgAutoPlay(); })(); }));
+requestAnimationFrame(() => requestAnimationFrame(() => { document.body.classList.add('ready'); performance.mark('ready'); const pb = $('#btnPlay'); if (pb && typeof THREE !== 'undefined') pb.disabled = false; menuCharStart(); (async () => { if (inCG()) { await cgBoot(); cgLoaded(); try { if (CG.user && CG.user.username && !store.get('pvp-name')) $('#inName').value = String(CG.user.username).replace(/[<>]/g, '').trim().slice(0, 16) || $('#inName').value; } catch (e) { /* sin cuenta */ } } })(); }));
 // gancho de pruebas: avanza la simulación sin depender de los FPS
-window.__isla = { shieldSync, get sel() { return sel; }, ITEMS, TUT, tutFinish, dropSlot, get chestOpen() { return chestOpen; }, pauseGame, renderPauseRoster, sendInv, deployables, remoteRoot, pressR(v) { mouseR = v; }, remotes: () => NET.remotes.values(), NET, netMsg, netSend, remoteHit, hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
+window.__isla = { objInfer, objRestore, giftOf, GIFTS, deathText, onKill, onTurretWarn, updateObjective, get objIndex() { return objIndex; }, set objIndex(v) { objIndex = v; }, shieldSync, get sel() { return sel; }, ITEMS, TUT, tutFinish, dropSlot, get chestOpen() { return chestOpen; }, pauseGame, renderPauseRoster, sendInv, deployables, remoteRoot, pressR(v) { mouseR = v; }, remotes: () => NET.remotes.values(), NET, netMsg, netSend, remoteHit, hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
   caveRoofs, BIOMES, biomeAt, CAVES, caveDark, caveInfo, roofH, player, inv, nodes, pieces, animals, spawnAnimal, LAKES, waterSurfaceAt, stats, giveItem, spawnBot, terrainH, spawn: SPAWN, scene, refreshEnv, renderer, POIS, destroyPiece, post, weather, setWeather(w) { wxState = w; wxTimer = 999; }, ctlData, N, CELL, HALF, camera, pieceRoot, get state() { return state; }, get aim() { return aim; }, get placement() { return placement; }, get waterAim() { return waterAim; },
   sim(sec, hold) { const n = Math.round(sec / .05); for (let k = 0; k < n; k++) { if (hold) mouseL = true; if (hold === 'click' && k === 0) clickQueued = true; waterTime.value += .05; scene.updateMatrixWorld(); tick(.05, performance.now()); } if (hold) mouseL = false; },
   setPhase(p) { dayPhase = p; } };

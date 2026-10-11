@@ -11,15 +11,20 @@ const WEAPONS = { fists: [4, 3.2], stone_axe: [13, 3.8], stone_pick: [13, 3.8], 
 const HELD = new Set(['shield', 'stone_axe', 'stone_pick', 'iron_axe', 'iron_pick', 'hammer', 'spear', 'iron_sword']);
 const PROT = process.env.PROT_SECONDS !== undefined ? +process.env.PROT_SECONDS : 30;
 const SPEED = 4.8, SPRINT = 7.8, RADIUS = 160, HP = 100, REACH = 2.6, DMG = 14, ATK_CD = .6;
+const CHAT = {
+  join: { p: .5, d0: 5, d1: 9, lines: [['buenas', 'hey'], ['wenas, ¿alguien tiene hierro?', 'hey, anyone got iron?'], ['hola, cuidado con los clanes del norte', 'hi, watch out for the northern clans'], ['hey', 'sup'], ['¿alguien se une a mi tribu?', 'anyone want to join my tribe?'], ['qué hambre llevo xD', 'so hungry lol']] },
+  killHuman: { p: .5, d0: 1.5, d1: 2.5, lines: [['gg', 'gg'], ['jaja perdona', 'lol sorry'], ['gg, no te acerques a mi base', 'gg, stay away from my base'], ['ez', 'ez'], ['te toca la revancha', 'revenge is yours']] },
+  killedByHuman: { p: .45, d0: 2, d1: 3, lines: [['buen golpe', 'nice hit'], ['gg, voy a por ti', 'gg, coming for you'], ['qué dolor jaja', 'ouch lol'], ['me has pillado', 'got me']] },
+};
 const isBotOwner = (tid) => typeof tid === 'string' && tid.startsWith('tb');
 export class Room {
-  constructor(mapId, maxPlayers = 20) { this.mapId = mapId; this.map = MAPS[mapId]; this.T = createTerrain({ world: this.map.world, seed: this.map.seed }); this.half = this.map.world / 2; this.sea = 0; this.max = maxPlayers; this.players = new Map(); this.nextId = 1; this.t = 80; this.tribeInfo = new Map(); this.tribeOfToken = new Map(); this.invites = new Map(); this.nextTribe = 1; this.B = new Buildings(); this.D = new Deps(); this.fxT = 0; this.wx = { state: 'clear', until: 200 }; this.nodes = new Map(); this.reports = new Map(); this.deadSleepers = new Map(); this.names = new Map(); this.raidT = new Map(); this.fauna = new Fauna(this); this.fauna.spawnAll(); this.timer = setInterval(() => this.tick(), DT * 1000); }
+  constructor(mapId, maxPlayers = 20) { this.mapId = mapId; this.map = MAPS[mapId]; this.T = createTerrain({ world: this.map.world, seed: this.map.seed }); this.half = this.map.world / 2; this.sea = 0; this.max = maxPlayers; this.players = new Map(); this.nextId = 1; this.t = 80; this.tribeInfo = new Map(); this.tribeOfToken = new Map(); this.invites = new Map(); this.nextTribe = 1; this.B = new Buildings(); this.D = new Deps(); this.fxT = 0; this.wx = { state: 'clear', until: 200 }; this.nodes = new Map(); this.reports = new Map(); this.tkLog = new Map(); this.deadSleepers = new Map(); this.names = new Map(); this.raidT = new Map(); this.fauna = new Fauna(this); this.fauna.spawnAll(); this.timer = setInterval(() => this.tick(), DT * 1000); }
   get humans() { let n = 0; for (const p of this.players.values()) if (!p.bot && !p.sleeping) n++; return n; }
   get count() { let n = 0; for (const p of this.players.values()) if (!p.sleeping) n++; return n; }
   get sleepers() { return [...this.players.values()].filter((p) => p.sleeping); }
   spawnPoint() { for (let i = 0; i < 300; i++) { const a = Math.random() * 6.283, r = this.half * (.2 + Math.random() * .62), x = Math.cos(a) * r, z = Math.sin(a) * r, h = this.T.terrainH(x, z); if (h > 1.6 && h < 12 && this.T.slopeAt(x, z) < .28 && !this.T.nearLake(x, z, 1.5)) return { x, z }; } return { x: 0, z: 0 }; }
   // Tribus: solo se forman por invitación (máx. 3). Quien no tiene tribu tiene una tribu "solitaria" propia (tid = 's:' + token).
-  pub(p) { const t = this.tribeInfo.get(p.tid); return { id: p.id, name: p.name, tid: p.tid, tribe: t ? t.name : '', look: p.look, held: p.held || '', sleep: p.sleeping ? 1 : 0 }; }
+  pub(p) { const t = this.tribeInfo.get(p.tid); return { id: p.id, name: p.name, tid: p.tid, tribe: t ? t.name : '', look: p.look, held: p.held || '', sleep: p.sleeping ? 1 : 0, k: p.kills || 0 }; }
   tribeSize(tid) { let n = 0; for (const q of this.players.values()) if (q.tid === tid && !q.bot) n++; return n; }
   members(tid) { return [...this.players.values()].filter((q) => q.tid === tid); }
   notice(p, text) { if (p && p.ws && p.ws.readyState === 1) p.ws.send(JSON.stringify({ t: 'notice', text })); }
@@ -182,7 +187,19 @@ export class Room {
     const who = by.bot ? this.tribeLabel(by.tid) : by.name; let m = this.reports.get(owner); if (!m) this.reports.set(owner, m = new Map());
     let e = m.get(who); if (!e) m.set(who, e = { who, pieces: 0, chest: 0, deps: 0, bot: !!by.bot }); e[field] = (e[field] || 0) + n; if (m.size > 12) m.delete(m.keys().next().value);
   }
-  sendReport(p) { const m = this.reports.get(p.tid); if (!m || !m.size) return; this.send(p, { t: 'report', list: [...m.values()] }); this.reports.delete(p.tid); }
+  // charla de ambiente: los otros jugadores de la isla hablan de vez en cuando (en el idioma de la mayoría)
+  chatLang() { let en = 0, es = 0; for (const q of this.players.values()) if (!q.bot && q.ws) { if (q.lang === 'en') en++; else es++; } return en > es ? 'en' : 'es'; }
+  botSay(bot, pool, delay) {
+    if (!bot || !bot.bot || !pool || !pool.length) return;
+    this.later(delay, () => { if (!this.players.has(bot.id) || bot.dead > 0 || bot.sleeping) return; const L = this.chatLang(), line = pool[Math.floor(Math.random() * pool.length)]; this.chat(bot, line[L === 'en' ? 1 : 0]); });
+  }
+  ambient(kind, bot) {
+    const P = CHAT[kind]; if (!P || Math.random() > P.p) return;
+    let b = bot; if (!b) { const bs = [...this.players.values()].filter((q) => q.bot && q.dead <= 0 && !q.sleeping); b = bs[Math.floor(Math.random() * bs.length)]; }
+    this.botSay(b, P.lines, P.d0 + Math.random() * P.d1);
+  }
+  tribeOnline(tid) { for (const q of this.players.values()) if (q.tid === tid && !q.bot && q.ws && q.ws.readyState === 1) return true; return false; }
+  sendReport(p) { const m = this.reports.get(p.tid), tk = this.tkLog.get(p.tid); if ((!m || !m.size) && (!tk || !tk.length)) return; this.send(p, { t: 'report', list: m ? [...m.values()] : [], tk: tk || [] }); this.reports.delete(p.tid); this.tkLog.delete(p.tid); }
   later(sec, fn) { (this.sched || (this.sched = [])).push({ t: this.t + sec, fn }); }
   feed(k, a, b, x) { this.broadcast(Object.assign({ t: 'ev', k, a, b }, x || null)); }
   pieceHit(p, key, weapon) {
@@ -210,7 +227,7 @@ export class Room {
     if (Math.hypot(x - p.x, z - p.z) > 14) return fail('Está demasiado lejos');
     if (this.D.countOf(p.tid) >= 150) return fail('Tu tribu ha alcanzado el límite de objetos');
     if (t === 'c4' && [...this.D.map.values()].filter((q) => q.t === 'c4' && q.owner === p.tid).length >= C4_MAX) return fail('Demasiadas cargas C4 colocadas');
-    const o = this.D.add(t, x, y, z, d.r, p.tid); this.broadcast({ t: 'db', d: this.D.pub(o) });
+    const o = this.D.add(t, x, y, z, d.r, p.tid); if (o) { o.ownerId = p.id; o.ownerName = p.name; } this.broadcast({ t: 'db', d: this.D.pub(o) });
   }
   ownDep(p, id) { const d = this.D.map.get(id); return d && d.owner === p.tid ? d : null; }
   removeDep(p, id) { const d = this.ownDep(p, id); if (!d || !this.depNear(p, d, 8)) return; this.D.map.delete(id); this.broadcast({ t: 'dd', id, by: p.id, refund: d.t }); if (d.slots) this.spill(d); }
@@ -264,9 +281,9 @@ export class Room {
     if (p.dead > 0 || !EXPLOSIONS[kind] || kind === 'barrel' || kind === 'shell' || kind === 'mine' || !Number.isFinite(x + y + z)) return;
     if (this.t < (p.exT || 0)) return; p.exT = this.t + 1.2; if (Math.hypot(x - p.x, z - p.z) > 30) return; this.explode(kind, x, y, z, p);
   }
-  explode(kind, x, y, z, by) {
+  explode(kind, x, y, z, by, src) {
     const E = EXPLOSIONS[kind]; if (!E) return; this.broadcast({ t: 'boom', x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), R: E.R, dmg: E.dmg });
-    for (const q of [...this.players.values()]) { if (q.dead > 0 || (by && q.tid === by.tid && q !== by && false)) continue; const d = Math.hypot(q.x - x, q.y + 1 - y, q.z - z); if (d < E.R) { if (by && q.tid === by.tid) continue; this.hurt(q, E.dmg * .4 * (1 - d / E.R * .6), by || null, 'explosion'); } }
+    for (const q of [...this.players.values()]) { if (q.dead > 0 || (by && q.tid === by.tid && q !== by && false)) continue; const d = Math.hypot(q.x - x, q.y + 1 - y, q.z - z); if (d < E.R) { if (by && q.tid === by.tid) continue; this.hurt(q, E.dmg * .4 * (1 - d / E.R * .6), by || null, 'explosion', src); } }
     for (const pc of [...this.B.map.values()]) { if (by && pc.owner === by.tid) continue; const c = pieceCenter(pc), dd = Math.max(0, Math.hypot(c.x - x, c.y - y, c.z - z) - 1.5); if (dd < E.R && this.B.map.has(pc.key)) this.damagePiece(pc, E.dmg * E.pm * (1 - EXP_RES[pc.tier]) * (1 - dd / E.R * .5), by || null); }
     for (const d of [...this.D.map.values()]) { if (by && d.owner === by.tid) continue; const dd = Math.hypot(d.x - x, d.y - y, d.z - z); if (dd < E.R && d.t !== 'mine' && this.D.map.has(d.id)) this.damageDep(d, E.dmg * .6 * (1 - dd / E.R * .5), by || null); }
   }
@@ -294,6 +311,7 @@ export class Room {
   pickBag(p, id) { const b = this.D.bags.get(id); if (!b || p.dead > 0 || Math.hypot(b.x - p.x, b.z - p.z) > 4) return; this.D.bags.delete(id); this.broadcast({ t: 'lx', id }); this.send(p, { t: 'give', items: b.slots.map((s) => [s.id, s.n]) }); }
   // ---- trampas y torretas (se evalúan en cada tick)
   enemiesNear(d, R, minR = 0) { const out = []; for (const q of this.players.values()) { if (q.dead > 0 || q.tid === d.owner || q.prot > this.t) continue; const dist = Math.hypot(q.x - d.x, q.z - d.z); if (dist <= R && dist >= minR && Math.abs(q.y - d.y) < 10) out.push([q, dist]); } return out; }
+  warnTurret(q, d) { if (!q.ws || this.t < (q.warnT || 0)) return; q.warnT = this.t + 2.5; this.send(q, { t: 'warn', w: d.t, o: d.ownerName || '' }); }
   tickDeps(dt) {
     for (const d of [...this.D.map.values()]) {
       if (d.cd > 0) d.cd -= dt; const T = DEF[d.t].turret;
@@ -302,16 +320,16 @@ export class Room {
       else if (T && d.ammo > 0) {
         const es = this.enemiesNear(d, T.range, T.min || 0); if (!es.length) continue;
         if (d.cd > 0) continue; d.cd = T.cd; const tgt = d.t === 'mortar' ? es.sort((a, b) => b[1] - a[1])[0][0] : es.sort((a, b) => a[1] - b[1])[0][0];
-        if (d.t === 'ballista') { d.ammo--; this.broadcast({ t: 'fx', k: 'bolt', id: d.id, x: d.x, y: d.y + 1.15, z: d.z, tx: tgt.x, ty: tgt.y + 1.1, tz: tgt.z }); this.hurt(tgt, T.dmg, null, 'trap', d); }
-        else if (d.t === 'flamer') { d.fuel = (d.fuel || 0) + T.cd; if (d.fuel >= 3) { d.fuel = 0; d.ammo--; } this.broadcast({ t: 'fx', k: 'flame', id: d.id, x: d.x, y: d.y + 1.1, z: d.z, tx: tgt.x, ty: tgt.y, tz: tgt.z }); for (const [q] of es) { const a = Math.atan2(q.x - d.x, q.z - d.z), b = Math.atan2(tgt.x - d.x, tgt.z - d.z); let da = Math.abs(a - b); if (da > Math.PI) da = 2 * Math.PI - da; if (da < .5) this.hurt(q, T.dmg, null, 'fire'); } }
-        else { d.ammo--; this.broadcast({ t: 'fx', k: 'shell', id: d.id, x: d.x, y: d.y + .9, z: d.z, tx: tgt.x, ty: tgt.y, tz: tgt.z }); const tx = tgt.x, ty = tgt.y, tz = tgt.z; setTimeout(() => this.explode('shell', tx, ty + .3, tz, null), 2400); }
+        if (d.t === 'ballista') { d.ammo--; this.broadcast({ t: 'fx', k: 'bolt', id: d.id, x: d.x, y: d.y + 1.15, z: d.z, tx: tgt.x, ty: tgt.y + 1.1, tz: tgt.z }); this.warnTurret(tgt, d); this.hurt(tgt, T.dmg, null, 'turret', d); }
+        else if (d.t === 'flamer') { d.fuel = (d.fuel || 0) + T.cd; if (d.fuel >= 3) { d.fuel = 0; d.ammo--; } this.broadcast({ t: 'fx', k: 'flame', id: d.id, x: d.x, y: d.y + 1.1, z: d.z, tx: tgt.x, ty: tgt.y, tz: tgt.z }); for (const [q] of es) { const a = Math.atan2(q.x - d.x, q.z - d.z), b = Math.atan2(tgt.x - d.x, tgt.z - d.z); let da = Math.abs(a - b); if (da > Math.PI) da = 2 * Math.PI - da; if (da < .5) { this.warnTurret(q, d); this.hurt(q, T.dmg, null, 'fire', d); } } }
+        else { d.ammo--; this.broadcast({ t: 'fx', k: 'shell', id: d.id, x: d.x, y: d.y + .9, z: d.z, tx: tgt.x, ty: tgt.y, tz: tgt.z }); const tx = tgt.x, ty = tgt.y, tz = tgt.z; this.warnTurret(tgt, d); setTimeout(() => this.explode('shell', tx, ty + .3, tz, null, d), 2400); }
         this.broadcast({ t: 'da', id: d.id, ammo: d.ammo });
       } else if (d.t === 'spikes') {
-        for (const [q] of this.enemiesNear(d, 1.2)) { if (this.t < (q.spikeT || 0)) continue; q.spikeT = this.t + .5; this.send(q, { t: 'slow', s: .4, dur: .8 }); this.hurt(q, 10, null, 'trap'); this.damageDep(d, 6, null); if (!this.D.map.has(d.id)) break; }
+        for (const [q] of this.enemiesNear(d, 1.2)) { if (this.t < (q.spikeT || 0)) continue; q.spikeT = this.t + .5; this.send(q, { t: 'slow', s: .4, dur: .8 }); this.hurt(q, 10, null, 'trap', d); this.damageDep(d, 6, null); if (!this.D.map.has(d.id)) break; }
       } else if (d.t === 'beartrap' && d.armed) {
-        const es = this.enemiesNear(d, .9); if (es.length) { const q = es[0][0]; d.armed = false; this.broadcast({ t: 'da', id: d.id, armed: false }); this.send(q, { t: 'stun', dur: 4 }); this.hurt(q, 35, null, 'trap'); }
+        const es = this.enemiesNear(d, .9); if (es.length) { const q = es[0][0]; d.armed = false; this.broadcast({ t: 'da', id: d.id, armed: false }); this.send(q, { t: 'stun', dur: 4 }); this.hurt(q, 35, null, 'trap', d); }
       } else if (d.t === 'mine') {
-        if (this.enemiesNear(d, 1.3).length) { this.D.map.delete(d.id); this.broadcast({ t: 'dd', id: d.id, by: 0, refund: null }); this.explode('mine', d.x, d.y + .3, d.z, null); }
+        if (this.enemiesNear(d, 1.3).length) { this.D.map.delete(d.id); this.broadcast({ t: 'dd', id: d.id, by: 0, refund: null }); this.explode('mine', d.x, d.y + .3, d.z, null, d); }
       } else if (d.t === 'bell') {
         if ((this.t - (d.ring || -99) > 15) && this.enemiesNear(d, 30).length) { d.ring = this.t; this.broadcastTribe(d.owner, { t: 'alarm', x: d.x, z: d.z }); }
       }
@@ -376,7 +394,7 @@ export class Room {
   setHeld(p, w) { w = HELD.has(w) ? w : ''; if (p.held !== undefined && p.held === w) return; p.held = w; this.broadcast({ t: 'held', id: p.id, w }); }
   get world() { return this._w || (this._w = buildWorld(this.T)); }
   hurt(q, dmg, by, cause, src) { if (!(dmg > 0)) return;
-    if ((q.blocking || (q.ai && q.ai.shielded)) && cause !== 'explosion' && cause !== 'fire' && cause !== 'selfdmg') { const s = src || by, fx = -Math.sin(q.yaw), fz = -Math.cos(q.yaw); if (q.ai || (s && ((s.x - q.x) * fx + (s.z - q.z) * fz) / (Math.hypot(s.x - q.x, s.z - q.z) || 1) > .45)) { dmg *= q.ai ? .3 : .22; if (q.ws) this.send(q, { t: 'blocked' }); } } if (by && by !== q) { q.lastBy = by.id; q.lastByT = this.t; } if ((by || cause === 'trap' || cause === 'fire' || cause === 'explosion' || cause === 'animal') && by !== q && cause !== 'selfdmg' && q.prot > this.t) return; if (by && by.prot > this.t) by.prot = 0; q.hp -= dmg; q.regenT = this.t + 10; this.broadcast({ t: 'hit', id: q.id, hp: Math.max(0, Math.round(q.hp)), by: by ? by.id : 0 }); if (q.hp <= 0 && !(q.dead > 0)) { q.dead = 4; q.deaths++; if (by) by.kills++; this.broadcast({ t: 'kill', victim: q.id, killer: by ? by.id : 0, cause: cause || '' }); if (q.sleeping) this.killSleeper(q, by); } }
+    if ((q.blocking || (q.ai && q.ai.shielded)) && cause !== 'explosion' && cause !== 'fire' && cause !== 'selfdmg') { const s = src || by, fx = -Math.sin(q.yaw), fz = -Math.cos(q.yaw); if (q.ai || (s && ((s.x - q.x) * fx + (s.z - q.z) * fz) / (Math.hypot(s.x - q.x, s.z - q.z) || 1) > .45)) { dmg *= q.ai ? .3 : .22; if (q.ws) this.send(q, { t: 'blocked' }); } } if (by && by !== q) { q.lastBy = by.id; q.lastByT = this.t; } if ((by || cause === 'trap' || cause === 'fire' || cause === 'explosion' || cause === 'animal') && by !== q && cause !== 'selfdmg' && q.prot > this.t) return; if (by && by.prot > this.t) by.prot = 0; q.hp -= dmg; q.regenT = this.t + 10; this.broadcast({ t: 'hit', id: q.id, hp: Math.max(0, Math.round(q.hp)), by: by ? by.id : 0 }); if (q.hp <= 0 && !(q.dead > 0)) { q.dead = 4; q.deaths++; let kr = by; const so = src && DEF[src.t] ? src : null; if (!kr && so && so.ownerId) { const o = this.players.get(so.ownerId); if (o && o !== q && o.tid === so.owner) kr = o; } if (so && so.owner && !isBotOwner(so.owner) && !this.tribeOnline(so.owner)) { let l = this.tkLog.get(so.owner); if (!l) this.tkLog.set(so.owner, l = []); l.push({ w: so.t, v: q.name }); if (l.length > 12) l.shift(); } if (kr && kr !== q) kr.kills++; if (kr && kr.bot && !q.bot) this.ambient('killHuman', kr); else if (kr && !kr.bot && q.bot) this.ambient('killedByHuman', q); this.broadcast({ t: 'kill', victim: q.id, killer: kr && kr !== q ? kr.id : 0, cause: cause || '', w: so ? so.t : (src && src.type) || (by && by.held) || '', o: so ? (so.ownerName || '') : '', vn: q.name, kn: kr && kr !== q ? kr.name : '', k: kr && kr !== q ? kr.kills : 0 }); if (q.sleeping) this.killSleeper(q, by); } }
   tick() {
     this.t += DT;
     for (const p of this.players.values()) {

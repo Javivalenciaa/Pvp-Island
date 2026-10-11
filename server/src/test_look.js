@@ -12,7 +12,7 @@ ok(me.look.head === 1.3 && me.look.arms === .85, 'las medidas se limitan a su ra
 ok(me.look.hairStyle === 4 && me.look.beard === false && me.look.helm === 'horn', 'peinado, barba y casco se conservan');
 const b = await conn('Beto', 'beto', null); ok(b.msgs.find((m) => m.t === 'welcome').roster.find((q) => q.name === 'Ana').look.skin === '#112233', 'los demás reciben el aspecto de Ana');
 ok(a.msgs.some((m) => m.t === 'join' && m.name === 'Beto'), 'Ana ve entrar a Beto');
-const bots = w.roster.filter((q) => q.bot); ok(bots.length > 0 && bots.every((q) => q.look && q.look.skin), 'los bots también tienen aspecto propio');
+const others = w.roster.filter((q) => q.name !== 'Ana'); ok(others.length > 0 && others.every((q) => q.look && q.look.skin), 'los demás jugadores de la isla también tienen aspecto propio');
 a.ws.send(JSON.stringify({ t: 'look', look: { skin: '#445566', head: 1.1 } })); await sleep(200);
 ok(b.msgs.some((m) => m.t === 'look' && m.look.skin === '#445566'), 'cambiar de aspecto en partida se propaga a los demás');
 a.ws.send(JSON.stringify({ t: 'chat', text: 'eres una mierda' })); await sleep(200);

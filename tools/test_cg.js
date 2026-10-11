@@ -19,23 +19,30 @@ async function run(name, { port, invite, adMode, serverUp = true, query = '', tu
   await p.route('**/*', (r) => r.request().url().startsWith('file:') ? r.continue() : r.abort());
   await p.route('https://sdk.crazygames.com/**', (r) => r.fulfill({ contentType: 'application/javascript', body: MOCK }));
   await p.goto('file://' + path.join(ROOT, 'client', 'index.html') + '?server=ws://localhost:' + port + (tut ? '' : '&notut=1') + query);
-  await p.waitForFunction(() => window.__isla && window.__isla.state === 'playing', null, { timeout: 120000 }).catch(() => {}); await p.waitForTimeout(1500);
+  await p.waitForFunction(() => document.body.classList.contains('ready') && window.__isla && !document.querySelector('#btnPlay').disabled, null, { timeout: 120000 }); await p.waitForTimeout(800);
+  const menuFirst = await p.evaluate(() => window.__isla.state === 'menu' && !document.querySelector('#menu').hidden);
+  for (let i = 0; i < 3; i++) { // pulsa Jugar (si el servidor cae, la página se recarga en local y hay que pulsar de nuevo)
+    await p.waitForFunction(() => document.body.classList.contains('ready') && window.__isla && !document.querySelector('#btnPlay').disabled, null, { timeout: 120000 }).catch(() => {});
+    if (await p.evaluate(() => window.__isla.state).catch(() => null) === 'playing') break;
+    await p.evaluate(() => document.querySelector('#btnPlay').click()).catch(() => {});
+    try { await p.waitForFunction(() => window.__isla && window.__isla.state === 'playing', null, { timeout: 15000 }); break; } catch (e) { /* reintento */ }
+  } await p.waitForTimeout(1500);
   const info = await p.evaluate(() => ({ state: window.__isla.state, log: window.__cgLog, name: window.__isla.NET.name, online: window.__isla.NET.on, creator: !document.querySelector('#creator').hidden, privacy: !document.querySelector('#privacy').hidden, offline: /offline=1/.test(location.search), hint: !document.querySelector('#lockHint').hidden }));
   console.log('---', name); console.log(JSON.stringify(info));
-  return { p, b, srv, info, errors };
+  info.menuFirst = menuFirst; return { p, b, srv, info, errors };
 }
 (async () => {
   let r = await run('flujo normal', { port: 8991 });
   const L = r.info.log, idx = (x) => L.findIndex((e) => e === x);
   ok(idx('init') >= 0 && idx('loadingStart') > idx('init') && idx('loadingStop') > idx('loadingStart'), 'init → loadingStart → loadingStop en orden');
-  ok(r.info.state === 'playing' && r.info.online, 'aterriza directamente en la partida en línea sin tocar nada');
-  ok(!r.info.creator, 'no se abre el creador ni el menú');
+  ok(r.info.menuFirst, 'al abrir siempre se ve el menú (nunca directo al mapa)');
+  ok(r.info.state === 'playing' && r.info.online, 'con un clic en Jugar entra a la partida en línea');
+  ok(!r.info.creator, 'no se abre el creador');
   ok(L.includes('gameplayStart'), 'gameplayStart al empezar');
   ok(r.info.name === 'CGPlayer', 'usa el nombre de la cuenta de CrazyGames');
   ok(L.some((e) => e.startsWith('showInvite:')), 'muestra el botón de invitar con la sala');
   ok(L.some((e) => e.startsWith('data.set:')), 'el progreso se guarda con SDK.data');
   ok(r.info.privacy, 'se muestra el aviso de privacidad');
-  ok(r.info.hint, 'pide un clic para capturar el ratón (no hay gesto previo)');
   await r.p.evaluate(() => window.__cgTrigger({ disableChat: true })); await r.p.waitForTimeout(300);
   ok(await r.p.evaluate(() => getComputedStyle(document.querySelector('#chat')).display === 'none'), 'disableChat oculta el chat');
   await r.p.evaluate(() => window.__cgTrigger({ disableChat: false, muteAudio: true })); await r.p.waitForTimeout(300);
@@ -54,11 +61,11 @@ async function run(name, { port, invite, adMode, serverUp = true, query = '', tu
   ok(await r.p.evaluate(() => window.__isla.state) === 'playing', 'con anuncio bloqueado (adError) el juego continúa');
   await r.b.close(); r.srv.kill();
   r = await run('servidor caído → respaldo sin conexión', { port: 8993, serverUp: false });
-  ok(r.info.state === 'playing' && !r.info.online, 'si el servidor no responde entra igualmente a jugar en local (sin esperar ni recargar)');
+  ok(r.info.state === 'playing' && !r.info.online, 'si el servidor no responde, tras pulsar Jugar entra a jugar en local');
   await r.b.close();
   r = await run('primera vez → tutorial inmediato', { port: 8992, tut: true });
-  ok(r.info.state === 'playing' && await r.p.evaluate(() => window.__isla.TUT.on && window.__isla.inv.count('bomb') > 0), 'la primera partida empieza directamente en el tutorial (con bombas), sin servidor ni menú');
-  ok(r.info.log.includes('gameplayStart'), 'y gameplayStart se envía al instante');
+  ok(r.info.state === 'playing' && await r.p.evaluate(() => window.__isla.TUT.on && window.__isla.inv.count('bomb') > 0), 'la primera partida empieza en el tutorial (con bombas) tras pulsar Jugar');
+  await r.p.waitForFunction(() => window.__cgLog.includes('gameplayStart'), null, { timeout: 10000 }).catch(() => {}); ok((await r.p.evaluate(() => window.__cgLog)).includes('gameplayStart'), 'y gameplayStart se envía en cuanto empieza el tutorial');
   await r.b.close();
   process.exit(process.exitCode || 0);
 })();
