@@ -182,7 +182,7 @@ body.touch #bottom{transform:scale(.68);transform-origin:bottom center}
 #kfeed .kl{background:rgba(13,18,16,.78);border-right:3px solid #ff5a3a;padding:4px 9px;border-radius:3px;font-size:13px;line-height:1.3;color:var(--bone);text-align:right;animation:feedin .25s ease-out;transition:opacity .6s}
 #kfeed .kl.me{border-color:#ffd27a;background:rgba(60,40,10,.8)}#kfeed .kl.dead{border-color:#c0392b}
 #kfeed .kl b{font-weight:700;color:#ffd7a8}#kfeed .kl i{font-style:normal;color:var(--muted)}
-#ktop{background:rgba(13,18,16,.7);padding:5px 9px;border-radius:4px;font-size:12px;color:var(--bone);text-align:right;line-height:1.35}#ktop:empty{display:none}#ktop span{color:var(--muted);letter-spacing:.1em;text-transform:uppercase;font-size:10px;font-weight:700;display:block}#ktop b{color:#ffd7a8}
+#ktop{background:rgba(13,18,16,.78);padding:6px 11px;border-radius:5px;font-size:13px;color:var(--bone);text-align:right;line-height:1.4;min-width:170px;border:1px solid rgba(255,210,122,.18)}#ktop i{font-style:normal;color:#ffd27a;font-weight:700}#ktop i.e{color:var(--muted);font-weight:400}#ktop span{color:var(--muted);letter-spacing:.1em;text-transform:uppercase;font-size:10px;font-weight:700;display:block}#ktop b{color:#ffd7a8}
 #feed .ev{background:rgba(13,18,16,.7);border-right:3px solid var(--ember);padding:4px 9px;border-radius:3px;font-size:13px;line-height:1.3;color:var(--bone);text-align:right;animation:feedin .25s ease-out;transition:opacity .6s}
 #feed .ev.raid{border-color:#ff5a3a}#feed .ev.loot{border-color:#ffd27a}#feed .ev.base{border-color:#8fbf6a}
 #feed .ev b{font-weight:700;color:#ffd7a8}
@@ -4058,8 +4058,9 @@ function kfAdd(html, cls) {
   setTimeout(() => { el.style.opacity = 0; setTimeout(() => el.remove(), 700); }, 11000);
 }
 function killTop() {
-  const l = [...NET.roster.values()].filter((q) => q.k > 0).sort((a, b) => b.k - a.k).slice(0, 3);
-  $('#ktop').innerHTML = l.length ? `<span>${LT('Más kills', 'Top kills')}</span>` + l.map((q, i) => `${i + 1}. <b>${escH(q.name)}</b> ${q.k}`).join('<br>') : '';
+  const el = $('#ktop'); if (!el) return;
+  const l = [...NET.roster.values()].filter((q) => q.k > 0).sort((a, b) => (b.k || 0) - (a.k || 0) || String(a.name).localeCompare(b.name)).slice(0, 5);
+  el.innerHTML = `<span>${LT('Top asesinos', 'Top killers')}</span>` + (l.length ? l.map((q, i) => `${i + 1}. <b>${escH(q.name)}</b> <i>${q.k}</i>`).join('<br>') : `<i class="e">${LT('Aún nadie ha matado', 'No kills yet')}</i>`);
 }
 function killHow(m) {
   const turret = ['ballista', 'flamer', 'mortar'].includes(m.w);
@@ -4217,7 +4218,7 @@ function objRestore() {
 }
 addEventListener('beforeunload', objSave);
 setInterval(objSave, 10000);
-function updateHook() { if (!NET.on) return; updateBagTimer(); updateBasePing(); updateRank(); if (clock - (NET.invT || -9) > 4) { NET.invT = clock; sendInv(); } }
+function updateHook() { if (!NET.on) return; killTop(); updateBagTimer(); updateBasePing(); updateRank(); if (clock - (NET.invT || -9) > 4) { NET.invT = clock; sendInv(); } }
 
 // ---------------------------------------------------------------- estado, entrada
 let state = 'menu', panelOpen = false, locked = false, lockWorked = false, fallbackLook = false;
@@ -5126,9 +5127,9 @@ function netMsg(m) {
     dayPhase = m.phase; dayCount = m.day; if (m.wx) wxState = m.wx; NET.id = m.id; NET.tid = m.tid; NET.tribe = m.tribe; $('#btnTLeave').hidden = !m.tribe; NET.roster.clear(); for (const q of m.roster) NET.roster.set(q.id, q);
     player.pos.set(m.x, Math.max(terrainH(m.x, m.z), Number.isFinite(m.y) ? m.y : -1e9) + .1, m.z); player.vel.set(0, 0, 0); player.hp = 100; NET.on = true;
     if (m.restore) { const R = m.restore; inv.slots.fill(null); (R.slots || []).forEach((sl, i) => { if (i < inv.slots.length && sl && ITEMS[sl.id]) inv.slots[i] = { id: sl.id, n: sl.n, dur: sl.dur }; }); inv.touch(); player.armorId = R.armor && ITEMS[R.armor] ? R.armor : null; if (R.hp > 0) player.hp = R.hp; if (Number.isFinite(R.hunger) && R.hunger > 0) player.hunger = R.hunger; if (Number.isFinite(R.thirst) && R.thirst > 0) player.thirst = R.thirst; setTimeout(() => toast(LT('Vuelves a tu cuerpo: conservas todo lo que llevabas', 'You return to your body: you keep everything you were carrying'), 'info'), 1500); } document.body.classList.add('online-on');
-    NET.bases = []; NET.joinT = clock; objRestore(); retentionGift(); $('#netStatus').textContent = ''; clearTimeout(CG.autoT); startGame(); cgRoom(true); showBanner('Pvp-Island', LT('Construye tu base · Raidea a los clanes · Sobrevive', 'Build your base · Raid the clans · Survive'), false); if (!store.get('pvp-priv')) privacyShow(); if (m.tribe) toast(`Tribu: ${m.tribe}`, 'info');
+    NET.bases = []; NET.joinT = clock; objRestore(); retentionGift(); killTop(); $('#netStatus').textContent = ''; clearTimeout(CG.autoT); startGame(); cgRoom(true); showBanner('Pvp-Island', LT('Construye tu base · Raidea a los clanes · Sobrevive', 'Build your base · Raid the clans · Survive'), false); if (!store.get('pvp-priv')) privacyShow(); if (m.tribe) toast(`Tribu: ${m.tribe}`, 'info');
   } else if (m.t === 'snap') netSnap(m);
-  else if (m.t === 'join') { NET.roster.set(m.id, { id: m.id, name: m.name, tid: m.tid, tribe: m.tribe, sleep: m.sleep, look: m.look || (NET.roster.get(m.id) || {}).look, held: m.held !== undefined ? m.held : (NET.roster.get(m.id) || {}).held }); chatAdd('', `${m.name} se ha unido`, false, true); }
+  else if (m.t === 'join') { NET.roster.set(m.id, { id: m.id, name: m.name, tid: m.tid, tribe: m.tribe, sleep: m.sleep, k: m.k || 0, look: m.look || (NET.roster.get(m.id) || {}).look, held: m.held !== undefined ? m.held : (NET.roster.get(m.id) || {}).held }); chatAdd('', `${m.name} se ha unido`, false, true); }
   else if (m.t === 'tribe') {
     NET.roster.set(m.id, { id: m.id, name: m.name, tid: m.tid, tribe: m.tribe, sleep: m.sleep, look: m.look || (NET.roster.get(m.id) || {}).look, held: m.held !== undefined ? m.held : (NET.roster.get(m.id) || {}).held });
     if (m.id === NET.id) { NET.tid = m.tid; NET.tribe = m.tribe; $('#btnTLeave').hidden = !m.tribe; toast(m.tribe ? `Tribu: ${m.tribe}` : 'Has abandonado la tribu', 'info'); for (const r of NET.remotes.values()) refreshRemote(r); }
