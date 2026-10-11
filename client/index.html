@@ -207,6 +207,7 @@ body.touch #rank{top:calc(12px + env(safe-area-inset-top,0px))}body.touch #feedC
 #pauseRoster .pl span.me{border-color:var(--ember);color:#ffd7a8}#pauseRoster .pl span.zz{opacity:.6}
 #pauseRoster .pl small{color:#ffb27a;margin-left:5px;font-size:11px}
 body.blocking #cross{transform:translate(-50%,-50%) scale(2.2);opacity:.45}
+#blk{position:absolute;left:50%;bottom:24%;transform:translateX(-50%);padding:6px 16px;border-radius:20px;background:rgba(40,90,170,.75);color:#fff;font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:14px;pointer-events:none}
 body.blocking #hurt{box-shadow:inset 0 0 120px rgba(90,160,255,.4)}
 #toasts{position:absolute;left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(120px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:4px;align-items:flex-start}
 .toast{padding:5px 10px;font-size:14px;font-weight:600;border-radius:4px;background:rgba(10,14,12,.75);border-left:3px solid var(--moss);animation:tin .2s ease-out}
@@ -398,6 +399,7 @@ body:not(.ready) .glass{backdrop-filter:none;-webkit-backdrop-filter:none}
   <div id="invring" hidden><i id="invbar"></i><span id="invtxt"></span></div>
   <div id="invite" class="glass" hidden><span id="invwho"></span><button type="button" id="invYes">Aceptar [Y]</button><button type="button" id="invNo">Rechazar [N]</button></div>
   <div id="toasts"></div>
+  <div id="blk" hidden></div>
   <div id="feedCol"><div id="ktop"></div><div id="kfeed"></div><div id="feed"></div></div>
   <div id="baseping" class="glass" hidden></div>
   <div id="rank" class="glass" hidden><div class="n" id="rkN"></div><span class="b"><i id="rkB"></i></span></div>
@@ -4238,7 +4240,7 @@ canvas.addEventListener('mousedown', (e) => {
   if (e.button === 2) { mouseR = true; shieldSync(); }
 });
 addEventListener('mouseup', (e) => { if (e.button === 0) mouseL = false; if (e.button === 2) { mouseR = false; shieldSync(); } });
-function shieldSync() { const sl = inv.slots[sel], want = !!(NET.on && state === 'playing' && mouseR && sl && ITEMS[sl.id].shield); if (want !== !!NET.block) { NET.block = want; netSend({ t: 'block', on: want }); document.body.classList.toggle('blocking', want); } }
+function shieldSync() { const sl = inv.slots[sel], want = !!(NET.on && state === 'playing' && (mouseR || mouseL) && sl && ITEMS[sl.id].shield); if (want !== !!NET.block) { NET.block = want; netSend({ t: 'block', on: want }); document.body.classList.toggle('blocking', want); { const bk = $('#blk'); if (bk) { bk.hidden = !want; bk.textContent = '🛡 ' + LT('Cubierto', 'Blocking'); } } } }
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 addEventListener('mousemove', (e) => {
   if (state !== 'playing' || panelOpen) return;
@@ -4406,6 +4408,7 @@ let nextAction = 0;
 function primaryAction() {
   if (clock < nextAction) return;
   const s = inv.slots[sel], it = s ? ITEMS[s.id] : null;
+  if (it && it.shield) return; // con el escudo en la mano, el clic sirve para cubrirse
   if (it && it.bow) {
     if (it.icon === 'bow') return;
     if (!clickQueued) return;
@@ -5336,7 +5339,7 @@ function netTick(dt) {
   updateRemotes(dt); updateNetAnimals(dt);
   if (state === 'playing' && inv.version !== NET.invV && (NET.invT = (NET.invT || 0) - dt) <= 0) { NET.invT = 2; NET.invV = inv.version; const items = {}; for (const sl of inv.slots) if (sl) items[sl.id] = (items[sl.id] || 0) + sl.n; netSend({ t: 'inv', items }); }
   shieldSync();
-  { const hid = state === 'playing' && inv.slots[sel] && HELD_OK.has(inv.slots[sel].id) ? inv.slots[sel].id : ''; if (NET.on && hid !== NET.held) { NET.held = hid; netSend({ t: 'held', w: hid }); } }
+  { const hid = state === 'playing' && inv.slots[sel] && HELD_OK.has(inv.slots[sel].id) ? inv.slots[sel].id : ''; if (hid === 'shield' && NET.held !== 'shield' && !NET.shieldHint) { NET.shieldHint = 1; toast(LT('Escudo: mantén el clic (izquierdo o derecho) para cubrirte. Solo protege de frente.', 'Shield: hold click (left or right) to block. It only protects from the front.'), 'info'); } if (NET.on && hid !== NET.held) { NET.held = hid; netSend({ t: 'held', w: hid }); } }
   if (state === 'playing' && (NET.sendT -= dt) <= 0) { NET.sendT = .05; netSend({ t: 'pos', x: +player.pos.x.toFixed(2), y: +player.pos.y.toFixed(2), z: +player.pos.z.toFixed(2), yaw: +player.yaw.toFixed(3), pitch: +player.pitch.toFixed(3) }); }
 }
 function remoteHit(r, weapon, extra) { netSend(Object.assign({ t: weapon === 'bow' || weapon === 'crossbow' ? 'shot' : 'attack', target: r.id, weapon }, extra || {})); }
@@ -5591,7 +5594,7 @@ setLang(LANG);
 requestAnimationFrame(frame);
 requestAnimationFrame(() => requestAnimationFrame(() => { document.body.classList.add('ready'); performance.mark('ready'); const pb = $('#btnPlay'); if (pb && typeof THREE !== 'undefined') pb.disabled = false; menuCharStart(); (async () => { if (inCG()) { await cgBoot(); cgLoaded(); try { if (CG.user && CG.user.username && !store.get('pvp-name')) $('#inName').value = String(CG.user.username).replace(/[<>]/g, '').trim().slice(0, 16) || $('#inName').value; } catch (e) { /* sin cuenta */ } } })(); }));
 // gancho de pruebas: avanza la simulación sin depender de los FPS
-window.__isla = { objInfer, objRestore, giftOf, GIFTS, deathText, onKill, onTurretWarn, updateObjective, get objIndex() { return objIndex; }, set objIndex(v) { objIndex = v; }, shieldSync, get sel() { return sel; }, ITEMS, TUT, tutFinish, dropSlot, get chestOpen() { return chestOpen; }, pauseGame, renderPauseRoster, sendInv, deployables, remoteRoot, pressR(v) { mouseR = v; }, remotes: () => NET.remotes.values(), NET, netMsg, netSend, remoteHit, hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
+window.__isla = { objInfer, objRestore, giftOf, GIFTS, deathText, onKill, onTurretWarn, updateObjective, get objIndex() { return objIndex; }, set objIndex(v) { objIndex = v; }, shieldSync, get sel() { return sel; }, set sel(v) { sel = v; }, ITEMS, TUT, tutFinish, dropSlot, get chestOpen() { return chestOpen; }, pauseGame, renderPauseRoster, sendInv, deployables, remoteRoot, pressR(v) { mouseR = v; }, remotes: () => NET.remotes.values(), NET, netMsg, netSend, remoteHit, hurtPlayer, bowS, arrows, press(v) { mouseL = v; if (v) clickQueued = true; }, addPiece, GRID, siege, startSiege, endSiege, deployables, addDeployable, projs, baseTarget, ETYPES, hurtBot, explode, challenges: () => challenges, get dayCount() { return dayCount; }, get dayPhase() { return dayPhase; }, bots,
   caveRoofs, BIOMES, biomeAt, CAVES, caveDark, caveInfo, roofH, player, inv, nodes, pieces, animals, spawnAnimal, LAKES, waterSurfaceAt, stats, giveItem, spawnBot, terrainH, spawn: SPAWN, scene, refreshEnv, renderer, POIS, destroyPiece, post, weather, setWeather(w) { wxState = w; wxTimer = 999; }, ctlData, N, CELL, HALF, camera, pieceRoot, get state() { return state; }, get aim() { return aim; }, get placement() { return placement; }, get waterAim() { return waterAim; },
   sim(sec, hold) { const n = Math.round(sec / .05); for (let k = 0; k < n; k++) { if (hold) mouseL = true; if (hold === 'click' && k === 0) clickQueued = true; waterTime.value += .05; scene.updateMatrixWorld(); tick(.05, performance.now()); } if (hold) mouseL = false; },
   setPhase(p) { dayPhase = p; } };

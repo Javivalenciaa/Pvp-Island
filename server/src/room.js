@@ -133,7 +133,7 @@ export class Room {
     else if (m.t === 'toss') this.tossItem(p, m.item);
     else if (m.t === 'det') this.detonate(p);
     else if (m.t === 'dup') this.upgradeDep(p, +m.id);
-    else if (m.t === 'block') p.blocking = !!m.on && p.held === 'shield' && p.dead <= 0;
+    else if (m.t === 'block') { p.blocking = !!m.on && p.dead <= 0; if (p.blocking) this.setHeld(p, 'shield'); }
     else if (m.t === 'bopen') this.bagOpen(p, +m.id);
     else if (m.t === 'btake') this.bagTake(p, +m.id, +m.i, String(m.item), +m.n);
     else if (m.t === 'bed') this.setBed(p, +m.id);
