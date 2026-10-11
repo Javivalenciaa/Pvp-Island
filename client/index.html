@@ -2532,7 +2532,7 @@ function openCrate(c) {
   if (clock < c.readyAt) { toast('Está vacía. Vuelve más tarde.', 'info'); return; }
   let got = 0;
   const first = !stats.firstBp && c.poi.type === 'lighthouse';
-  if (first) { stats.firstBp = true; stats.bp = stats.bp || {}; if (!stats.bp.ballista) { stats.bp.ballista = true; toast('¡Plano conseguido: Torreta de ballesta!', 'info'); } got++; }
+  if (first) { stats.firstBp = true; stats.bp = stats.bp || {}; if (!stats.bp.ballista) { stats.bp.ballista = true; toast('¡Plano conseguido: Torreta de ballesta!', 'info'); objSave(); } got++; }
   for (const [id, a, b, chance] of LOOT[c.poi.type]) if (Math.random() < chance) { if (id === 'bp') grantBlueprint(); else giveItem(id, a + Math.floor(Math.random() * (b - a + 1))); got++; }
   if (!got) giveItem('fiber', 5);
   c.readyAt = clock + 480; sfx.craft(); stats.crates = (stats.crates || 0) + 1; chEvent('crate');
@@ -3919,7 +3919,7 @@ function grantBlueprint() {
   const left = Object.keys(BLUEPRINTS).filter((k) => !stats.bp[k]);
   if (!left.length) { giveItem('gear', 2); return null; }
   const k = left[Math.floor(Math.random() * left.length)]; stats.bp[k] = true;
-  toast('¡Plano conseguido: ' + BLUEPRINTS[k] + '!', 'info'); sfx.craft(); renderPanel(true); return k;
+  toast('¡Plano conseguido: ' + BLUEPRINTS[k] + '!', 'info'); sfx.craft(); renderPanel(true); objSave(); return k;
 }
 
 // cola de fabricación (port del CraftingQueue.cs)
@@ -4212,7 +4212,7 @@ function objInfer() {
   if (c('workbench') || c('furnace') || c('chest')) mk(stats.placed, 'workbench', 1);
 }
 function objRestore() {
-  try { const d = JSON.parse(store.get(OBJ_KEY) || 'null'); if (d && d.st) { for (const k of ['got', 'crafted', 'placed']) Object.assign(stats[k], d.st[k] || {}); for (const k of Object.keys(d.st)) if (typeof d.st[k] === 'number') stats[k] = Math.max(stats[k] || 0, d.st[k]); if (d.i > objIndex) objIndex = d.i; } } catch (e) { /* datos corruptos */ }
+  try { const d = JSON.parse(store.get(OBJ_KEY) || 'null'); if (d && d.st) { for (const k of ['got', 'crafted', 'placed']) Object.assign(stats[k], d.st[k] || {}); for (const k of Object.keys(d.st)) if (typeof d.st[k] === 'number') stats[k] = Math.max(stats[k] || 0, d.st[k]); if (d.st.bp) stats.bp = Object.assign(stats.bp || {}, d.st.bp); if (d.st.firstBp) stats.firstBp = true; if (d.i > objIndex) objIndex = d.i; } } catch (e) { /* datos corruptos */ }
   objInfer();
 }
 addEventListener('beforeunload', objSave);

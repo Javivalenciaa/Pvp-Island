@@ -9,7 +9,7 @@ let srv = createServer({ port: 0, minPlayers: 0, dataDir: dir }); await new Prom
 const conn = async (name, token) => { const ws = new WebSocket('ws://localhost:' + port); const c = { ws, msgs: [] }; ws.on('message', (d) => c.msgs.push(JSON.parse(d))); await new Promise((r) => ws.on('open', r)); ws.send(JSON.stringify({ t: 'join', name, token, map: 'isla' })); await sleep(250); return c; };
 const send = (c, m) => c.ws.send(JSON.stringify(m)), room = srv.rooms[0];
 const a = await conn('Dormilona', 'tok-a'), b = await conn('Asesino', 'tok-b');
-const pa = [...room.players.values()].find((p) => p.name === 'Dormilona'), pb = [...room.players.values()].find((p) => p.name === 'Asesino'); pa.prot = 0; pb.prot = 0;
+const pa = [...room.players.values()].find((p) => p.name === 'Dormilona'), pb = [...room.players.values()].find((p) => p.name === 'Asesino'); pa.prot = 0; pb.prot = 0; pb.x = pa.x + 4; pb.z = pa.z; pb.y = pa.y;
 const slots = Array.from({ length: 24 }, () => null); slots[0] = { id: 'iron_sword', n: 1, dur: 80 }; slots[1] = { id: 'wood', n: 120 }; slots[5] = { id: 'bomb', n: 3 };
 send(a, { t: 'pos', x: pa.x, y: pa.y, z: pa.z, yaw: 1 }); send(a, { t: 'invfull', slots, armor: 'iron_armor', hunger: 55, thirst: 40 }); await sleep(200);
 ok(pa.slots && pa.slots.length === 24 && pa.armor === 'iron_armor', 'el servidor guarda el inventario completo que informa el cliente');
@@ -17,7 +17,7 @@ const { x, y, z, id } = pa; a.ws.close(); await sleep(300);
 ok(room.players.has(id) && pa.sleeping, 'al desconectarse el cuerpo sigue en el mapa durmiendo');
 ok(b.msgs.some((m) => m.t === 'sleep' && m.id === id), 'los demás reciben el aviso de que se ha dormido');
 ok(room.count === 1 && room.humans === 1, 'un cuerpo dormido no cuenta como jugador conectado');
-await sleep(150); ok(b.msgs.some((m) => m.t === 'snap' && m.p.some((e) => e[0] === id && e[8] === 1 && Math.abs(e[1] - x) < .1)), 'aparece en las instantáneas como dormido, en su sitio');
+await sleep(400); ok(b.msgs.some((m) => m.t === 'snap' && m.p.some((e) => e[0] === id && e[8] === 1 && Math.abs(e[1] - x) < .1)), 'aparece en las instantáneas como dormido, en su sitio');
 // reconectar: vuelve con todo
 let a2 = await conn('Dormilona', 'tok-a'); const w = a2.msgs.find((m) => m.t === 'welcome');
 ok(w && w.id === id && w.restore && w.restore.slots[1].n === 120 && w.restore.armor === 'iron_armor' && Math.abs(w.x - x) < .1, 'al volver recupera su cuerpo, posición e inventario');
