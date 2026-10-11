@@ -25,4 +25,8 @@ a.dead = 0; a.hp = 5; b.held = 'iron_axe'; la.length = 0; room.hurt(a, 10, b, 'm
 // charla de ambiente: un jugador de la isla comenta tras abatirte
 const bot = room.join('Skadi', 'tbot', null, true); bot.prot = 0; a.dead = 0; a.hp = 5; a.lang = 'en'; const rnd = Math.random; Math.random = () => 0; la.length = 0; room.hurt(a, 50, bot, 'melee'); Math.random = rnd;
 for (let i = 0; i < 100; i++) room.tick(); const say = la.find((m) => m.t === 'chat' && m.from === 'Skadi'); ok(say && say.text === 'gg', 'tras abatirte, el otro jugador comenta en tu idioma: ' + (say && say.text));
+// lobo domado: defiende al dueño de un jabalí
+const wolf = room.fauna.spawn('wolf'), boar = room.fauna.spawn('boar'); a.dead = 0; a.hp = 100; a.prot = 0; a.x = 100; a.z = 100; a.y = T.terrainH(100, 100); b.x = 400; b.z = 400;
+wolf.owner = a.tid; wolf.x = a.x + 3; wolf.z = a.z; wolf.y = a.y; boar.x = a.x + 6; boar.z = a.z; boar.y = a.y; boar.mode = 1; boar.provoked = 10; const bhp = boar.hp;
+for (let i = 0; i < 160 && !boar.dead; i++) { boar.provoked = 10; room.tick(); } ok(boar.dead || boar.hp < bhp, 'el lobo domado ataca al jabalí que acosa a su dueño (vida del jabalí ' + Math.round(boar.hp) + '/' + bhp + ')');
 process.exit(process.exitCode || 0);

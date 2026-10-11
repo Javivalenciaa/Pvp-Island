@@ -46,7 +46,10 @@ export class Fauna {
         // sigue a su tribu y ataca a los enemigos cercanos
         let own = null, od = 1e9; for (const q of players) if (q.tid === a.owner) { const d = Math.hypot(q.x - a.x, q.z - a.z); if (d < od) { od = d; own = q; } }
         let foe = null, fd = 14; for (const q of players) if (q.tid !== a.owner) { const d = Math.hypot(q.x - a.x, q.z - a.z); if (d < fd) { fd = d; foe = q; } }
-        if (foe && (!own || Math.hypot(foe.x - own.x, foe.z - own.z) < 30)) { tgt = foe; mode = 1; mx = foe.x - a.x; mz = foe.z - a.z; sp = D.run; const dist = Math.hypot(mx, mz); if (dist < D.reach + .4) { sp = 0; if (a.atk <= 0) { a.atk = D.cd; r.hurt(foe, D.dmg, null, 'animal', a); } } }
+        // defiende a su dueño de las fieras salvajes (jabalíes y lobos) que lo acosan
+        let pest = null, pd = 1e9; if (own) for (const o of this.map.values()) { if (o.dead || o.owner || o === a || (o.type !== 'boar' && o.type !== 'wolf')) continue; const dO = Math.hypot(o.x - own.x, o.z - own.z); if (dO < 16 && dO < pd && (o.mode === 1 || o.provoked > 0 || dO < 9)) { pd = dO; pest = o; } }
+        if (pest && !(foe && fd < 6)) { tgt = pest; mode = 1; mx = pest.x - a.x; mz = pest.z - a.z; sp = D.run; const dist = Math.hypot(mx, mz); if (dist < D.reach + .5) { sp = 0; if (a.atk <= 0) { a.atk = D.cd; this.hurt(pest, D.dmg * 1.6, null); } } }
+        else if (foe && (!own || Math.hypot(foe.x - own.x, foe.z - own.z) < 30)) { tgt = foe; mode = 1; mx = foe.x - a.x; mz = foe.z - a.z; sp = D.run; const dist = Math.hypot(mx, mz); if (dist < D.reach + .4) { sp = 0; if (a.atk <= 0) { a.atk = D.cd; r.hurt(foe, D.dmg, null, 'animal', a); } } }
         else if (own && od > 5) { mx = own.x - a.x; mz = own.z - a.z; sp = od > 14 ? D.run : D.walk * 1.5; }
       } else if (!tame || a.type !== 'wolf') {
         const hunter = D.temper === 'hunt' && !tame, def = D.temper === 'defend';

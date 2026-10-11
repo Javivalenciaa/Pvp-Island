@@ -36,7 +36,7 @@ const sh0 = sf.hp; for (let k = 0; k < 30; k++) { a.cd = 0; room.onMessage(a, { 
 let k = 0; while (room.D.map.has(sf.id) && k < 20) { room.explode('charge', sf.x, sf.y, sf.z, a); k++; } ok(!room.D.map.has(sf.id) && k >= 5 && k <= 8, `con ${k} C4 se rompe la caja fuerte`);
 // escudo: reduce golpes de frente, no de espaldas ni explosiones
 a.dead = 0; b.dead = 0; b.hp = 100; b.yaw = 0; b.x = 0; b.z = 0; a.x = 0; a.z = -2; b.held = 'shield'; room.onMessage(b, { t: 'block', on: true }); ok(b.blocking === true, 'se puede alzar el escudo si lo llevas en la mano');
-room.hurt(b, 40, a, 'melee'); ok(Math.abs(b.hp - (100 - 40 * .22)) < .01, 'el escudo absorbe el 78 % de un golpe frontal (' + (100 - b.hp).toFixed(1) + ' de daño)');
+lb.length = 0; room.hurt(b, 40, a, 'melee'); ok(b.hp === 100 && lb.some((m) => m.t === 'blocked' && m.abs === 40), 'el escudo anula por completo un golpe frontal y avisa del desgaste (' + (100 - b.hp).toFixed(1) + ' de daño)');
 b.hp = 100; a.z = 2; room.hurt(b, 40, a, 'melee'); ok(b.hp === 60, 'por la espalda no protege'); b.hp = 100; a.z = -2; room.hurt(b, 40, a, 'explosion'); ok(b.hp < 70, 'las explosiones atraviesan el escudo');
 // rampas
 const mkf = (i, j) => room.B.place({ kind: 'foundation', i, j, L: 0, top: 5, bottom: 4 }, a.tid, 0);
